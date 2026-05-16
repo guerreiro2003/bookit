@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Marcação confirmada. Verifica os teus dados, copia o código de referido e cria a tua conta Book It." />
+  <meta name="robots" content="noindex" />
+  <meta name="theme-color" content="#6b7c5a" />
+  <title>Marcação confirmada — Book It</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <header class="header">
+    <div class="header__inner">
+      <a class="header__brand" href="index.html" aria-label="Voltar à página inicial">
+        <div class="header__mark" id="headerMark" aria-hidden="true">B</div>
+        <div>
+          <div class="header__name" id="headerName">Book It</div>
+          <div class="header__sub" id="headerSub">Marcações online</div>
+        </div>
+      </a>
+    </div>
+  </header>
+
+  <main style="padding: 48px 0 80px">
+    <div class="container">
+
+      <div class="success-icon" aria-hidden="true">✓</div>
+      <h1 style="text-align:center;font-size:24px;font-weight:500;margin-bottom:6px">Marcação confirmada!</h1>
+      <p style="text-align:center;color:var(--muted);font-size:13.5px;margin-bottom:28px">
+        Recebes em breve um email com os detalhes.
+      </p>
+
+      <div class="card" style="margin-bottom:16px">
+        <table class="confirm-table" aria-label="Resumo da marcação">
+          <tbody>
+            <tr><td class="label">Serviço</td><td class="value" id="rService">—</td></tr>
+            <tr><td class="label">Data</td>   <td class="value" id="rDate">—</td></tr>
+            <tr><td class="label">Hora</td>   <td class="value" id="rTime">—</td></tr>
+            <tr><td class="label">Preço</td>  <td class="value" id="rPrice">—</td></tr>
+            <tr><td class="label">Nome</td>   <td class="value" id="rName">—</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card" id="referralCard" style="display:none;margin-bottom:16px">
+        <div style="font-size:14px;font-weight:500;margin-bottom:8px">🎁 O teu código de referido</div>
+        <div class="ref-code-box">
+          <div id="refCodeDisplay" class="ref-code-value">—</div>
+          <button class="btn btn--ghost btn--sm" type="button" data-action="copy-code">
+            Copiar código
+          </button>
+        </div>
+        <div style="font-size:12px;color:var(--muted);text-align:center">
+          Partilha este código com amigos — quando vierem pela primeira vez, ambos ganham desconto.
+        </div>
+      </div>
+
+      <div class="card card--soft" style="margin-bottom:16px">
+        <div style="font-size:15px;font-weight:500;color:#3b5a28;margin-bottom:6px">🌿 Cria uma conta gratuita</div>
+        <div style="font-size:13px;color:#4a6338;margin-bottom:14px;line-height:1.55">
+          Acompanha os teus pontos, descontos e histórico de visitas. Demora menos de 30 segundos.
+        </div>
+        <a class="btn btn--primary btn--full" id="btnAccount" href="account.html">Criar conta / Entrar</a>
+      </div>
+
+      <a class="btn btn--ghost btn--full btn--lg" id="btnBack" href="index.html">
+        Nova marcação
+      </a>
+
+    </div>
+  </main>
+
+<script type="module">
+import { loadSalon, applySalonBranding, getSalonId, on, toastSuccess, toastError, escapeHTML } from './app.js';
+
+const salonId = getSalonId();
+const params  = new URLSearchParams(window.location.search);
+
+(async () => {
+  const salon = await loadSalon(salonId);
+  if (salon) applySalonBranding(salon, { titlePrefix: 'Marcação confirmada' });
+})();
+
+// Fill booking summary (params come from index.html → success.html redirect)
+const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v || '—'; };
+set('rService', params.get('service'));
+set('rDate',    params.get('date'));
+set('rTime',    params.get('time'));
+const price = params.get('price');
+set('rPrice', price ? `${price}€` : '—');
+set('rName',  params.get('name'));
+
+// Referral code
+const refCode = params.get('refCode');
+if (refCode) {
+  document.getElementById('referralCard').style.display = 'block';
+  document.getElementById('refCodeDisplay').textContent = refCode;
+}
+
+// Salon-aware navigation
+document.getElementById('btnBack').href    = `index.html?salon=${encodeURIComponent(salonId)}`;
+document.getElementById('btnAccount').href = `account.html?salon=${encodeURIComponent(salonId)}`;
+
+// Copy code action
+on('copy-code', async () => {
+  if (!refCode) return;
+  try {
+    await navigator.clipboard.writeText(refCode);
+    toastSuccess('Código copiado para a área de transferência');
+  } catch {
+    toastError('Não foi possível copiar. Copia manualmente.');
+  }
+});
+</script>
+</body>
+</html>

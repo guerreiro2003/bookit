@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Portal da equipa — vê as marcações do dia, regista pagamentos e gere clientes." />
+  <meta name="robots" content="noindex" />
+  <meta name="theme-color" content="#6b7c5a" />
+  <title>Portal da equipa — Book It</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <header class="header">
+    <div class="header__inner">
+      <a class="header__brand" href="#" aria-label="Página inicial">
+        <div class="header__mark" id="headerMark" aria-hidden="true">B</div>
+        <div>
+          <div class="header__name" id="headerName">Book It</div>
+          <div class="header__sub" id="headerSub">Portal da equipa</div>
+        </div>
+      </a>
+      <div class="header__actions" id="headerActions" hidden>
+        <span class="badge badge--gray" id="modeBadge">Equipa</span>
+        <button class="btn btn--sm btn--ghost" type="button" data-action="logout">Sair</button>
+      </div>
+    </div>
+  </header>
+
+  <main style="padding: 28px 0 64px">
+    <div class="container container--wide">
+
+      <!-- ── LOGIN ──────────────────────────────────────── -->
+      <div id="screenLogin">
+        <div class="auth-box" style="margin:0 auto">
+          <div class="auth-box__head">
+            <div class="auth-box__logo" aria-hidden="true">B</div>
+            <h1>Portal da equipa</h1>
+            <p class="auth-box__sub">Entra como colaborador ou como admin</p>
+          </div>
+
+          <div class="tabs" role="tablist" style="margin-bottom:18px">
+            <button class="tab active" type="button" role="tab" id="tabTeam"  data-action="switch-mode" data-mode="team"  aria-selected="true">Equipa</button>
+            <button class="tab"        type="button" role="tab" id="tabAdmin" data-action="switch-mode" data-mode="admin" aria-selected="false">Admin</button>
+          </div>
+
+          <div id="loginErr" class="error-msg" role="alert"></div>
+
+          <!-- Team form -->
+          <form id="formTeam" novalidate>
+            <div class="field field--password" data-revealed="false">
+              <label for="teamPw">Password da equipa</label>
+              <input type="password" id="teamPw" required autocomplete="current-password" placeholder="••••••••" />
+              <button type="button" class="pw-toggle" data-action="toggle-pw" aria-label="Mostrar password"></button>
+            </div>
+            <button class="btn btn--primary btn--full" type="submit" id="teamBtn">
+              <span class="btn__label">Entrar</span>
+            </button>
+            <p style="text-align:center;font-size:12px;color:var(--muted);margin-top:12px">
+              A password é definida pela administração em <em>Admin → Configurações</em>.
+            </p>
+          </form>
+
+          <!-- Admin form -->
+          <form id="formAdmin" novalidate style="display:none">
+            <div class="field">
+              <label for="adminEmail">Email</label>
+              <input type="email" id="adminEmail" required autocomplete="email" />
+            </div>
+            <div class="field field--password" data-revealed="false">
+              <label for="adminPw">Password</label>
+              <input type="password" id="adminPw" required autocomplete="current-password" />
+              <button type="button" class="pw-toggle" data-action="toggle-pw" aria-label="Mostrar password"></button>
+            </div>
+            <button class="btn btn--primary btn--full" type="submit" id="adminBtn">
+              <span class="btn__label">Entrar como admin</span>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- ── APP ────────────────────────────────────────── -->
+      <div id="screenApp" hidden>
+
+        <div class="tabs" role="tablist" id="appTabs">
+          <button class="tab active" type="button" role="tab" data-action="switch-tab" data-tab="today"     aria-selected="true">Hoje</button>
+          <button class="tab"        type="button" role="tab" data-action="switch-tab" data-tab="all"       aria-selected="false">Todas as marcações</button>
+          <button class="tab"        type="button" role="tab" data-action="switch-tab" data-tab="services"  aria-selected="false">Serviços</button>
+          <button class="tab adminOnly" hidden type="button" role="tab" data-action="switch-tab" data-tab="clients"  aria-selected="false">Clientes</button>
+        </div>
+
+        <!-- HOJE -->
+        <div id="tab-today" class="tab-content active" role="tabpanel">
+          <div class="stats-grid">
+            <div class="stat-card"><div class="stat-value" id="statTotal">—</div><div class="stat-label">Marcações</div></div>
+            <div class="stat-card"><div class="stat-value" id="statPending">—</div><div class="stat-label">Pendentes</div></div>
+            <div class="stat-card"><div class="stat-value" id="statConfirmed">—</div><div class="stat-label">Confirmadas</div></div>
+            <div class="stat-card stat-card--accent"><div class="stat-value" id="statRevenue">—</div><div class="stat-label">Faturação</div></div>
+          </div>
+          <div class="admin-card" style="padding:var(--s-5)">
+            <div class="admin-card__head" style="margin-bottom:14px">
+              <h3 id="todayTitle">Marcações de hoje</h3>
+              <button class="btn btn--ghost btn--sm" type="button" data-action="reload-today">↻ Atualizar</button>
+            </div>
+            <div id="todayList"><div class="loading-state"><span class="spinner" aria-hidden="true"></span><div>A carregar…</div></div></div>
+          </div>
+        </div>
+
+        <!-- TODAS AS MARCAÇÕES -->
+        <div id="tab-all" class="tab-content" role="tabpanel">
+          <div class="admin-card">
+            <div class="row" style="gap:10px">
+              <label class="sr-only" for="fStatus">Filtrar estado</label>
+              <select id="fStatus" class="input" style="max-width:200px" data-action="filter-all">
+                <option value="">Todos os estados</option>
+                <option value="pending">Pendentes</option>
+                <option value="confirmed">Confirmadas</option>
+                <option value="completed">Concluídas</option>
+                <option value="cancelled">Canceladas</option>
+                <option value="noshow">Não compareceu</option>
+              </select>
+              <label class="sr-only" for="fDate">Filtrar data</label>
+              <input type="date" id="fDate" class="input" style="max-width:200px" data-action="filter-all" />
+              <button class="btn btn--ghost btn--sm" type="button" data-action="clear-all-filters">Limpar</button>
+            </div>
+          </div>
+          <div class="admin-card" style="padding:var(--s-5)">
+            <div id="allList"><div class="loading-state"><span class="spinner" aria-hidden="true"></span><div>A carregar…</div></div></div>
+          </div>
+        </div>
+
+        <!-- SERVIÇOS (read-only) -->
+        <div id="tab-services" class="tab-content" role="tabpanel">
+          <div class="admin-card" style="padding:var(--s-5)">
+            <h3 style="margin-bottom:14px">Serviços &amp; preços</h3>
+            <div id="servicesList"><div class="loading-state"><span class="spinner" aria-hidden="true"></span><div>A carregar…</div></div></div>
+          </div>
+        </div>
+
+        <!-- CLIENTES (admin only) -->
+        <div id="tab-clients" class="tab-content" role="tabpanel">
+          <div class="admin-card" style="padding:var(--s-5)">
+            <h3 style="margin-bottom:14px">Clientes</h3>
+            <div id="clientsList"><div class="loading-state"><span class="spinner" aria-hidden="true"></span><div>A carregar…</div></div></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- Payment modal -->
+  <div id="payModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="payTitle" aria-hidden="true">
+    <div class="modal">
+      <button class="modal__close" type="button" data-action="close-pay" aria-label="Fechar">✕</button>
+      <h2 class="modal__title" id="payTitle">Registar pagamento</h2>
+      <p class="modal__sub" id="paySub">—</p>
+      <div class="pay-methods">
+        <button type="button" class="pay-method" data-action="pick-method" data-method="balcao">
+          <div class="pay-method__icon">💵</div>
+          <div class="pay-method__name">Balcão</div>
+          <div class="pay-method__sub">Dinheiro · MB · TPA</div>
+        </button>
+        <button type="button" class="pay-method" data-action="pick-method" data-method="online">
+          <div class="pay-method__icon">💳</div>
+          <div class="pay-method__name">Online</div>
+          <div class="pay-method__sub">MB Way · Stripe</div>
+        </button>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:14px">
+        Ao confirmar, atribui-se <strong id="payPoints">10</strong> pontos ao cliente e a marcação fica concluída.
+      </p>
+      <div class="btn-group btn-group--full">
+        <button class="btn btn--ghost" type="button" data-action="close-pay">Cancelar</button>
+        <button class="btn btn--primary" type="button" id="payConfirmBtn" data-action="confirm-pay" disabled>Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+<script type="module">
+import {
+  db, auth, collection, doc, getDoc, getDocs, updateDoc, setDoc,
+  query, where, orderBy, serverTimestamp, increment,
+  signInWithEmailAndPassword, signOut, onAuthStateChanged
+} from './firebase.js';
+import {
+  $, $$, on, toast, toastSuccess, toastError,
+  escapeHTML, html, htmlMix, raw,
+  MONTHS_FULL, formatDate, formatDatePT, formatPrice,
+  getSalonId, loadSalon, applySalonBranding,
+  authErrorMessage, showFatalError, statusBadge
+} from './app.js';
+
+const SESSION_KEY = 'bookit_staff_session';
+const salonId = getSalonId();
+let salon = null;
+let mode  = 'team';   // 'team' or 'admin'
+let payContext = null;
+
+(async function init() {
+  salon = await loadSalon(salonId);
+  if (!salon) { showFatalError('Salão não encontrado. Verifica o link.'); return; }
+  applySalonBranding(salon, { titlePrefix: 'Portal da equipa' });
+
+  // If admin is logged in, jump straight to app in admin mode
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      const admin = await getDocs(query(collection(db,'salons'), where('adminUid','==', user.uid)));
+      if (!admin.empty) {
+        // Same admin, same salon
+        mode = 'admin';
+        showApp();
+        return;
+      }
+    }
+    // Otherwise check team session
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null');
+      if (saved && saved.salonId === salonId && saved.expires > Date.now()) {
+        mode = saved.mode || 'team';
+        showApp();
+      } else {
+        showLogin();
+      }
+    } catch { showLogin(); }
+  });
+})();
+
+/* ── PASSWORD TOGGLE ──────────────────────────────────── */
+on('toggle-pw', (el) => {
+  const field = el.closest('.field');
+  const reveal = field.getAttribute('data-revealed') !== 'true';
+  field.setAttribute('data-revealed', String(reveal));
+  field.querySelector('input').type = reveal ? 'text' : 'password';
+});
+
+/* ── LOGIN MODE SWITCH ────────────────────────────────── */
+on('switch-mode', (el) => {
+  const m = el.dataset.mode;
+  $('#tabTeam').classList.toggle('active', m === 'team');
+  $('#tabAdmin').classList.toggle('active', m === 'admin');
+  $('#tabTeam').setAttribute('aria-selected',  String(m === 'team'));
+  $('#tabAdmin').setAttribute('aria-selected', String(m === 'admin'));
+  $('#formTeam').style.display  = m === 'team' ? 'block' : 'none';
+  $('#formAdmin').style.display = m === 'admin' ? 'block' : 'none';
+  setErr('');
+});
+
+function setErr(msg) {
+  const el = $('#loginErr');
+  el.textContent = msg || '';
+  el.classList.toggle('show', !!msg);
+}
+
+/* ── TEAM LOGIN ────────────────────────────────────────── */
+$('#formTeam').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  setErr('');
+  const pw = $('#teamPw').value;
+  if (!pw) return setErr('Escreve a password da equipa.');
+  if (!salon.teamPassword) return setErr('A administração ainda não definiu password da equipa. Pede para a configurar.');
+  const btn = $('#teamBtn'); btn.disabled = true;
+  if (pw !== salon.teamPassword) {
+    setErr('Password incorreta.');
+    btn.disabled = false;
+    return;
+  }
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+    salonId, mode: 'team', expires: Date.now() + 8 * 60 * 60 * 1000
+  }));
+  mode = 'team';
+  showApp();
+});
+
+/* ── ADMIN LOGIN ───────────────────────────────────────── */
+$('#formAdmin').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  setErr('');
+  const email = $('#adminEmail').value.trim();
+  const pw    = $('#adminPw').value;
+  if (!email || !pw) return setErr('Preenche email e password.');
+  const btn = $('#adminBtn'); btn.disabled = true;
+  try {
+    await signInWithEmailAndPassword(auth, email, pw);
+    // onAuthStateChanged handler will showApp() with mode='admin'
+  } catch (err) {
+    setErr(authErrorMessage(err.code));
+    btn.disabled = false;
+  }
+});
+
+/* ── LOGOUT ────────────────────────────────────────────── */
+on('logout', async () => {
+  sessionStorage.removeItem(SESSION_KEY);
+  try { await signOut(auth); } catch {}
+  mode = 'team';
+  showLogin();
+});
+
+/* ── SHOW APP / LOGIN ─────────────────────────────────── */
+function showLogin() {
+  $('#screenLogin').hidden = false;
+  $('#screenApp').hidden   = true;
+  $('#headerActions').hidden = true;
+}
+function showApp() {
+  $('#screenLogin').hidden = true;
+  $('#screenApp').hidden   = false;
+  $('#headerActions').hidden = false;
+  $('#modeBadge').textContent = mode === 'admin' ? 'Admin' : 'Equipa';
+  $('#modeBadge').classList.toggle('badge--green', mode === 'admin');
+  // Show/hide admin-only tabs
+  $$('.adminOnly').forEach(t => t.hidden = mode !== 'admin');
+  loadToday();
+  loadServices();
+}
+
+/* ── SWITCH TAB ───────────────────────────────────────── */
+on('switch-tab', (el) => {
+  if (el.hidden) return;
+  const tab = el.dataset.tab;
+  $$('.tab-content').forEach(t => t.classList.remove('active'));
+  $$('#appTabs .tab').forEach(t => { t.classList.remove('active'); t.setAttribute('aria-selected','false'); });
+  $('#tab-' + tab).classList.add('active');
+  el.classList.add('active');
+  el.setAttribute('aria-selected','true');
+  if (tab === 'all')      loadAll();
+  if (tab === 'clients')  loadClients();
+  if (tab === 'services') loadServices();
+  if (tab === 'today')    loadToday();
+});
+
+/* ── HOJE ─────────────────────────────────────────────── */
+on('reload-today', loadToday);
+
+async function loadToday() {
+  const today = new Date();
+  const dateStr = formatDate(today);
+  $('#todayTitle').textContent = `Marcações de hoje · ${today.getDate()} ${MONTHS_FULL[today.getMonth()]}`;
+  try {
+    const snap = await getDocs(query(
+      collection(db,'salons',salonId,'bookings'),
+      where('date','==', dateStr),
+      orderBy('time','asc')
+    ));
+    const bookings = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const active = bookings.filter(b => b.status !== 'cancelled');
+    $('#statTotal').textContent     = active.length;
+    $('#statPending').textContent   = active.filter(b => b.status === 'pending').length;
+    $('#statConfirmed').textContent = active.filter(b => b.status === 'confirmed').length;
+    const revenue = active.filter(b => b.paid).reduce((s,b) => s + (Number(b.finalPrice) || Number(b.servicePrice) || 0), 0);
+    $('#statRevenue').textContent   = `${revenue}€`;
+
+    renderBookings('#todayList', bookings, { compact: false });
+  } catch (e) {
+    console.error(e);
+    $('#todayList').innerHTML = `<div class="error-state"><div class="error-state__icon" aria-hidden="true">⚠️</div><div class="error-state__title">Erro a carregar</div></div>`;
+  }
+}
+
+/* ── TODAS AS MARCAÇÕES ───────────────────────────────── */
+on('filter-all', loadAll);
+on('clear-all-filters', () => { $('#fStatus').value = ''; $('#fDate').value = ''; loadAll(); });
+
+async function loadAll() {
+  const el = $('#allList');
+  el.innerHTML = `<div class="loading-state"><span class="spinner" aria-hidden="true"></span><div>A carregar…</div></div>`;
+  try {
+    const snap = await getDocs(query(collection(db,'salons',salonId,'bookings'), orderBy('date','desc')));
+    let bookings = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const statusFilter = $('#fStatus').value;
+    const dateFilter   = $('#fDate').value;
+    if (statusFilter) bookings = bookings.filter(b => b.status === statusFilter);
+    if (dateFilter)   bookings = bookings.filter(b => b.date === dateFilter);
+    renderBookings('#allList', bookings, { showDate: true });
+  } catch (e) {
+    console.error(e);
+    el.innerHTML = `<div class="error-state"><div class="error-state__icon" aria-hidden="true">⚠️</div><div class="error-state__title">Erro a carregar</div></div>`;
+  }
+}
+
+/* ── BOOKING LIST RENDERER ────────────────────────────── */
+function renderBookings(sel, bookings, { showDate = false } = {}) {
+  const el = $(sel);
+  if (!bookings.length) {
+    el.innerHTML = `<div class="empty-state" style="background:transparent;border:none">
+      <div class="empty-state__icon" aria-hidden="true">📅</div>
+      <div class="empty-state__title">Sem marcações</div></div>`;
+    return;
+  }
+  el.innerHTML = bookings.map(b => htmlMix`
+    <div class="list-row">
+      <div class="list-row__main">
+        <div class="list-row__title">
+          ${raw(showDate ? `<span style="font-size:12px;color:var(--muted);margin-right:6px">${escapeHTML(formatDatePT(b.date, { short: true }))}</span>` : '')}
+          <strong>${b.time}</strong> · ${b.serviceName}${b.forSomeone ? raw(htmlMix`<span style="font-weight:400;color:var(--muted);font-size:13px"> (para ${b.forSomeone})</span>`) : ''}
+        </div>
+        <div class="list-row__meta">
+          ${b.clientName}${b.clientPhone ? ' · ' + escapeHTML(b.clientPhone) : ''}${b.staffName && b.staffName !== 'Sem preferência' ? ' · ' + escapeHTML(b.staffName) : ''}
+          ${b.notes ? raw(htmlMix`<br><em>"${b.notes}"</em>`) : ''}
+        </div>
+      </div>
+      <div class="list-row__side">
+        <div class="list-row__price">${formatPrice(b.finalPrice ?? b.servicePrice)}</div>
+        <div style="display:flex;gap:5px;justify-content:flex-end;margin-top:4px;flex-wrap:wrap">
+          ${raw(statusBadge(b.status))}
+          ${raw(b.paid ? '<span class="badge badge--green">Pago</span>' : '')}
+        </div>
+        <div style="display:flex;gap:5px;justify-content:flex-end;margin-top:6px;flex-wrap:wrap">${raw(bookingActions(b))}</div>
+      </div>
+    </div>`).join('');
+}
+
+function bookingActions(b) {
+  const btns = [];
+  if (b.status === 'pending') {
+    btns.push(htmlMix`<button class="btn btn--sm btn--success" type="button" data-action="confirm-booking" data-id="${b.id}">✓ Confirmar</button>`);
+  }
+  if (!b.paid && !['cancelled','noshow'].includes(b.status)) {
+    btns.push(htmlMix`<button class="btn btn--sm btn--primary" type="button" data-action="open-pay" data-id="${b.id}" data-client="${b.clientName}" data-amount="${b.finalPrice ?? b.servicePrice}">💰 Pagamento</button>`);
+  }
+  if (['pending','confirmed'].includes(b.status)) {
+    btns.push(htmlMix`<button class="btn btn--sm btn--ghost" type="button" data-action="noshow-booking" data-id="${b.id}">Não compareceu</button>`);
+  }
+  if (!['cancelled','noshow','completed'].includes(b.status)) {
+    btns.push(htmlMix`<button class="btn btn--sm btn--danger" type="button" data-action="cancel-booking" data-id="${b.id}">Cancelar</button>`);
+  }
+  return btns.join(' ');
+}
+
+/* ── BOOKING ACTIONS ──────────────────────────────────── */
+on('confirm-booking', async (el) => {
+  await updateDoc(doc(db,'salons',salonId,'bookings', el.dataset.id), { status: 'confirmed' });
+  toastSuccess('Marcação confirmada.');
+  reload();
+});
+
+on('cancel-booking', async (el) => {
+  if (!confirm('Cancelar esta marcação?')) return;
+  await updateDoc(doc(db,'salons',salonId,'bookings', el.dataset.id),
+    { status: 'cancelled', cancelledAt: serverTimestamp() });
+  toastSuccess('Marcação cancelada.');
+  reload();
+});
+
+on('noshow-booking', async (el) => {
+  if (!confirm('Marcar como "Não compareceu"? Vão ser deduzidos pontos ao cliente.')) return;
+  const id = el.dataset.id;
+  const bSnap = await getDoc(doc(db,'salons',salonId,'bookings', id));
+  if (!bSnap.exists()) return;
+  const b = bSnap.data();
+  await updateDoc(doc(db,'salons',salonId,'bookings', id), { status: 'noshow', noShowAt: serverTimestamp() });
+  if (b.clientId) {
+    const penalty = salon.noShowPenalty || 5;
+    await updateDoc(doc(db,'salons',salonId,'clients', b.clientId), { points: increment(-penalty) });
+  }
+  toastSuccess('Marcado como "Não compareceu".');
+  reload();
+});
+
+function reload() {
+  loadToday();
+  if ($('#tab-all').classList.contains('active')) loadAll();
+}
+
+/* ── PAYMENT MODAL ────────────────────────────────────── */
+on('open-pay', (el) => {
+  payContext = { bookingId: el.dataset.id, method: null };
+  $('#paySub').textContent = `${el.dataset.client} · ${el.dataset.amount}€`;
+  $('#payPoints').textContent = String(salon.pointsPerVisit || 10);
+  $$('.pay-method').forEach(m => m.classList.remove('selected'));
+  $('#payConfirmBtn').disabled = true;
+  const o = $('#payModal');
+  o.classList.add('show'); o.setAttribute('aria-hidden','false');
+});
+on('pick-method', (el) => {
+  payContext.method = el.dataset.method;
+  $$('.pay-method').forEach(m => m.classList.toggle('selected', m === el));
+  $('#payConfirmBtn').disabled = false;
+});
+on('close-pay', () => {
+  $('#payModal').classList.remove('show');
+  $('#payModal').setAttribute('aria-hidden','true');
+  payContext = null;
+});
+$('#payModal').addEventListener('click', (e) => { if (e.target === e.currentTarget) on('close-pay')(); });
+
+on('confirm-pay', async () => {
+  if (!payContext?.method) return;
+  const btn = $('#payConfirmBtn'); btn.disabled = true;
+  try {
+    const bRef = doc(db,'salons',salonId,'bookings', payContext.bookingId);
+    const bSnap = await getDoc(bRef);
+    if (!bSnap.exists()) throw new Error('Booking not found');
+    const b = bSnap.data();
+    const pts = salon.pointsPerVisit || 10;
+    await updateDoc(bRef, {
+      paid: true, status: 'completed',
+      paidAt: serverTimestamp(),
+      paymentMethod: payContext.method,
+      pointsAwarded: pts
+    });
+    if (b.clientId) {
+      const cRef = doc(db,'salons',salonId,'clients', b.clientId);
+      const cSnap = await getDoc(cRef);
+      if (cSnap.exists()) {
+        const c = cSnap.data();
+        const visits = (c.visits || 0) + 1;
+        const points = (c.points || 0) + pts;
+        const spent  = (c.totalSpent || 0) + (Number(b.finalPrice) || Number(b.servicePrice) || 0);
+        const target   = salon.loyaltyVisits   || 10;
+        const discount = salon.loyaltyDiscount || 20;
+        const updates = { visits, points, totalSpent: spent };
+        if (visits > 0 && visits % target === 0) {
+          updates.discounts = [...(c.discounts || []), {
+            type: 'loyalty',
+            title: '⭐ Desconto de Fidelização',
+            description: `${discount}% — ${visits} visitas atingidas!`,
+            code: `LOYAL${visits}-${(c.referralCode || '').split('-')[1] || Math.floor(Math.random()*999)}`,
+            discount, expiresAt: null, used: false,
+            createdAt: new Date().toISOString()
+          }];
+        }
+        await updateDoc(cRef, updates);
+      }
+    }
+    toastSuccess('Pagamento registado · pontos atribuídos.');
+    on('close-pay')();
+    reload();
+  } catch (e) {
+    console.error(e);
+    toastError('Erro ao registar pagamento.');
+    btn.disabled = false;
+  }
+});
+
+/* ── SERVICES (read-only) ─────────────────────────────── */
+async function loadServices() {
+  const el = $('#servicesList');
+  try {
+    const snap = await getDocs(query(collection(db,'salons',salonId,'services'), orderBy('order','asc')));
+    const services = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (!services.length) {
+      el.innerHTML = `<p style="color:var(--muted);font-size:13px">Nenhum serviço definido.</p>`;
+      return;
+    }
+    el.innerHTML = `<div class="table-scroll"><table class="data-table">
+      <thead><tr><th>Serviço</th><th>Duração</th><th>Preço</th><th>Estado</th></tr></thead>
+      <tbody>
+        ${services.map(s => htmlMix`
+          <tr>
+            <td>
+              <strong>${s.name}</strong>
+              ${s.isPackage ? raw('<span class="badge badge--green" style="margin-left:6px">Pacote</span>') : ''}
+              ${s.description ? raw(htmlMix`<br><span style="font-size:11px;color:var(--muted)">${s.description}</span>`) : ''}
+              ${s.includes ? raw(htmlMix`<br><span style="font-size:11px;color:var(--muted)">Inclui: ${s.includes}</span>`) : ''}
+            </td>
+            <td>${s.duration} min</td>
+            <td><strong>${s.price}€</strong>${s.isPackage && s.originalPrice ? raw(htmlMix`<br><span style="font-size:11px;color:var(--muted);text-decoration:line-through">${s.originalPrice}€</span>`) : ''}</td>
+            <td>${raw(`<span class="badge ${s.active ? 'badge--green' : 'badge--red'}">${s.active ? 'Ativo' : 'Inativo'}</span>`)}</td>
+          </tr>`).join('')}
+      </tbody></table></div>`;
+  } catch (e) {
+    console.error(e);
+    el.innerHTML = `<div class="error-state"><div class="error-state__icon" aria-hidden="true">⚠️</div><div class="error-state__title">Erro a carregar</div></div>`;
+  }
+}
+
+/* ── CLIENTS (admin only) ─────────────────────────────── */
+async function loadClients() {
+  if (mode !== 'admin') return;
+  const el = $('#clientsList');
+  try {
+    const snap = await getDocs(query(collection(db,'salons',salonId,'clients'), orderBy('visits','desc')));
+    const clients = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (!clients.length) {
+      el.innerHTML = `<p style="color:var(--muted);font-size:13px">Sem clientes ainda.</p>`;
+      return;
+    }
+    const loyalty = salon?.loyaltyVisits || 10;
+    el.innerHTML = `<div class="table-scroll"><table class="data-table">
+      <thead><tr><th>Nome</th><th>Email</th><th>Visitas</th><th>Pontos</th><th>Gasto</th><th>Código ref.</th></tr></thead>
+      <tbody>
+        ${clients.map(c => htmlMix`
+          <tr>
+            <td><strong>${c.name}</strong></td>
+            <td style="font-size:12px;color:var(--muted)">${c.email || '—'}</td>
+            <td>${c.visits || 0} / ${loyalty}</td>
+            <td><strong style="color:var(--brand)">${c.points || 0}</strong></td>
+            <td>${c.totalSpent || 0}€</td>
+            <td><code>${c.referralCode || '—'}</code></td>
+          </tr>`).join('')}
+      </tbody></table></div>`;
+  } catch (e) {
+    console.error(e);
+    el.innerHTML = `<div class="error-state"><div class="error-state__icon" aria-hidden="true">⚠️</div><div class="error-state__title">Erro a carregar</div></div>`;
+  }
+}
+</script>
+</body>
+</html>

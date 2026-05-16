@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Configura o teu salão Book It em minutos." />
+  <meta name="robots" content="noindex" />
+  <meta name="theme-color" content="#6b7c5a" />
+  <title>Setup inicial — Book It</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <main style="padding: 48px 0 80px">
+    <div class="container">
+
+      <div style="text-align:center;margin-bottom:32px">
+        <div class="auth-box__logo" style="margin-bottom:14px" aria-hidden="true">B</div>
+        <h1 style="font-size:24px;font-weight:500;margin-bottom:4px">Book It — Setup inicial</h1>
+        <p style="color:var(--muted);font-size:13.5px">Configura o teu salão pela primeira vez · ~2 minutos</p>
+      </div>
+
+      <form id="setupForm" novalidate>
+
+        <div class="card" style="margin-bottom:16px">
+          <h3 class="card__title">Dados do salão</h3>
+          <div class="field">
+            <label for="sName">Nome do salão *</label>
+            <input type="text" id="sName" required placeholder="Ex: Zen Organic Hair Concept" autocomplete="organization" />
+          </div>
+          <div class="field">
+            <label for="sSlug">Slug (ID único, sem espaços) *</label>
+            <input type="text" id="sSlug" required placeholder="Ex: zenorganic" pattern="[a-z0-9-]+" />
+            <div class="field__hint">Aparece nos URLs (?salon=…). Apenas letras minúsculas, números e hífens.</div>
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label for="sTagline">Tagline</label>
+              <input type="text" id="sTagline" placeholder="Ex: Eco conscious · Telheiras" />
+            </div>
+            <div class="field">
+              <label for="sPhone">Telefone</label>
+              <input type="tel" id="sPhone" placeholder="Ex: 213 456 789" autocomplete="tel" />
+            </div>
+          </div>
+          <div class="field">
+            <label for="sAddress">Morada</label>
+            <input type="text" id="sAddress" placeholder="Ex: R. Prof. Francisco Gentil 16A, Lisboa" autocomplete="street-address" />
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label for="sEmail">Email do salão</label>
+              <input type="email" id="sEmail" placeholder="contacto@exemplo.com" />
+            </div>
+            <div class="field">
+              <label for="sColor">Cor principal</label>
+              <div class="row" style="gap:8px">
+                <input type="text" id="sColor" value="#6b7c5a" style="flex:1" pattern="^#[0-9A-Fa-f]{6}$" />
+                <input type="color" id="sColorPicker" value="#6b7c5a"
+                       style="width:42px;height:42px;border-radius:10px;border:1px solid var(--line);padding:2px;cursor:pointer" aria-label="Escolher cor" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:16px">
+          <h3 class="card__title">Conta admin</h3>
+          <div class="field">
+            <label for="aEmail">Email do admin *</label>
+            <input type="email" id="aEmail" required placeholder="admin@exemplo.com" autocomplete="email" />
+          </div>
+          <div class="field field--password" data-revealed="false">
+            <label for="aPw">Password * <span class="field__hint" style="display:inline">(mínimo 6 caracteres)</span></label>
+            <input type="password" id="aPw" required minlength="6" autocomplete="new-password" placeholder="••••••••" />
+            <button type="button" class="pw-toggle" data-action="toggle-pw" aria-label="Mostrar password"></button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:16px">
+          <h3 class="card__title">Horário de funcionamento</h3>
+          <p class="card__sub">Podes ajustar depois nas Configurações.</p>
+          <div id="scheduleFields"></div>
+        </div>
+
+        <div id="setupErr" class="error-msg" role="alert" aria-live="assertive"></div>
+
+        <button type="submit" id="setupBtn" class="btn btn--primary btn--full btn--lg">
+          <span class="btn__label">Criar salão e conta admin</span>
+        </button>
+        <p style="text-align:center;font-size:12px;color:var(--muted);margin-top:14px">
+          Este setup só precisa de ser feito uma vez por salão.
+        </p>
+      </form>
+    </div>
+  </main>
+
+<script type="module">
+import {
+  db, auth, doc, setDoc, collection, addDoc, serverTimestamp,
+  writeBatch, createUserWithEmailAndPassword
+} from './firebase.js';
+import { on, toast, toastSuccess, toastError, authErrorMessage, $, escapeHTML, html } from './app.js';
+
+const DAYS = [
+  { key: 'monday',    label: 'Segunda' },
+  { key: 'tuesday',   label: 'Terça' },
+  { key: 'wednesday', label: 'Quarta' },
+  { key: 'thursday',  label: 'Quinta' },
+  { key: 'friday',    label: 'Sexta' },
+  { key: 'saturday',  label: 'Sábado' },
+  { key: 'sunday',    label: 'Domingo' },
+];
+const defaults = {
+  monday:    { open:'10:00', close:'19:00', closed: false },
+  tuesday:   { open:'10:00', close:'19:00', closed: false },
+  wednesday: { open:'10:00', close:'19:00', closed: false },
+  thursday:  { open:'10:00', close:'19:00', closed: false },
+  friday:    { open:'10:00', close:'19:00', closed: false },
+  saturday:  { open:'10:00', close:'18:00', closed: false },
+  sunday:    { open:'',      close:'',      closed: true  },
+};
+
+// Render schedule fields
+const sf = $('#scheduleFields');
+sf.innerHTML = DAYS.map(d => {
+  const v = defaults[d.key];
+  return `
+    <div class="time-row" id="row-${d.key}">
+      <div class="time-row__day">${d.label}</div>
+      <input type="time" id="open-${d.key}"  value="${v.open}"  aria-label="Hora de abertura ${d.label}"  ${v.closed ? 'disabled' : ''} />
+      <span class="time-row__sep">até</span>
+      <input type="time" id="close-${d.key}" value="${v.close}" aria-label="Hora de fecho ${d.label}"    ${v.closed ? 'disabled' : ''} />
+      <label class="time-row__closed">
+        <input type="checkbox" id="closed-${d.key}" data-action="toggle-day" data-day="${d.key}" ${v.closed ? 'checked' : ''} />
+        Fechado
+      </label>
+    </div>`;
+}).join('');
+
+on('toggle-day', (el) => {
+  const key = el.dataset.day;
+  const checked = document.getElementById(`closed-${key}`).checked;
+  $(`#open-${key}`).disabled  = checked;
+  $(`#close-${key}`).disabled = checked;
+});
+
+on('toggle-pw', (el) => {
+  const field = el.closest('.field');
+  const reveal = field.getAttribute('data-revealed') !== 'true';
+  field.setAttribute('data-revealed', String(reveal));
+  field.querySelector('input').type = reveal ? 'text' : 'password';
+  el.setAttribute('aria-label', reveal ? 'Esconder password' : 'Mostrar password');
+});
+
+// Slug auto-derive from name (only if user hasn't typed it)
+const nameEl = $('#sName');
+const slugEl = $('#sSlug');
+let slugTouched = false;
+slugEl.addEventListener('input', () => { slugTouched = true; });
+nameEl.addEventListener('input', () => {
+  if (slugTouched) return;
+  slugEl.value = nameEl.value.toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+});
+
+// Sync color picker ↔ input
+const colorEl = $('#sColor');
+const pickEl  = $('#sColorPicker');
+colorEl.addEventListener('input', () => {
+  if (/^#[0-9A-Fa-f]{6}$/.test(colorEl.value)) {
+    pickEl.value = colorEl.value;
+    document.documentElement.style.setProperty('--brand', colorEl.value);
+  }
+});
+pickEl.addEventListener('input', () => {
+  colorEl.value = pickEl.value;
+  document.documentElement.style.setProperty('--brand', pickEl.value);
+});
+
+const errEl   = $('#setupErr');
+const btn     = $('#setupBtn');
+const btnText = btn.querySelector('.btn__label');
+function setError(msg) { errEl.textContent = msg; errEl.classList.toggle('show', !!msg); }
+function setLoading(loading) {
+  btn.disabled = loading;
+  btnText.innerHTML = loading
+    ? '<span class="spinner" aria-hidden="true"></span> A criar salão...'
+    : 'Criar salão e conta admin';
+}
+
+$('#setupForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  setError('');
+
+  const name    = nameEl.value.trim();
+  const slug    = slugEl.value.trim().toLowerCase().replace(/\s+/g, '-');
+  const tagline = $('#sTagline').value.trim();
+  const address = $('#sAddress').value.trim();
+  const phone   = $('#sPhone').value.trim();
+  const email   = $('#sEmail').value.trim();
+  const color   = colorEl.value.trim() || '#6b7c5a';
+  const aEmail  = $('#aEmail').value.trim();
+  const aPw     = $('#aPw').value;
+
+  if (!name || !slug || !aEmail || !aPw) { setError('Preenche todos os campos obrigatórios (*).'); return; }
+  if (!/^[a-z0-9-]+$/.test(slug))         { setError('Slug inválido: usa apenas letras minúsculas, números e hífens.'); return; }
+  if (aPw.length < 6)                     { setError('A password deve ter pelo menos 6 caracteres.'); return; }
+
+  // Collect schedule
+  const schedule = {};
+  DAYS.forEach(d => {
+    const closed = $(`#closed-${d.key}`).checked;
+    schedule[d.key] = {
+      open:   closed ? '' : $(`#open-${d.key}`).value,
+      close:  closed ? '' : $(`#close-${d.key}`).value,
+      closed
+    };
+  });
+
+  setLoading(true);
+  try {
+    // 1) Auth account
+    const userCred = await createUserWithEmailAndPassword(auth, aEmail, aPw);
+    const uid = userCred.user.uid;
+
+    // 2-N) Batch all Firestore writes for atomicity & speed
+    const batch = writeBatch(db);
+    const salonRef = doc(db, 'salons', slug);
+    batch.set(salonRef, {
+      name, slug, tagline, address, phone, email,
+      primaryColor: color, primaryColorDark: color, primaryColorLight: '#eef3e8',
+      loyaltyVisits: 10, loyaltyDiscount: 20,
+      referralDiscount: 10, birthdayDiscount: 15,
+      noShowPenalty: 5, pointsPerVisit: 10,
+      teamPassword: '',
+      adminUid: uid, adminEmail: aEmail,
+      createdAt: serverTimestamp()
+    });
+    batch.set(doc(db, 'salons', slug, 'config', 'schedule'), schedule);
+    batch.set(doc(db, 'salons', slug, 'users', uid), {
+      email: aEmail, role: 'admin', createdAt: serverTimestamp()
+    });
+    // Example services
+    const exServices = [
+      { name: 'Corte + Brushing',  duration: 45, price: 35, order: 1, description: '' },
+      { name: 'Coloração',         duration: 90, price: 45, order: 2, description: 'A partir de' },
+      { name: 'Tratamento',        duration: 30, price: 25, order: 3, description: '' },
+      { name: 'Brushing',          duration: 30, price: 18, order: 4, description: '' },
+      { name: 'Corte Masculino',   duration: 30, price: 18, order: 5, description: '' },
+      { name: 'Barba',             duration: 20, price: 12, order: 6, description: '' },
+    ];
+    for (const s of exServices) {
+      const ref = doc(collection(db, 'salons', slug, 'services'));
+      batch.set(ref, { ...s, active: true, isPackage: false, createdAt: serverTimestamp() });
+    }
+    await batch.commit();
+
+    toastSuccess('Salão criado com sucesso!');
+    setTimeout(() => { window.location.href = 'login.html'; }, 1400);
+
+  } catch (e) {
+    console.error(e);
+    setError(authErrorMessage(e.code) || 'Erro ao criar salão. Tenta novamente.');
+    setLoading(false);
+  }
+});
+</script>
+</body>
+</html>

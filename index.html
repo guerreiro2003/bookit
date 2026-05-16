@@ -1,0 +1,786 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Marca serviços de cabeleireiro online em 5 passos. Escolhe o serviço, colaborador, data e hora — confirmação imediata." />
+  <meta name="theme-color" content="#6b7c5a" />
+  <meta property="og:title" content="Book It — Marcações online" />
+  <meta property="og:description" content="Marca o teu serviço em segundos. Sem chamadas, sem espera." />
+  <meta property="og:type" content="website" />
+  <title>Marcar — Book It</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <header class="header">
+    <div class="header__inner">
+      <a class="header__brand" href="#" aria-label="Book It">
+        <div class="header__mark" id="headerMark" aria-hidden="true">B</div>
+        <div>
+          <div class="header__name" id="headerName">Book It</div>
+          <div class="header__sub" id="headerSub">Marcações online</div>
+        </div>
+      </a>
+      <div class="header__actions" id="headerActions">
+        <!-- Auth status / account link injected here -->
+      </div>
+    </div>
+  </header>
+
+  <!-- Auth status bar (shown when logged in) -->
+  <div id="statusBar" class="statusbar" hidden>
+    <div class="statusbar__inner">
+      <span id="statusGreet">Olá!</span>
+      <a class="btn btn--ghost btn--sm" href="account.html" id="statusAccountLink">A minha conta →</a>
+    </div>
+  </div>
+
+  <main style="padding: 24px 0 64px">
+    <div class="container">
+
+      <!-- Steps indicator -->
+      <ol class="steps" id="stepsBar" aria-label="Progresso da marcação">
+        <li class="step active" id="step1" aria-current="step">
+          <div class="step__circle"><span>1</span></div>
+          <div class="step__label">Serviço</div>
+        </li>
+        <li class="step-line" id="line1" aria-hidden="true"></li>
+        <li class="step" id="step2">
+          <div class="step__circle"><span>2</span></div>
+          <div class="step__label">Equipa</div>
+        </li>
+        <li class="step-line" id="line2" aria-hidden="true"></li>
+        <li class="step" id="step3">
+          <div class="step__circle"><span>3</span></div>
+          <div class="step__label">Data &amp; hora</div>
+        </li>
+        <li class="step-line" id="line3" aria-hidden="true"></li>
+        <li class="step" id="step4">
+          <div class="step__circle"><span>4</span></div>
+          <div class="step__label">Dados</div>
+        </li>
+        <li class="step-line" id="line4" aria-hidden="true"></li>
+        <li class="step" id="step5">
+          <div class="step__circle"><span>5</span></div>
+          <div class="step__label">Confirmar</div>
+        </li>
+      </ol>
+
+      <!-- Promotions -->
+      <div id="promoBanners" aria-live="polite"></div>
+
+      <!-- ── STEP 1: Services ─────────────────────────────── -->
+      <section id="screenServices" aria-labelledby="title1">
+        <h1 class="section-title" id="title1">Escolhe um serviço</h1>
+        <p class="section-sub" id="salonTagline">Seleciona o que pretendes</p>
+        <div class="option-list" id="servicesList" role="list">
+          <div class="loading-state"><span class="spinner spinner--lg" aria-hidden="true"></span><div>A carregar serviços…</div></div>
+        </div>
+      </section>
+
+      <!-- ── STEP 2: Staff ────────────────────────────────── -->
+      <section id="screenStaff" aria-labelledby="title2" hidden>
+        <h2 class="section-title" id="title2">Escolhe um colaborador</h2>
+        <p class="section-sub">Ou escolhe "Sem preferência" para o primeiro disponível</p>
+        <div class="option-list" id="staffList" role="list"></div>
+        <div class="btn-group btn-group--full" style="margin-top:16px">
+          <button class="btn btn--ghost" type="button" data-action="back-to" data-step="1">← Voltar</button>
+        </div>
+      </section>
+
+      <!-- ── STEP 3: Date & time ──────────────────────────── -->
+      <section id="screenDateTime" aria-labelledby="title3" hidden>
+        <h2 class="section-title" id="title3">Quando preferes?</h2>
+        <p class="section-sub">Escolhe o dia e a hora disponível</p>
+
+        <div class="card" style="margin-bottom:16px">
+          <div class="calendar">
+            <div class="calendar__header">
+              <button class="calendar__nav" type="button" id="calPrev" aria-label="Mês anterior">‹</button>
+              <div class="calendar__title" id="calTitle" aria-live="polite"></div>
+              <button class="calendar__nav" type="button" id="calNext" aria-label="Mês seguinte">›</button>
+            </div>
+            <div class="calendar__grid" id="calGrid" role="grid"></div>
+          </div>
+        </div>
+
+        <div id="timeslotsWrap" hidden>
+          <p class="section-sub" id="selectedDateLabel" style="margin-bottom:12px"></p>
+          <div class="timeslots" id="timeslotsList" role="listbox" aria-label="Horários disponíveis"></div>
+        </div>
+
+        <div class="btn-group btn-group--full" style="margin-top:8px">
+          <button class="btn btn--ghost" type="button" data-action="back-to" data-step="2">← Voltar</button>
+          <button class="btn btn--primary" type="button" id="btnDateNext" data-action="go-to" data-step="4" disabled>Continuar →</button>
+        </div>
+      </section>
+
+      <!-- ── STEP 4: Client data ──────────────────────────── -->
+      <section id="screenData" aria-labelledby="title4" hidden>
+        <h2 class="section-title" id="title4">Os teus dados</h2>
+        <p class="section-sub">Para confirmarmos a marcação</p>
+
+        <div class="card">
+          <div class="field">
+            <label for="clientName">Nome completo *</label>
+            <input type="text" id="clientName" required autocomplete="name" placeholder="O teu nome" />
+          </div>
+          <div class="field">
+            <label for="clientEmail">Email *</label>
+            <input type="email" id="clientEmail" required autocomplete="email" placeholder="email@exemplo.com" />
+          </div>
+          <div class="field">
+            <label for="clientPhone">Telemóvel *</label>
+            <input type="tel" id="clientPhone" required autocomplete="tel" placeholder="9XX XXX XXX" />
+          </div>
+          <div class="field">
+            <label for="forSomeone">Esta marcação é para outra pessoa? (opcional)</label>
+            <input type="text" id="forSomeone" placeholder="Nome de quem vai ser atendido" />
+            <div class="field__hint">Se preencheres, os pontos Zen Club ficam na tua conta.</div>
+          </div>
+          <div class="field">
+            <label for="referralCode">Código de referido (opcional)</label>
+            <input type="text" id="referralCode" placeholder="Ex: ZEN-ANA42" style="text-transform:uppercase" />
+            <div class="field__hint">Tens um código de amigo? Ambos ganham desconto!</div>
+          </div>
+          <div class="field">
+            <label for="clientNotes">Notas (opcional)</label>
+            <textarea id="clientNotes" placeholder="Alguma preferência ou informação extra…"></textarea>
+          </div>
+        </div>
+
+        <!-- Account invite (only without session) -->
+        <div id="accountInvite" class="card card--soft" style="margin-top:12px">
+          <div style="font-size:14px;font-weight:500;color:#3b5a28;margin-bottom:4px">🌿 Queres ganhar pontos Zen Club?</div>
+          <div style="font-size:12.5px;color:#4a6338;margin-bottom:10px">Cria conta gratuita e ganha pontos por cada visita paga.</div>
+          <a class="btn btn--primary btn--sm" id="inviteAccountLink" href="account.html">Criar conta / Entrar →</a>
+        </div>
+
+        <div class="btn-group btn-group--full" style="margin-top:16px">
+          <button class="btn btn--ghost" type="button" data-action="back-to" data-step="3">← Voltar</button>
+          <button class="btn btn--primary" type="button" data-action="go-to" data-step="5">Continuar →</button>
+        </div>
+      </section>
+
+      <!-- ── STEP 5: Confirm ──────────────────────────────── -->
+      <section id="screenConfirm" aria-labelledby="title5" hidden>
+        <h2 class="section-title" id="title5">Confirmar marcação</h2>
+        <p class="section-sub">Verifica os dados antes de confirmar</p>
+
+        <div class="card" style="margin-bottom:16px">
+          <table class="confirm-table" aria-label="Resumo da marcação">
+            <tbody>
+              <tr><td class="label">Serviço</td><td class="value" id="confirmService">—</td></tr>
+              <tr id="confirmStaffRow"><td class="label">Colaborador</td><td class="value" id="confirmStaff">—</td></tr>
+              <tr><td class="label">Data</td><td class="value" id="confirmDate">—</td></tr>
+              <tr><td class="label">Hora</td><td class="value" id="confirmTime">—</td></tr>
+              <tr><td class="label">Duração</td><td class="value" id="confirmDuration">—</td></tr>
+              <tr><td class="label">Preço</td><td class="value" id="confirmPrice">—</td></tr>
+              <tr><td class="label">Nome</td><td class="value" id="confirmName">—</td></tr>
+              <tr id="confirmForRow" hidden><td class="label">Para</td><td class="value" id="confirmFor">—</td></tr>
+              <tr><td class="label">Email</td><td class="value" id="confirmEmail">—</td></tr>
+              <tr><td class="label">Telemóvel</td><td class="value" id="confirmPhone">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div id="discountInfo" hidden style="margin-bottom:16px">
+          <div class="promo-banner">
+            <div>
+              <div class="promo-banner__text">🎉 Desconto aplicado!</div>
+              <div class="promo-banner__desc" id="discountDesc"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="btn-group btn-group--full">
+          <button class="btn btn--ghost" type="button" data-action="back-to" data-step="4">← Voltar</button>
+          <button class="btn btn--primary btn--lg" type="button" id="btnConfirm" data-action="submit-booking">
+            <span class="btn__label">Confirmar marcação</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Loading screen during submit -->
+      <div id="screenLoading" hidden class="loading-state" style="padding:80px 0">
+        <span class="spinner spinner--lg" aria-hidden="true"></span>
+        <div style="margin-top:14px;font-size:14px;color:var(--muted)">A confirmar a tua marcação…</div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- ── Zen Club popup (shown to non-authed users after delay) ── -->
+  <div id="clubPopup" class="modal-overlay club-popup" role="dialog" aria-modal="true" aria-labelledby="clubTitle" aria-hidden="true">
+    <div class="modal">
+      <button class="modal__close" type="button" data-action="close-club" aria-label="Fechar">✕</button>
+      <div class="club-popup__icon" aria-hidden="true">★</div>
+      <h2 id="clubTitle">Junta-te ao <em style="color:var(--brand)">Zen Club</em></h2>
+      <p class="club-popup__lead">Cria uma conta gratuita e começa a ganhar recompensas a cada visita.</p>
+      <div class="club-popup__benefits">
+        <div class="club-popup__benefit">
+          <div class="club-popup__benefit-icon">⭐</div>
+          <div>
+            <div class="club-popup__benefit-title">Pontos a cada visita</div>
+            <div class="club-popup__benefit-desc">Acumula pontos e troca por descontos exclusivos</div>
+          </div>
+        </div>
+        <div class="club-popup__benefit">
+          <div class="club-popup__benefit-icon">🎂</div>
+          <div>
+            <div class="club-popup__benefit-title">Desconto de aniversário</div>
+            <div class="club-popup__benefit-desc">Recebe automaticamente um desconto no teu mês</div>
+          </div>
+        </div>
+        <div class="club-popup__benefit">
+          <div class="club-popup__benefit-icon">🔗</div>
+          <div>
+            <div class="club-popup__benefit-title">Código de referido único</div>
+            <div class="club-popup__benefit-desc">Traz amigos e ambos ganham desconto</div>
+          </div>
+        </div>
+        <div class="club-popup__benefit">
+          <div class="club-popup__benefit-icon">🎁</div>
+          <div>
+            <div class="club-popup__benefit-title">Promoções exclusivas</div>
+            <div class="club-popup__benefit-desc">Ofertas só para membros do clube</div>
+          </div>
+        </div>
+      </div>
+      <a class="btn btn--primary btn--full btn--lg" id="clubCreateLink" href="account.html" style="margin-bottom:8px">Criar conta gratuita →</a>
+      <button class="btn btn--ghost btn--full" type="button" data-action="close-club">Continuar sem conta</button>
+    </div>
+  </div>
+
+<script type="module">
+import {
+  db, auth, collection, doc, getDoc, getDocs, addDoc,
+  query, where, orderBy, serverTimestamp,
+  onAuthStateChanged
+} from './firebase.js';
+import {
+  $, $$, on, toast, toastError, toastSuccess,
+  escapeHTML, html, htmlMix, raw,
+  MONTHS_FULL, WEEKDAYS_SHORT, WEEKDAY_KEYS,
+  formatDate, formatDateLongPT, formatPrice,
+  getSalonId, loadSalon, applySalonBranding,
+  generateReferralCode, showFatalError
+} from './app.js';
+
+const POPUP_KEY = 'bookit_club_dismissed';
+
+const state = {
+  salon: null,
+  salonId: getSalonId(),
+  services: [],
+  staff: [],
+  promotions: [],
+  schedule: null,
+  selectedService: null,
+  selectedStaff:   null,
+  selectedDate:    null,
+  selectedTime:    null,
+  currentMonth:    new Date(),
+  referralValid:   false,
+  referralDiscount: 0,
+  authUser:        null,
+  clientData:      null,
+};
+
+/* ── INIT ──────────────────────────────────────────────── */
+(async function init() {
+  // Auth observer
+  onAuthStateChanged(auth, async (user) => {
+    state.authUser = user || null;
+    state.clientData = null;
+    updateAuthUI();
+    if (user) await loadClientForAuth(user);
+  });
+
+  try {
+    state.salon = await loadSalon(state.salonId);
+    if (!state.salon) { showFatalError('Salão não encontrado.'); return; }
+    applySalonBranding(state.salon, { titlePrefix: 'Marcar' });
+    $('#salonTagline').textContent = state.salon.address || state.salon.tagline || 'Seleciona o que pretendes';
+
+    // Schedule
+    const schedDoc = await getDoc(doc(db, 'salons', state.salonId, 'config', 'schedule'));
+    if (schedDoc.exists()) state.schedule = schedDoc.data();
+
+    // Parallel: staff, promotions, services
+    const [staffSnap, promoSnap, svcSnap] = await Promise.all([
+      getDocs(query(collection(db,'salons',state.salonId,'staff'), where('active','==',true), orderBy('order','asc'))),
+      getDocs(query(collection(db,'salons',state.salonId,'promotions'), where('active','==',true))),
+      getDocs(query(collection(db,'salons',state.salonId,'services'), where('active','==',true), orderBy('order','asc'))),
+    ]);
+    state.staff      = staffSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+    state.promotions = promoSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+    state.services   = svcSnap.docs.map(d  => ({ id:d.id, ...d.data() }));
+
+    renderPromos();
+    renderServices();
+
+    // Show Zen Club popup if not logged in & not dismissed
+    if (!state.authUser && !sessionStorage.getItem(POPUP_KEY)) {
+      setTimeout(showClubPopup, 4000);
+    }
+
+  } catch (e) {
+    console.error(e);
+    showFatalError('Erro ao carregar. Verifica a tua ligação e tenta novamente.');
+  }
+})();
+
+/* ── AUTH UI ───────────────────────────────────────────── */
+function updateAuthUI() {
+  const bar  = $('#statusBar');
+  const acts = $('#headerActions');
+  const invite = $('#accountInvite');
+  const salonQS = `?salon=${encodeURIComponent(state.salonId)}`;
+
+  if (state.authUser) {
+    bar.hidden = false;
+    $('#statusGreet').textContent = `Olá, ${state.authUser.displayName || state.authUser.email.split('@')[0]}!`;
+    $('#statusAccountLink').href = `account.html${salonQS}`;
+    acts.innerHTML = htmlMix`<a class="btn btn--ghost btn--sm" href="account.html${raw(salonQS)}">Conta</a>`;
+    if (invite) invite.hidden = true;
+  } else {
+    bar.hidden = true;
+    acts.innerHTML = htmlMix`<a class="btn btn--ghost btn--sm" href="account.html${raw(salonQS)}">Entrar / Criar conta</a>`;
+    if (invite) invite.hidden = false;
+  }
+  $('#clubCreateLink').href = `account.html${salonQS}`;
+  $('#inviteAccountLink').href = `account.html${salonQS}`;
+}
+
+async function loadClientForAuth(user) {
+  try {
+    let snap = await getDoc(doc(db,'salons',state.salonId,'clients',user.uid));
+    if (!snap.exists()) {
+      const q = await getDocs(query(collection(db,'salons',state.salonId,'clients'), where('email','==',user.email)));
+      if (!q.empty) { state.clientData = { id: q.docs[0].id, ...q.docs[0].data() }; }
+    } else {
+      state.clientData = { id: user.uid, ...snap.data() };
+    }
+    prefillFromClient();
+  } catch (e) { console.error('loadClient', e); }
+}
+
+function prefillFromClient() {
+  if (!state.clientData) return;
+  const setIfEmpty = (id, v) => { const el = document.getElementById(id); if (el && !el.value && v) el.value = v; };
+  setIfEmpty('clientName',  state.clientData.name);
+  setIfEmpty('clientEmail', state.clientData.email);
+  setIfEmpty('clientPhone', state.clientData.phone);
+}
+
+/* ── PROMOS ────────────────────────────────────────────── */
+function renderPromos() {
+  const wrap = $('#promoBanners');
+  wrap.innerHTML = state.promotions.map(p => htmlMix`
+    <div class="promo-banner">
+      <div>
+        <div class="promo-banner__text">🌿 ${p.title}</div>
+        <div class="promo-banner__desc">${p.description}</div>
+      </div>
+      ${p.badgeText ? raw(htmlMix`<div class="badge badge--green">${p.badgeText}</div>`) : ''}
+    </div>
+  `).join('');
+}
+
+/* ── SERVICES ──────────────────────────────────────────── */
+function renderServices() {
+  const list = $('#servicesList');
+  if (!state.services.length) {
+    list.innerHTML = `<div class="empty-state">
+      <div class="empty-state__icon" aria-hidden="true">📭</div>
+      <div class="empty-state__title">Sem serviços disponíveis</div>
+      <div class="empty-state__desc">O salão ainda não publicou os seus serviços. Tenta de novo mais tarde.</div>
+    </div>`;
+    return;
+  }
+  list.innerHTML = state.services.map(s => {
+    const savings = s.isPackage && s.originalPrice ? Math.max(0, Number(s.originalPrice) - Number(s.price)) : 0;
+    return htmlMix`
+      <button class="option-item" role="listitem" type="button"
+              data-action="pick-service" data-id="${s.id}"
+              aria-label="${s.name}, ${s.duration} minutos, ${s.price} euros">
+        <div class="option-item__main">
+          <div>
+            <div class="option-item__name">
+              ${s.name}
+              ${s.isPackage ? raw('<span class="badge badge--green" style="margin-left:6px">Pacote</span>') : ''}
+              ${savings > 0 ? raw(htmlMix`<span class="badge badge--amber" style="margin-left:6px">Poupas ${savings}€</span>`) : ''}
+            </div>
+            <div class="option-item__detail">
+              ${s.duration} min${s.description ? ' · ' + s.description : ''}${s.includes ? ' · Inclui: ' + s.includes : ''}
+            </div>
+          </div>
+        </div>
+        <div class="option-item__price">
+          ${savings > 0 ? raw(htmlMix`<span class="option-item__price-old">${s.originalPrice}€</span>`) : ''}
+          ${s.price}€
+        </div>
+      </button>`;
+  }).join('');
+}
+
+on('pick-service', (el) => {
+  const id = el.dataset.id;
+  state.selectedService = state.services.find(s => s.id === id);
+  $$('.option-item').forEach(o => o.classList.toggle('selected', o === el));
+  setTimeout(() => goTo(2), 220);
+});
+
+/* ── STAFF ─────────────────────────────────────────────── */
+function renderStaff() {
+  const list = $('#staffList');
+  const items = [];
+  items.push(htmlMix`
+    <button class="option-item ${raw(!state.selectedStaff ? 'selected' : '')}" type="button"
+            data-action="pick-staff" data-id="">
+      <div class="option-item__main">
+        <div class="option-item__avatar" aria-hidden="true">✦</div>
+        <div>
+          <div class="option-item__name">Sem preferência</div>
+          <div class="option-item__detail">Primeiro colaborador disponível</div>
+        </div>
+      </div>
+    </button>`);
+
+  for (const s of state.staff) {
+    const sel = state.selectedStaff?.id === s.id;
+    items.push(htmlMix`
+      <button class="option-item ${raw(sel ? 'selected' : '')}" type="button"
+              data-action="pick-staff" data-id="${s.id}">
+        <div class="option-item__main">
+          <div class="option-item__avatar" aria-hidden="true">${s.name?.charAt(0) || '?'}</div>
+          <div>
+            <div class="option-item__name">${s.name}</div>
+            <div class="option-item__detail">${s.role || 'Cabeleireiro/a'}${s.specialties ? ' · ' + s.specialties : ''}</div>
+          </div>
+        </div>
+      </button>`);
+  }
+  list.innerHTML = items.join('');
+}
+on('pick-staff', (el) => {
+  const id = el.dataset.id;
+  state.selectedStaff = id ? state.staff.find(s => s.id === id) : null;
+  $$('#staffList .option-item').forEach(o => o.classList.toggle('selected', o === el));
+  setTimeout(() => goTo(3), 220);
+});
+
+/* ── CALENDAR ──────────────────────────────────────────── */
+function renderCalendar() {
+  const d = state.currentMonth;
+  const year = d.getFullYear(), month = d.getMonth();
+  const today = new Date(); today.setHours(0,0,0,0);
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  $('#calTitle').textContent = `${MONTHS_FULL[month]} ${year}`;
+  $('#calPrev').disabled = (month <= today.getMonth() && year <= today.getFullYear());
+
+  let cells = WEEKDAYS_SHORT.map(d => `<div class="calendar__day-name" role="columnheader">${d}</div>`).join('');
+  for (let i = 0; i < firstDay; i++) cells += `<div class="calendar__day empty" aria-hidden="true"></div>`;
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = new Date(year, month, day); date.setHours(0,0,0,0);
+    const isPast    = date < today;
+    const isClosed  = isClosedDay(date);
+    const isSel     = state.selectedDate && date.toDateString() === state.selectedDate.toDateString();
+    const isToday   = date.toDateString() === today.toDateString();
+    const isDisabled = isPast || isClosed;
+    const cls = ['calendar__day',
+      isDisabled ? 'disabled' : '',
+      isSel ? 'selected' : '',
+      (isToday && !isSel) ? 'today' : ''
+    ].filter(Boolean).join(' ');
+    cells += isDisabled
+      ? `<div class="${cls}" role="gridcell" aria-disabled="true">${day}</div>`
+      : `<button type="button" class="${cls}" role="gridcell" data-action="pick-day" data-y="${year}" data-m="${month}" data-d="${day}" aria-label="${day} de ${MONTHS_FULL[month]}">${day}</button>`;
+  }
+  $('#calGrid').innerHTML = cells;
+}
+function isClosedDay(date) {
+  if (!state.schedule) return false;
+  const cfg = state.schedule[WEEKDAY_KEYS[date.getDay()]];
+  return cfg && cfg.closed;
+}
+on('pick-day', (el) => {
+  const y = +el.dataset.y, m = +el.dataset.m, d = +el.dataset.d;
+  state.selectedDate = new Date(y, m, d);
+  state.selectedTime = null;
+  $('#btnDateNext').disabled = true;
+  renderCalendar();
+  loadTimeslots();
+});
+
+async function loadTimeslots() {
+  const wrap  = $('#timeslotsWrap');
+  const list  = $('#timeslotsList');
+  const label = $('#selectedDateLabel');
+  const date  = state.selectedDate;
+  label.textContent = `Horários disponíveis — ${date.getDate()} de ${MONTHS_FULL[date.getMonth()]}`;
+  wrap.hidden = false;
+  list.innerHTML = '<div class="loading-state" style="grid-column:1/-1;padding:24px 0"><span class="spinner" aria-hidden="true"></span> <span>A verificar disponibilidade…</span></div>';
+
+  const dayName = WEEKDAY_KEYS[date.getDay()];
+  const dayCfg = state.selectedStaff?.schedule?.[dayName] || state.schedule?.[dayName] || {};
+  const open  = dayCfg.open  || '10:00';
+  const close = dayCfg.close || '19:00';
+  const duration = state.selectedService?.duration || 60;
+  const slots = generateSlots(open, close, duration);
+
+  try {
+    const dateStr = formatDate(date);
+    const baseQ = [collection(db,'salons',state.salonId,'bookings'),
+                   where('date','==',dateStr),
+                   where('status','in',['pending','confirmed'])];
+    const q = state.selectedStaff
+      ? query(...baseQ, where('staffId','==', state.selectedStaff.id))
+      : query(...baseQ);
+    const snap = await getDocs(q);
+    const booked = new Set(snap.docs.map(d => d.data().time));
+
+    if (!slots.length) {
+      list.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+        <div class="empty-state__icon" aria-hidden="true">⏰</div>
+        <div class="empty-state__title">Sem horários neste dia</div>
+        <div class="empty-state__desc">Escolhe outro dia.</div></div>`;
+      return;
+    }
+
+    list.innerHTML = slots.map(slot => {
+      const isBooked = booked.has(slot);
+      return isBooked
+        ? `<div class="timeslot booked" aria-disabled="true">${slot}</div>`
+        : htmlMix`<button class="timeslot" type="button" data-action="pick-time" data-time="${slot}" role="option" aria-selected="false">${slot}</button>`;
+    }).join('');
+  } catch (e) {
+    console.error(e);
+    list.innerHTML = `<div class="error-state" style="grid-column:1/-1">
+      <div class="error-state__icon" aria-hidden="true">⚠️</div>
+      <div class="error-state__title">Erro a carregar horários</div>
+      <div class="error-state__desc">Verifica a tua ligação.</div></div>`;
+  }
+}
+
+function generateSlots(open, close, duration) {
+  const slots = [];
+  let [h, m] = open.split(':').map(Number);
+  const [eH, eM] = close.split(':').map(Number);
+  const endTotal = eH * 60 + eM;
+  while (h * 60 + m + duration <= endTotal) {
+    slots.push(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
+    m += duration;
+    if (m >= 60) { h += Math.floor(m / 60); m = m % 60; }
+  }
+  return slots;
+}
+
+on('pick-time', (el) => {
+  state.selectedTime = el.dataset.time;
+  $$('.timeslot').forEach(o => {
+    o.classList.toggle('selected', o === el);
+    o.setAttribute('aria-selected', String(o === el));
+  });
+  $('#btnDateNext').disabled = false;
+});
+
+/* ── NAVIGATION ────────────────────────────────────────── */
+on('go-to',   (el) => goTo(+el.dataset.step));
+on('back-to', (el) => goTo(+el.dataset.step));
+
+function goTo(step) {
+  if (step === 2 && !state.selectedService) return toast('Escolhe um serviço primeiro.');
+  if (step === 4 && (!state.selectedDate || !state.selectedTime)) return toast('Escolhe data e hora.');
+  if (step === 5) {
+    const name  = $('#clientName').value.trim();
+    const email = $('#clientEmail').value.trim();
+    const phone = $('#clientPhone').value.trim();
+    if (!name || !email || !phone)             return toast('Preenche todos os campos obrigatórios.');
+    if (!/^.+@.+\..+$/.test(email))             return toast('Email inválido.');
+    if (!/^\+?[0-9\s]{6,}$/.test(phone))        return toast('Telefone inválido.');
+    fillConfirmation();
+  }
+
+  ['Services','Staff','DateTime','Data','Confirm','Loading'].forEach(s => {
+    const el = document.getElementById('screen' + s);
+    if (el) el.hidden = true;
+  });
+  const map = { 1:'Services', 2:'Staff', 3:'DateTime', 4:'Data', 5:'Confirm' };
+  document.getElementById('screen' + map[step]).hidden = false;
+  updateStepper(step);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (step === 2) renderStaff();
+  if (step === 3) { renderCalendar(); setupCalNav(); }
+}
+
+function setupCalNav() {
+  $('#calPrev').onclick = () => { state.currentMonth = new Date(state.currentMonth.getFullYear(), state.currentMonth.getMonth() - 1, 1); renderCalendar(); };
+  $('#calNext').onclick = () => { state.currentMonth = new Date(state.currentMonth.getFullYear(), state.currentMonth.getMonth() + 1, 1); renderCalendar(); };
+}
+
+function updateStepper(current) {
+  for (let i = 1; i <= 5; i++) {
+    const el = document.getElementById('step' + i);
+    if (!el) continue;
+    el.classList.remove('active', 'done');
+    if (i < current)  el.classList.add('done');
+    if (i === current){ el.classList.add('active'); el.setAttribute('aria-current','step'); }
+    else el.removeAttribute('aria-current');
+    if (i < 5) {
+      const line = document.getElementById('line' + i);
+      if (line) line.classList.toggle('done', i < current);
+    }
+  }
+}
+
+/* ── CONFIRMATION ──────────────────────────────────────── */
+function fillConfirmation() {
+  const s = state.selectedService, d = state.selectedDate;
+  $('#confirmService').textContent  = s.name;
+  $('#confirmDate').textContent     = formatDateLongPT(d);
+  $('#confirmTime').textContent     = state.selectedTime;
+  $('#confirmDuration').textContent = `${s.duration} min`;
+  $('#confirmPrice').textContent    = formatPrice(s.price);
+  $('#confirmName').textContent     = $('#clientName').value.trim();
+  $('#confirmEmail').textContent    = $('#clientEmail').value.trim();
+  $('#confirmPhone').textContent    = $('#clientPhone').value.trim();
+  $('#confirmStaff').textContent    = state.selectedStaff ? state.selectedStaff.name : 'Sem preferência';
+  const forName = $('#forSomeone').value.trim();
+  $('#confirmForRow').hidden = !forName;
+  if (forName) $('#confirmFor').textContent = forName;
+  checkReferral();
+}
+
+async function checkReferral() {
+  const code = $('#referralCode').value.trim().toUpperCase();
+  const wrap = $('#discountInfo');
+  const desc = $('#discountDesc');
+  if (!code) { wrap.hidden = true; state.referralValid = false; return; }
+  try {
+    const snap = await getDocs(query(
+      collection(db,'salons',state.salonId,'clients'),
+      where('referralCode','==', code)
+    ));
+    if (!snap.empty) {
+      const discount = state.salon.referralDiscount || 10;
+      state.referralValid = true;
+      state.referralDiscount = discount;
+      desc.textContent = `Código "${code}" válido — ${discount}% de desconto aplicado.`;
+      wrap.hidden = false;
+    } else {
+      state.referralValid = false;
+      desc.textContent = `Código "${code}" não encontrado.`;
+      wrap.hidden = false;
+    }
+  } catch (e) { console.error(e); }
+}
+
+/* ── SUBMIT ────────────────────────────────────────────── */
+on('submit-booking', async () => {
+  $('#screenConfirm').hidden = true;
+  $('#screenLoading').hidden = false;
+  $('#btnConfirm').disabled = true;
+
+  try {
+    const name  = $('#clientName').value.trim();
+    const email = $('#clientEmail').value.trim();
+    const phone = $('#clientPhone').value.trim();
+    const notes = $('#clientNotes').value.trim();
+    const forSomeone = $('#forSomeone').value.trim();
+    const referralCode = $('#referralCode').value.trim().toUpperCase();
+    const s = state.selectedService;
+    const newReferralCode = generateReferralCode(name, state.salonId);
+
+    // Find or create client
+    let clientId;
+    if (state.authUser && state.clientData) {
+      clientId = state.clientData.id;
+    } else {
+      const existing = await getDocs(query(
+        collection(db,'salons',state.salonId,'clients'), where('email','==', email)
+      ));
+      if (existing.empty) {
+        const ref = await addDoc(collection(db,'salons',state.salonId,'clients'), {
+          name, email, phone,
+          referralCode: newReferralCode,
+          visits: 0, points: 0, totalSpent: 0,
+          referredBy: state.referralValid ? referralCode : null,
+          discounts: [],
+          createdAt: serverTimestamp()
+        });
+        clientId = ref.id;
+      } else {
+        clientId = existing.docs[0].id;
+      }
+    }
+
+    let finalPrice = Number(s.price) || 0;
+    if (state.referralValid) finalPrice = Math.round(finalPrice * (1 - state.referralDiscount / 100));
+
+    await addDoc(collection(db,'salons',state.salonId,'bookings'), {
+      clientId, clientName: name, clientEmail: email, clientPhone: phone,
+      serviceId: s.id, serviceName: s.name,
+      serviceDuration: s.duration, servicePrice: s.price,
+      finalPrice,
+      staffId:   state.selectedStaff?.id   || null,
+      staffName: state.selectedStaff?.name || 'Sem preferência',
+      date: formatDate(state.selectedDate),
+      time: state.selectedTime,
+      notes,
+      forSomeone: forSomeone || null,
+      referralCode: state.referralValid ? referralCode : null,
+      referralDiscount: state.referralValid ? state.referralDiscount : 0,
+      status: 'pending',
+      paid: false,
+      salonId: state.salonId,
+      createdAt: serverTimestamp()
+    });
+
+    const params = new URLSearchParams({
+      salon:   state.salonId,
+      service: s.name,
+      date:    formatDateLongPT(state.selectedDate),
+      time:    state.selectedTime,
+      price:   String(finalPrice),
+      name,
+      refCode: state.authUser ? '' : newReferralCode,
+    });
+    window.location.href = `success.html?${params.toString()}`;
+
+  } catch (e) {
+    console.error(e);
+    $('#screenLoading').hidden = true;
+    $('#screenConfirm').hidden = false;
+    $('#btnConfirm').disabled = false;
+    toastError('Erro ao confirmar marcação. Tenta novamente.');
+  }
+});
+
+/* ── ZEN CLUB POPUP ────────────────────────────────────── */
+function showClubPopup() {
+  const o = $('#clubPopup');
+  o.classList.add('show');
+  o.setAttribute('aria-hidden', 'false');
+}
+function hideClubPopup() {
+  const o = $('#clubPopup');
+  o.classList.remove('show');
+  o.setAttribute('aria-hidden', 'true');
+  sessionStorage.setItem(POPUP_KEY, '1');
+}
+on('close-club', hideClubPopup);
+$('#clubPopup').addEventListener('click', (e) => { if (e.target === e.currentTarget) hideClubPopup(); });
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && $('#clubPopup').classList.contains('show')) hideClubPopup();
+});
+</script>
+</body>
+</html>

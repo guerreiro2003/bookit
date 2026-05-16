@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Acesso à área de administração Book It." />
+  <meta name="robots" content="noindex" />
+  <meta name="theme-color" content="#6b7c5a" />
+  <title>Entrar — Admin Book It</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="auth-wrap">
+    <form class="auth-box" id="loginForm" novalidate>
+      <div class="auth-box__head">
+        <div class="auth-box__logo" aria-hidden="true">B</div>
+        <h1>Book It · Admin</h1>
+        <p class="auth-box__sub">Área de administração do salão</p>
+      </div>
+
+      <div id="loginErr" class="error-msg" role="alert" aria-live="assertive"></div>
+
+      <div class="field">
+        <label for="loginEmail">Email</label>
+        <input type="email" id="loginEmail" name="email"
+               autocomplete="email" required placeholder="admin@exemplo.com" />
+      </div>
+      <div class="field field--password" data-revealed="false">
+        <label for="loginPw">Password</label>
+        <input type="password" id="loginPw" name="password"
+               autocomplete="current-password" required placeholder="••••••••" />
+        <button type="button" class="pw-toggle" aria-label="Mostrar password" data-action="toggle-pw"></button>
+      </div>
+
+      <button class="btn btn--primary btn--full btn--lg" type="submit" id="loginBtn" style="margin-top:8px">
+        <span class="btn__label">Entrar</span>
+      </button>
+
+      <div class="auth-box__footer">
+        <a data-action="forgot-pw" tabindex="0" role="link">Esqueci-me da password</a>
+      </div>
+      <div class="auth-box__footer" style="margin-top:4px">
+        Não és admin? <a href="account.html">Área do cliente</a> ·
+        <a href="staff.html">Portal da equipa</a>
+      </div>
+    </form>
+  </main>
+
+<script type="module">
+import {
+  auth, signInWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail
+} from './firebase.js';
+import { on, toastSuccess, toastError, authErrorMessage, $ } from './app.js';
+
+const form    = $('#loginForm');
+const errEl   = $('#loginErr');
+const btn     = $('#loginBtn');
+const btnText = btn.querySelector('.btn__label');
+const emailEl = $('#loginEmail');
+const pwEl    = $('#loginPw');
+
+function setError(msg) {
+  errEl.textContent = msg;
+  errEl.classList.toggle('show', !!msg);
+}
+
+function setLoading(loading) {
+  btn.disabled = loading;
+  btnText.innerHTML = loading
+    ? '<span class="spinner" aria-hidden="true"></span> A entrar...'
+    : 'Entrar';
+}
+
+// If already logged in, redirect immediately
+onAuthStateChanged(auth, user => {
+  if (user) window.location.href = 'admin.html';
+});
+
+// Toggle password visibility
+on('toggle-pw', (el) => {
+  const field = el.closest('.field');
+  const reveal = field.getAttribute('data-revealed') !== 'true';
+  field.setAttribute('data-revealed', String(reveal));
+  pwEl.type = reveal ? 'text' : 'password';
+  el.setAttribute('aria-label', reveal ? 'Esconder password' : 'Mostrar password');
+});
+
+// Forgot password
+on('forgot-pw', async () => {
+  const email = emailEl.value.trim();
+  if (!email) { setError('Escreve o teu email primeiro.'); emailEl.focus(); return; }
+  try {
+    await sendPasswordResetEmail(auth, email);
+    toastSuccess('Email de recuperação enviado.');
+    setError('');
+  } catch (e) {
+    setError(authErrorMessage(e.code));
+  }
+});
+
+// Submit
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  setError('');
+  const email = emailEl.value.trim();
+  const pw    = pwEl.value;
+  if (!email || !pw) { setError('Preenche email e password.'); return; }
+  setLoading(true);
+  try {
+    await signInWithEmailAndPassword(auth, email, pw);
+    window.location.href = 'admin.html';
+  } catch (err) {
+    setError(authErrorMessage(err.code));
+    setLoading(false);
+  }
+});
+</script>
+</body>
+</html>
