@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <meta name="theme-color" content="#09090b" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+  <title>Página não encontrada — Book It</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <noscript><div class="noscript-banner"><div class="noscript-banner__inner"><h1>JavaScript necessário</h1><p>Esta aplicação precisa de JavaScript para funcionar. Por favor ativa o JavaScript nas definições do teu browser e recarrega a página.</p></div></div></noscript>
+  <main class="auth-shell">
+    <div class="text-center" style="max-width:420px">
+      <div style="font-family:var(--font-mono);font-size:88px;font-weight:600;color:var(--brand);letter-spacing:-0.04em;line-height:1">404</div>
+      <h1 class="page-title mt-3">Página não encontrada</h1>
+      <p class="page-sub" style="margin-bottom:var(--s-6)">
+        O link que abriste não existe ou foi removido. Verifica o endereço ou volta à página inicial.
+      </p>
+      <div class="btn-group" style="justify-content:center">
+        <a class="btn" href="javascript:history.back()">← Voltar</a>
+        <a class="btn btn--primary" href="/">Página inicial</a>
+      </div>
+    </div>
+  </main>
+  <script type="module">
+    import { setTheme, getTheme } from '/app.js';
+    setTheme(getTheme());
+  </script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Allow: /index.html
+Allow: /success.html
+Disallow: /admin.html
+Disallow: /staff.html
+Disallow: /login.html
+Disallow: /setup.html
+Disallow: /account.html
+
+Sitemap: /sitemap.xml

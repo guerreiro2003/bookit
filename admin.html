@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <noscript><div class="noscript-banner"><div class="noscript-banner__inner"><h1>JavaScript necessário</h1><p>Esta aplicação precisa de JavaScript para funcionar. Por favor ativa o JavaScript nas definições do teu browser e recarrega a página.</p></div></div></noscript>
 
 <div class="app-mobile-header">
   <button class="burger" type="button" id="adminBurger" aria-label="Abrir menu" aria-expanded="false">
@@ -149,6 +150,29 @@
         <div class="stat">
           <div class="stat__label">Total clientes</div>
           <div class="stat__value" id="statClients">—</div>
+        </div>
+      </div>
+
+      <!-- Onboarding card for first-time admin (no services and no bookings) -->
+      <div id="onboardingCard" hidden class="card card--accent mb-4">
+        <div class="flex" style="gap:var(--s-4);align-items:flex-start">
+          <div style="font-size:28px">👋</div>
+          <div class="flex-1">
+            <div style="font-weight:600;font-size:var(--text-lg);color:var(--fg)">Bem-vindo/a ao Book It</div>
+            <div class="text-sm text-muted mt-1" style="line-height:1.55">
+              Configura o teu salão em 3 passos para começar a receber marcações.
+            </div>
+            <ol id="onboardingSteps" style="list-style:none;padding:0;margin:var(--s-4) 0 0;display:flex;flex-direction:column;gap:8px">
+              <li class="flex" style="gap:10px"><span class="badge badge--gray" data-step="services">1</span> <a href="#" data-action="show-panel" data-panel="services" style="color:var(--fg)">Adiciona os teus serviços</a></li>
+              <li class="flex" style="gap:10px"><span class="badge badge--gray" data-step="staff">2</span> <a href="#" data-action="show-panel" data-panel="staff" style="color:var(--fg)">Adiciona a tua equipa</a></li>
+              <li class="flex" style="gap:10px"><span class="badge badge--gray" data-step="schedule">3</span> <a href="#" data-action="show-panel" data-panel="schedule" style="color:var(--fg)">Define o horário</a></li>
+              <li class="flex" style="gap:10px"><span class="badge badge--gray" data-step="settings">4</span> <a href="#" data-action="show-panel" data-panel="settings" style="color:var(--fg)">Define a password da equipa</a></li>
+            </ol>
+            <a class="btn btn--primary btn--sm mt-4" data-action="show-panel" data-panel="services">Começar →</a>
+          </div>
+          <button class="icon-btn" type="button" data-action="dismiss-onboarding" aria-label="Dispensar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
         </div>
       </div>
 
@@ -661,7 +685,43 @@ function subscribeToday() {
 
   getDocs(collection(db,'salons',salonId,'clients')).then(s => $('#statClients').textContent = s.size);
   $('#liveBadge').innerHTML = '<span class="dot" style="margin-right:6px"></span>Em tempo real';
+  refreshOnboarding();
 }
+
+const ONBOARDING_KEY = 'bookit:onboarding_dismissed';
+async function refreshOnboarding() {
+  if (localStorage.getItem(ONBOARDING_KEY)) return;
+  try {
+    const [svc, staff, schedDoc] = await Promise.all([
+      getDocs(collection(db, 'salons', salonId, 'services')),
+      getDocs(collection(db, 'salons', salonId, 'staff')),
+      getDoc(doc(db, 'salons', salonId, 'config', 'schedule')),
+    ]);
+    const hasServices = svc.size > 0;
+    const hasStaff = staff.size > 0;
+    const hasSchedule = schedDoc.exists();
+    const hasTeamPw = !!(salon.teamPasswordHash || salon.teamPassword);
+    const allDone = hasServices && hasStaff && hasSchedule && hasTeamPw;
+    const card = $('#onboardingCard');
+    if (allDone) { card.hidden = true; return; }
+    card.hidden = false;
+    const mark = (step, done) => {
+      const li = card.querySelector(`[data-step="${step}"]`);
+      if (li) {
+        li.className = done ? 'badge badge--green' : 'badge badge--gray';
+        li.textContent = done ? '✓' : li.textContent;
+      }
+    };
+    mark('services', hasServices);
+    mark('staff', hasStaff);
+    mark('schedule', hasSchedule);
+    mark('settings', hasTeamPw);
+  } catch (e) { console.error('onboarding', e); }
+}
+on('dismiss-onboarding', () => {
+  localStorage.setItem(ONBOARDING_KEY, '1');
+  $('#onboardingCard').hidden = true;
+});
 
 function renderTodayList(bookings) {
   const el = $('#todayBookings');

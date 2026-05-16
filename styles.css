@@ -1588,6 +1588,24 @@ kbd {
   body { background: white; color: black; }
 }
 
+/* ── NOSCRIPT FALLBACK ───────────────────────────────────── */
+.noscript-banner {
+  position: fixed; inset: 0; z-index: 9999;
+  display: grid; place-items: center; padding: var(--s-6);
+  background: var(--bg);
+  text-align: center;
+}
+.noscript-banner__inner {
+  max-width: 480px;
+  padding: var(--s-7);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
+}
+.noscript-banner h1 { font-size: var(--text-2xl); margin-bottom: var(--s-3); }
+.noscript-banner p  { color: var(--fg-muted); margin-bottom: var(--s-3); line-height: 1.55; }
+
 /* ── UTIL ─────────────────────────────────────────────────── */
 .hidden { display: none !important; }
 .flex   { display: flex; gap: var(--s-3); align-items: center; }
