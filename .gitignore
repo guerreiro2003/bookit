@@ -1,0 +1,11 @@
+.DS_Store
+.firebase/
+node_modules/
+*.log
+
+# Don't commit zips/exports
+*.zip
+
+# Editor
+.vscode/
+.idea/

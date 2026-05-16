@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuth() { return request.auth != null; }
+
+    function isAdmin(salonId) {
+      return isAuth() &&
+        get(/databases/$(database)/documents/salons/$(salonId)).data.adminUid == request.auth.uid;
+    }
+
+    match /salons/{salonId} {
+      // Public read (so the booking site can show salon name / colour)
+      allow read: if true;
+      // Only the admin (Firebase Auth) can update
+      allow update: if isAdmin(salonId);
+      // Create only via setup.html (must set adminUid to self)
+      allow create: if isAuth() && request.resource.data.adminUid == request.auth.uid;
+      allow delete: if false;
+
+      match /config/{document=**} {
+        allow read: if true;
+        allow write: if isAdmin(salonId);
+      }
+
+      match /users/{uid} {
+        allow read: if isAuth() && request.auth.uid == uid;
+        allow write: if isAdmin(salonId) || request.auth.uid == uid;
+      }
+
+      match /services/{id}   { allow read: if true; allow write: if isAdmin(salonId); }
+      match /staff/{id}      { allow read: if true; allow write: if isAdmin(salonId); }
+      match /promotions/{id} { allow read: if true; allow write: if isAdmin(salonId); }
+
+      match /clients/{clientId} {
+        allow read, update: if isAdmin(salonId)
+          || (isAuth() && resource.data.uid == request.auth.uid)
+          || (isAuth() && resource.data.email == request.auth.token.email);
+        allow create: if true;
+        allow delete: if isAdmin(salonId);
+      }
+
+      match /bookings/{id} {
+        allow read: if isAdmin(salonId)
+          || (isAuth() && resource.data.clientEmail == request.auth.token.email);
+        allow create: if true;
+        allow update: if isAdmin(salonId)
+          || (isAuth() && resource.data.clientEmail == request.auth.token.email
+              && request.resource.data.status == 'cancelled');
+        allow delete: if isAdmin(salonId);
+      }
+    }
+  }
+}
