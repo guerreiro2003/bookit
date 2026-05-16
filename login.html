@@ -5,44 +5,45 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="Acesso à área de administração Book It." />
   <meta name="robots" content="noindex" />
-  <meta name="theme-color" content="#6b7c5a" />
-  <title>Entrar — Admin Book It</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet" />
+  <meta name="theme-color" content="#09090b" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+  <title>Entrar — Book It Admin</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <main class="auth-wrap">
-    <form class="auth-box" id="loginForm" novalidate>
-      <div class="auth-box__head">
-        <div class="auth-box__logo" aria-hidden="true">B</div>
-        <h1>Book It · Admin</h1>
-        <p class="auth-box__sub">Área de administração do salão</p>
+  <main class="auth-shell">
+    <form class="auth-card" id="loginForm" novalidate>
+      <div class="auth-card__brand">
+        <div class="auth-card__mark" aria-hidden="true">B</div>
+        <span style="font-weight:600">Book It</span>
+        <span class="text-sm text-muted" style="margin-left:auto">Admin</span>
       </div>
 
+      <h1 class="auth-card__title">Entrar na conta</h1>
+      <p class="auth-card__sub">Gere o teu salão · marcações, equipa e clientes.</p>
+
       <div id="loginErr" class="error-msg" role="alert" aria-live="assertive"></div>
+      <div id="loginOk"  class="success-msg" role="status" aria-live="polite"></div>
 
       <div class="field">
         <label for="loginEmail">Email</label>
-        <input type="email" id="loginEmail" name="email"
-               autocomplete="email" required placeholder="admin@exemplo.com" />
+        <input type="email" id="loginEmail" name="email" autocomplete="email" required placeholder="admin@exemplo.com" />
       </div>
       <div class="field field--password" data-revealed="false">
         <label for="loginPw">Password</label>
-        <input type="password" id="loginPw" name="password"
-               autocomplete="current-password" required placeholder="••••••••" />
+        <input type="password" id="loginPw" name="password" autocomplete="current-password" required placeholder="••••••••" />
         <button type="button" class="pw-toggle" aria-label="Mostrar password" data-action="toggle-pw"></button>
       </div>
 
-      <button class="btn btn--primary btn--full btn--lg" type="submit" id="loginBtn" style="margin-top:8px">
+      <button class="btn btn--primary btn--full btn--lg" type="submit" id="loginBtn" style="margin-top:6px">
         <span class="btn__label">Entrar</span>
       </button>
 
-      <div class="auth-box__footer">
+      <div class="auth-card__footer">
         <a data-action="forgot-pw" tabindex="0" role="link">Esqueci-me da password</a>
       </div>
-      <div class="auth-box__footer" style="margin-top:4px">
+      <div class="divider"></div>
+      <div class="auth-card__footer" style="margin-top:0">
         Não és admin? <a href="account.html">Área do cliente</a> ·
         <a href="staff.html">Portal da equipa</a>
       </div>
@@ -53,33 +54,27 @@
 import {
   auth, signInWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail
 } from './firebase.js';
-import { on, toastSuccess, toastError, authErrorMessage, $ } from './app.js';
+import { on, authErrorMessage, $, withLock } from './app.js';
 
 const form    = $('#loginForm');
 const errEl   = $('#loginErr');
+const okEl    = $('#loginOk');
 const btn     = $('#loginBtn');
 const btnText = btn.querySelector('.btn__label');
 const emailEl = $('#loginEmail');
 const pwEl    = $('#loginPw');
 
-function setError(msg) {
-  errEl.textContent = msg;
-  errEl.classList.toggle('show', !!msg);
-}
-
+function setErr(msg)  { errEl.textContent = msg; errEl.classList.toggle('show', !!msg); if (msg) okEl.classList.remove('show'); }
+function setOk(msg)   { okEl.textContent  = msg; okEl.classList.toggle('show', !!msg);  if (msg) errEl.classList.remove('show'); }
 function setLoading(loading) {
   btn.disabled = loading;
-  btnText.innerHTML = loading
-    ? '<span class="spinner" aria-hidden="true"></span> A entrar...'
-    : 'Entrar';
+  btnText.innerHTML = loading ? '<span class="spinner" aria-hidden="true"></span> A entrar…' : 'Entrar';
 }
 
-// If already logged in, redirect immediately
 onAuthStateChanged(auth, user => {
   if (user) window.location.href = 'admin.html';
 });
 
-// Toggle password visibility
 on('toggle-pw', (el) => {
   const field = el.closest('.field');
   const reveal = field.getAttribute('data-revealed') !== 'true';
@@ -88,35 +83,32 @@ on('toggle-pw', (el) => {
   el.setAttribute('aria-label', reveal ? 'Esconder password' : 'Mostrar password');
 });
 
-// Forgot password
 on('forgot-pw', async () => {
   const email = emailEl.value.trim();
-  if (!email) { setError('Escreve o teu email primeiro.'); emailEl.focus(); return; }
+  if (!email) { setErr('Escreve o email primeiro.'); emailEl.focus(); return; }
   try {
     await sendPasswordResetEmail(auth, email);
-    toastSuccess('Email de recuperação enviado.');
-    setError('');
+    setOk('Email de recuperação enviado. Verifica a tua caixa de entrada.');
   } catch (e) {
-    setError(authErrorMessage(e.code));
+    setErr(authErrorMessage(e.code));
   }
 });
 
-// Submit
-form.addEventListener('submit', async (e) => {
+form.addEventListener('submit', withLock('login', async (e) => {
   e.preventDefault();
-  setError('');
+  setErr(''); setOk('');
   const email = emailEl.value.trim();
   const pw    = pwEl.value;
-  if (!email || !pw) { setError('Preenche email e password.'); return; }
+  if (!email || !pw) { setErr('Preenche email e password.'); return; }
   setLoading(true);
   try {
     await signInWithEmailAndPassword(auth, email, pw);
     window.location.href = 'admin.html';
   } catch (err) {
-    setError(authErrorMessage(err.code));
+    setErr(authErrorMessage(err.code));
     setLoading(false);
   }
-});
+}));
 </script>
 </body>
 </html>

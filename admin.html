@@ -3,172 +3,260 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Painel de administração Book It — gere marcações, clientes, serviços, equipa e configurações." />
+  <meta name="description" content="Painel de administração Book It." />
   <meta name="robots" content="noindex" />
-  <meta name="theme-color" content="#6b7c5a" />
+  <meta name="theme-color" content="#09090b" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
   <title>Admin — Book It</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 
-<!-- Mobile header (only visible <= 900px) -->
-<div class="admin-mobile-header">
+<div class="app-mobile-header">
   <button class="burger" type="button" id="adminBurger" aria-label="Abrir menu" aria-expanded="false">
     <span></span><span></span><span></span>
   </button>
-  <div class="header__brand">
-    <div class="header__mark" id="mobileMark" aria-hidden="true">B</div>
-    <div class="header__name" id="mobileName">Book It</div>
+  <div class="appbar__brand">
+    <div class="appbar__mark" id="mobileMark" aria-hidden="true">B</div>
+    <div class="appbar__name" id="mobileName">Book It</div>
   </div>
-  <div style="width:40px"></div>
+  <button class="icon-btn" type="button" data-action="open-cmdk" aria-label="Pesquisa rápida">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+  </button>
 </div>
 
-<div class="admin-layout" id="adminApp" style="display:none">
+<div class="app-shell" id="adminApp" style="display:none">
 
-  <!-- SIDEBAR -->
-  <aside class="admin-sidebar" id="adminSidebar" aria-label="Menu lateral">
-    <div class="sidebar-logo">
-      <div class="sidebar-logo__mark" id="sidebarMark" aria-hidden="true">B</div>
+  <aside class="sidebar" id="adminSidebar" aria-label="Menu lateral">
+    <div class="sidebar__brand">
+      <div class="sidebar__brand-mark" id="sidebarMark" aria-hidden="true">B</div>
       <div>
-        <div class="sidebar-logo__name" id="sidebarName">Book It</div>
-        <div class="sidebar-logo__sub">Admin</div>
+        <div class="sidebar__brand-text" id="sidebarName">Book It</div>
+        <div class="sidebar__brand-sub">Admin</div>
       </div>
     </div>
 
-    <nav class="sidebar-section" aria-label="Geral">
-      <span class="sidebar-section__label">Geral</span>
-      <button class="sidebar-link active" type="button" data-action="show-panel" data-panel="dashboard">
-        <span class="sidebar-link__icon" aria-hidden="true">◈</span> Dashboard
+    <div class="sidebar__section">
+      <button class="sidebar__link active" type="button" data-action="show-panel" data-panel="dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>
+        <span>Dashboard</span>
       </button>
-    </nav>
+    </div>
 
-    <nav class="sidebar-section" aria-label="Gestão">
-      <span class="sidebar-section__label">Gestão</span>
-      <button class="sidebar-link" type="button" data-action="show-panel" data-panel="bookings">
-        <span class="sidebar-link__icon" aria-hidden="true">📅</span> Marcações
+    <div class="sidebar__section">
+      <span class="sidebar__label">Operação</span>
+      <button class="sidebar__link" type="button" data-action="show-panel" data-panel="bookings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span>Marcações</span>
+        <span class="sidebar__link-count" id="navPendingCount" hidden>0</span>
       </button>
-      <button class="sidebar-link" type="button" data-action="show-panel" data-panel="clients">
-        <span class="sidebar-link__icon" aria-hidden="true">👤</span> Clientes
+      <button class="sidebar__link" type="button" data-action="show-panel" data-panel="dayview">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="8" y2="18"/><line x1="13" y1="14" x2="16" y2="14"/></svg>
+        <span>Vista de dia</span>
       </button>
-    </nav>
+      <button class="sidebar__link" type="button" data-action="show-panel" data-panel="clients">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span>Clientes</span>
+      </button>
+    </div>
 
-    <nav class="sidebar-section" aria-label="Configurar">
-      <span class="sidebar-section__label">Configurar</span>
-      <button class="sidebar-link" type="button" data-action="show-panel" data-panel="services">
-        <span class="sidebar-link__icon" aria-hidden="true">✂</span> Serviços
+    <div class="sidebar__section">
+      <span class="sidebar__label">Configurar</span>
+      <button class="sidebar__link" type="button" data-action="show-panel" data-panel="services">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
+        <span>Serviços</span>
       </button>
-      <button class="sidebar-link" type="button" data-action="show-panel" data-panel="staff">
-        <span class="sidebar-link__icon" aria-hidden="true">👥</span> Equipa
+      <button class="sidebar__link" type="button" data-action="show-panel" data-panel="staff">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        <span>Equipa</span>
       </button>
-      <button class="sidebar-link" type="button" data-action="show-panel" data-panel="schedule">
-        <span class="sidebar-link__icon" aria-hidden="true">🕐</span> Horários
+      <button class="sidebar__link" type="button" data-action="show-panel" data-panel="schedule">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span>Horários</span>
       </button>
-      <button class="sidebar-link" type="button" data-action="show-panel" data-panel="promotions">
-        <span class="sidebar-link__icon" aria-hidden="true">🎉</span> Promoções
+      <button class="sidebar__link" type="button" data-action="show-panel" data-panel="promotions">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        <span>Promoções</span>
       </button>
-      <button class="sidebar-link" type="button" data-action="show-panel" data-panel="loyalty">
-        <span class="sidebar-link__icon" aria-hidden="true">⭐</span> Fidelização
+      <button class="sidebar__link" type="button" data-action="show-panel" data-panel="loyalty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
+        <span>Fidelização</span>
       </button>
-      <button class="sidebar-link" type="button" data-action="show-panel" data-panel="settings">
-        <span class="sidebar-link__icon" aria-hidden="true">⚙</span> Configurações
+      <button class="sidebar__link" type="button" data-action="show-panel" data-panel="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>Configurações</span>
       </button>
-    </nav>
+    </div>
 
-    <div class="sidebar-footer">
-      <a class="sidebar-link" id="viewSiteLink" target="_blank" rel="noopener" href="index.html">
-        <span class="sidebar-link__icon" aria-hidden="true">↗</span> Ver site marcações
+    <div class="sidebar__footer">
+      <a class="sidebar__link" id="viewSiteLink" target="_blank" rel="noopener" href="index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        <span>Site marcações</span>
       </a>
-      <a class="sidebar-link" id="viewAccountLink" target="_blank" rel="noopener" href="account.html">
-        <span class="sidebar-link__icon" aria-hidden="true">🌿</span> Ver portal cliente
+      <a class="sidebar__link" id="viewStaffLink" target="_blank" rel="noopener" href="staff.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span>Portal equipa</span>
       </a>
-      <a class="sidebar-link" id="viewStaffLink" target="_blank" rel="noopener" href="staff.html">
-        <span class="sidebar-link__icon" aria-hidden="true">👤</span> Ver portal equipa
-      </a>
-      <button class="sidebar-link" type="button" data-action="logout">
-        <span class="sidebar-link__icon" aria-hidden="true">⇥</span> Sair
+      <button class="sidebar__link" type="button" data-action="toggle-theme" id="themeBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="themeIcon"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <span id="themeLabel">Tema escuro</span>
+      </button>
+      <button class="sidebar__link" type="button" data-action="logout">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        <span>Sair</span>
       </button>
     </div>
   </aside>
 
-  <!-- MAIN -->
-  <main class="admin-main">
+  <main class="app-main">
 
-    <!-- DASHBOARD -->
-    <section class="panel active" id="panel-dashboard" aria-labelledby="t-dashboard">
+    <section class="panel active" id="panel-dashboard">
       <div class="panel-header">
-        <div>
-          <h1 class="panel-title" id="t-dashboard">Dashboard</h1>
-          <p class="panel-sub" id="dashDate"></p>
+        <div class="panel-header__title-row">
+          <h1 class="page-title">Dashboard</h1>
+          <p class="page-sub" id="dashDate"></p>
         </div>
-        <button class="btn btn--ghost btn--sm" type="button" data-action="refresh-dashboard">↻ Atualizar</button>
+        <div class="cluster">
+          <div class="search" style="max-width:280px">
+            <input type="search" id="globalSearch" placeholder="Pesquisar clientes, marcações…" />
+            <kbd>⌘K</kbd>
+          </div>
+          <button class="btn btn--sm" type="button" data-action="refresh-dashboard" aria-label="Atualizar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            Atualizar
+          </button>
+          <button class="btn btn--primary btn--sm" type="button" data-action="open-new-booking">＋ Nova marcação</button>
+        </div>
       </div>
-      <div class="stats-grid">
-        <div class="stat-card"><div class="stat-value" id="statToday">—</div><div class="stat-label">Marcações hoje</div></div>
-        <div class="stat-card"><div class="stat-value" id="statPending">—</div><div class="stat-label">Pendentes</div></div>
-        <div class="stat-card"><div class="stat-value" id="statConfirmed">—</div><div class="stat-label">Confirmadas</div></div>
-        <div class="stat-card stat-card--accent"><div class="stat-value" id="statRevenue">—</div><div class="stat-label">Faturação hoje</div></div>
-        <div class="stat-card"><div class="stat-value" id="statClients">—</div><div class="stat-label">Total clientes</div></div>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="stat__label">Marcações hoje</div>
+          <div class="stat__value" id="statToday">—</div>
+        </div>
+        <div class="stat">
+          <div class="stat__label">Pendentes</div>
+          <div class="stat__value" id="statPending">—</div>
+        </div>
+        <div class="stat">
+          <div class="stat__label">Confirmadas</div>
+          <div class="stat__value" id="statConfirmed">—</div>
+        </div>
+        <div class="stat">
+          <div class="stat__label">Faturação hoje</div>
+          <div class="stat__value" id="statRevenue" style="color:var(--brand)">—</div>
+        </div>
+        <div class="stat">
+          <div class="stat__label">Total clientes</div>
+          <div class="stat__value" id="statClients">—</div>
+        </div>
       </div>
-      <div class="admin-card">
-        <h3 style="margin-bottom:14px">Marcações de hoje</h3>
-        <div id="todayBookings"><div class="loading-state"><span class="spinner" aria-hidden="true"></span><div>A carregar…</div></div></div>
+
+      <div class="table-card">
+        <div class="table-card__head">
+          <div class="card__title">Marcações de hoje</div>
+          <span class="text-sm text-muted" id="liveBadge"></span>
+        </div>
+        <div class="table-card__body table-scroll" id="todayBookings">
+          <div class="loading-state"><span class="spinner" aria-hidden="true"></span></div>
+        </div>
       </div>
     </section>
 
-    <!-- BOOKINGS -->
-    <section class="panel" id="panel-bookings" aria-labelledby="t-bookings">
+    <section class="panel" id="panel-bookings">
       <div class="panel-header">
-        <div>
-          <h1 class="panel-title" id="t-bookings">Marcações</h1>
-          <p class="panel-sub">Gere todas as marcações do salão</p>
+        <div class="panel-header__title-row">
+          <h1 class="page-title">Marcações</h1>
+          <p class="page-sub">Gere todas as marcações do salão</p>
+        </div>
+        <div class="cluster">
+          <button class="btn btn--sm" type="button" data-action="export-bookings">⬇ Exportar CSV</button>
+          <button class="btn btn--primary btn--sm" type="button" data-action="open-new-booking">＋ Nova</button>
         </div>
       </div>
-      <div class="admin-card">
-        <div class="row" style="gap:10px;flex-wrap:wrap">
-          <label class="sr-only" for="filterStatus">Filtrar por estado</label>
-          <select id="filterStatus" class="input" style="max-width:200px" data-action="filter-bookings">
-            <option value="">Todos os estados</option>
-            <option value="pending">Pendentes</option>
-            <option value="confirmed">Confirmadas</option>
-            <option value="completed">Concluídas</option>
-            <option value="cancelled">Canceladas</option>
-            <option value="noshow">Não compareceu</option>
-          </select>
-          <label class="sr-only" for="filterDate">Filtrar por data</label>
-          <input type="date" id="filterDate" class="input" style="max-width:200px" data-action="filter-bookings" />
-          <button class="btn btn--ghost btn--sm" type="button" data-action="clear-filters">Limpar</button>
+
+      <div class="toolbar">
+        <div class="search" style="flex:1;max-width:320px">
+          <input type="search" id="bookingsSearch" placeholder="Cliente, telefone, serviço…" />
         </div>
+        <select id="filterStatus" class="input" style="max-width:180px" data-action="filter-bookings">
+          <option value="">Todos os estados</option>
+          <option value="pending">Pendentes</option>
+          <option value="confirmed">Confirmadas</option>
+          <option value="completed">Concluídas</option>
+          <option value="cancelled">Canceladas</option>
+          <option value="noshow">Não compareceu</option>
+        </select>
+        <input type="date" id="filterDate" class="input" style="max-width:160px" data-action="filter-bookings" />
+        <button class="btn btn--sm" type="button" data-action="clear-filters">Limpar</button>
       </div>
-      <div class="admin-card" style="padding:var(--s-5)">
-        <div id="bookingsList"><div class="loading-state"><span class="spinner" aria-hidden="true"></span><div>A carregar…</div></div></div>
+
+      <div class="table-card">
+        <div class="table-card__body" id="bookingsList">
+          <div class="loading-state"><span class="spinner" aria-hidden="true"></span></div>
+        </div>
       </div>
     </section>
 
-    <!-- CLIENTS -->
-    <section class="panel" id="panel-clients" aria-labelledby="t-clients">
-      <h1 class="panel-title" id="t-clients">Clientes</h1>
-      <p class="panel-sub">Histórico e fidelização dos clientes</p>
-      <div class="admin-card" style="padding:var(--s-5)">
-        <div id="clientsList"><div class="loading-state"><span class="spinner" aria-hidden="true"></span><div>A carregar…</div></div></div>
+    <section class="panel" id="panel-dayview">
+      <div class="panel-header">
+        <div class="panel-header__title-row">
+          <h1 class="page-title">Vista de dia</h1>
+          <p class="page-sub">Cronograma do dia em formato visual</p>
+        </div>
+        <div class="cluster">
+          <button class="btn btn--sm" type="button" data-action="dayview-prev" aria-label="Anterior">‹</button>
+          <input type="date" id="dayviewDate" class="input" style="max-width:160px" data-action="dayview-change" />
+          <button class="btn btn--sm" type="button" data-action="dayview-next" aria-label="Seguinte">›</button>
+          <button class="btn btn--sm" type="button" data-action="dayview-today">Hoje</button>
+        </div>
+      </div>
+      <div class="dayview">
+        <div class="dayview__head">
+          <div class="dayview__title" id="dayviewTitle">—</div>
+          <div class="text-sm text-muted" id="dayviewCount">0 marcações</div>
+        </div>
+        <div class="dayview__grid">
+          <div class="dayview__hours" id="dayviewHours"></div>
+          <div class="dayview__slots" id="dayviewSlots"></div>
+        </div>
       </div>
     </section>
 
-    <!-- SERVICES -->
-    <section class="panel" id="panel-services" aria-labelledby="t-services">
-      <h1 class="panel-title" id="t-services">Serviços &amp; Preços</h1>
-      <p class="panel-sub">Adiciona, edita e remove serviços. As alterações aparecem imediatamente no site.</p>
+    <section class="panel" id="panel-clients">
+      <div class="panel-header">
+        <div class="panel-header__title-row">
+          <h1 class="page-title">Clientes</h1>
+          <p class="page-sub">Histórico e fidelização</p>
+        </div>
+        <div class="cluster">
+          <div class="search" style="max-width:280px">
+            <input type="search" id="clientsSearch" placeholder="Nome, email…" />
+          </div>
+          <button class="btn btn--sm" type="button" data-action="export-clients">⬇ Exportar CSV</button>
+        </div>
+      </div>
+      <div class="table-card">
+        <div class="table-card__body" id="clientsList">
+          <div class="loading-state"><span class="spinner" aria-hidden="true"></span></div>
+        </div>
+      </div>
+    </section>
 
-      <form class="admin-card" id="serviceForm">
-        <h3 id="svcFormTitle" style="margin-bottom:14px">Novo serviço</h3>
+    <section class="panel" id="panel-services">
+      <h1 class="page-title">Serviços &amp; preços</h1>
+      <p class="page-sub mb-5">Adiciona, edita e remove. As alterações aparecem imediatamente no site.</p>
+
+      <form class="card mb-4" id="serviceForm">
+        <div class="card__head">
+          <div class="card__title" id="svcFormTitle">Novo serviço</div>
+        </div>
         <div class="grid-2">
           <div class="field"><label for="svcName">Nome *</label><input type="text" id="svcName" required placeholder="Ex: Corte + Brushing" /></div>
           <div class="field"><label for="svcPrice">Preço (€) *</label><input type="number" id="svcPrice" required min="0" step="0.5" placeholder="35" /></div>
           <div class="field"><label for="svcDuration">Duração (min) *</label><input type="number" id="svcDuration" required min="5" step="5" placeholder="45" /></div>
           <div class="field"><label for="svcType">Tipo</label>
-            <select id="svcType" class="input">
+            <select id="svcType">
               <option value="single">Serviço individual</option>
               <option value="package">Pacote / Combinação</option>
             </select>
@@ -177,130 +265,131 @@
         <div class="field"><label for="svcDesc">Descrição (opcional)</label><input type="text" id="svcDesc" placeholder="Ex: A partir de" /></div>
         <div id="packageFields" hidden>
           <div class="grid-2">
-            <div class="field"><label for="svcOriginal">Preço original (€)</label><input type="number" id="svcOriginal" min="0" step="0.5" placeholder="55" /></div>
-            <div class="field"><label for="svcIncludes">O que inclui</label><input type="text" id="svcIncludes" placeholder="Corte + Coloração + Tratamento" /></div>
+            <div class="field"><label for="svcOriginal">Preço original (€)</label><input type="number" id="svcOriginal" min="0" step="0.5" /></div>
+            <div class="field"><label for="svcIncludes">Inclui</label><input type="text" id="svcIncludes" placeholder="Corte + Coloração + Tratamento" /></div>
           </div>
         </div>
-        <div class="row" style="margin-top:8px">
+        <div class="cluster">
           <button class="btn btn--primary" type="submit" id="svcSubmitBtn">Adicionar serviço</button>
-          <button class="btn btn--ghost" type="button" id="svcCancelBtn" data-action="cancel-edit-service" hidden>Cancelar edição</button>
+          <button class="btn" type="button" id="svcCancelBtn" data-action="cancel-edit-service" hidden>Cancelar edição</button>
         </div>
       </form>
 
-      <div class="admin-card" style="padding:var(--s-5)">
-        <h3 style="margin-bottom:10px">Serviços</h3>
-        <div id="servicesList"><div class="loading-state"><span class="spinner" aria-hidden="true"></span><div>A carregar…</div></div></div>
+      <div class="table-card">
+        <div class="table-card__head"><div class="card__title">Serviços</div></div>
+        <div class="table-card__body" id="servicesList">
+          <div class="loading-state"><span class="spinner" aria-hidden="true"></span></div>
+        </div>
       </div>
     </section>
 
-    <!-- STAFF -->
-    <section class="panel" id="panel-staff" aria-labelledby="t-staff">
-      <h1 class="panel-title" id="t-staff">Equipa</h1>
-      <p class="panel-sub">Adiciona e gere os colaboradores. Os clientes podem escolher um ao marcar.</p>
+    <section class="panel" id="panel-staff">
+      <h1 class="page-title">Equipa</h1>
+      <p class="page-sub mb-5">Colaboradores e horários individuais</p>
 
-      <form class="admin-card" id="staffForm">
-        <h3 style="margin-bottom:14px">Novo colaborador</h3>
+      <form class="card mb-4" id="staffForm">
+        <div class="card__head"><div class="card__title">Novo colaborador</div></div>
         <div class="grid-2">
-          <div class="field"><label for="staffName">Nome *</label><input type="text" id="staffName" required placeholder="Ex: Ana Silva" /></div>
+          <div class="field"><label for="staffName">Nome *</label><input type="text" id="staffName" required /></div>
           <div class="field"><label for="staffRole">Função</label><input type="text" id="staffRole" placeholder="Ex: Cabeleireira" /></div>
           <div class="field"><label for="staffSpecialties">Especialidades</label><input type="text" id="staffSpecialties" placeholder="Coloração, Madeixas" /></div>
-          <div class="field"><label for="staffEmail">Email (opcional)</label><input type="email" id="staffEmail" /></div>
+          <div class="field"><label for="staffEmail">Email</label><input type="email" id="staffEmail" /></div>
         </div>
-        <div class="field"><label for="staffBio">Sobre (opcional)</label><textarea id="staffBio" placeholder="Breve descrição…"></textarea></div>
+        <div class="field"><label for="staffBio">Sobre (opcional)</label><textarea id="staffBio"></textarea></div>
         <button class="btn btn--primary" type="submit">Adicionar colaborador</button>
       </form>
 
-      <div class="admin-card">
-        <h3 style="margin-bottom:6px">Horário por colaborador</h3>
-        <p class="card__sub">Define horários individuais (folgas, horas diferentes).</p>
+      <div class="card mb-4">
+        <div class="card__head">
+          <div>
+            <div class="card__title">Horário por colaborador</div>
+            <div class="card__sub">Folgas e horas individuais.</div>
+          </div>
+        </div>
         <div class="field">
           <label for="staffSchedSelect">Seleciona colaborador</label>
-          <select id="staffSchedSelect" class="input" data-action="load-staff-schedule">
-            <option value="">— escolhe —</option>
-          </select>
+          <select id="staffSchedSelect" data-action="load-staff-schedule"><option value="">—</option></select>
         </div>
         <div id="staffSchedEditor" hidden>
           <div id="staffSchedFields"></div>
-          <button class="btn btn--primary" type="button" data-action="save-staff-schedule" style="margin-top:14px">
-            Guardar horário do colaborador
-          </button>
+          <button class="btn btn--primary mt-4" type="button" data-action="save-staff-schedule">Guardar horário</button>
         </div>
       </div>
 
-      <div class="admin-card" style="padding:var(--s-5)">
-        <h3 style="margin-bottom:10px">Colaboradores <span class="badge badge--green" id="staffCount">0</span></h3>
-        <div id="staffList"><div class="loading-state"><span class="spinner" aria-hidden="true"></span><div>A carregar…</div></div></div>
+      <div class="table-card">
+        <div class="table-card__head">
+          <div class="card__title">Colaboradores <span class="badge badge--gray" id="staffCount" style="margin-left:6px">0</span></div>
+        </div>
+        <div class="table-card__body" id="staffList" style="padding: 0 var(--s-5)">
+          <div class="loading-state"><span class="spinner" aria-hidden="true"></span></div>
+        </div>
       </div>
     </section>
 
-    <!-- SCHEDULE -->
-    <section class="panel" id="panel-schedule" aria-labelledby="t-schedule">
-      <h1 class="panel-title" id="t-schedule">Horários</h1>
-      <p class="panel-sub">Horários de funcionamento. Dias fechados ficam indisponíveis para marcação.</p>
-      <div class="admin-card">
+    <section class="panel" id="panel-schedule">
+      <h1 class="page-title">Horários</h1>
+      <p class="page-sub mb-5">Horários de funcionamento. Dias fechados ficam indisponíveis para marcação.</p>
+      <div class="card">
         <div id="scheduleEditor"></div>
-        <button class="btn btn--primary" type="button" data-action="save-schedule" style="margin-top:18px">
-          Guardar horário
-        </button>
+        <button class="btn btn--primary mt-5" type="button" data-action="save-schedule">Guardar horário</button>
       </div>
     </section>
 
-    <!-- PROMOTIONS -->
-    <section class="panel" id="panel-promotions" aria-labelledby="t-promotions">
-      <h1 class="panel-title" id="t-promotions">Promoções</h1>
-      <p class="panel-sub">Promoções que aparecem no topo da página de marcações.</p>
-      <form class="admin-card" id="promoForm">
-        <h3 style="margin-bottom:14px">Nova promoção</h3>
-        <div class="field"><label for="promoTitle">Título *</label><input type="text" id="promoTitle" required placeholder="Ex: Primavera em beleza" /></div>
-        <div class="field"><label for="promoDesc">Descrição *</label><input type="text" id="promoDesc" required placeholder="Ex: 20% em coloração durante abril" /></div>
-        <div class="field"><label for="promoBadge">Badge (opcional)</label><input type="text" id="promoBadge" placeholder="Ex: -20%" /></div>
+    <section class="panel" id="panel-promotions">
+      <h1 class="page-title">Promoções</h1>
+      <p class="page-sub mb-5">Banners no topo da página de marcações.</p>
+      <form class="card mb-4" id="promoForm">
+        <div class="card__head"><div class="card__title">Nova promoção</div></div>
+        <div class="field"><label for="promoTitle">Título *</label><input type="text" id="promoTitle" required /></div>
+        <div class="field"><label for="promoDesc">Descrição *</label><input type="text" id="promoDesc" required /></div>
+        <div class="field"><label for="promoBadge">Badge</label><input type="text" id="promoBadge" placeholder="Ex: -20%" /></div>
         <button class="btn btn--primary" type="submit">Publicar promoção</button>
       </form>
-      <div class="admin-card" style="padding:var(--s-5)">
-        <h3 style="margin-bottom:10px">Promoções</h3>
-        <div id="promotionsList"><div class="loading-state"><span class="spinner" aria-hidden="true"></span><div>A carregar…</div></div></div>
+      <div class="table-card">
+        <div class="table-card__head"><div class="card__title">Promoções</div></div>
+        <div class="table-card__body" id="promotionsList" style="padding: 0 var(--s-5)">
+          <div class="loading-state"><span class="spinner" aria-hidden="true"></span></div>
+        </div>
       </div>
     </section>
 
-    <!-- LOYALTY -->
-    <section class="panel" id="panel-loyalty" aria-labelledby="t-loyalty">
-      <h1 class="panel-title" id="t-loyalty">Fidelização &amp; Referidos</h1>
-      <p class="panel-sub">Programa de recompensas para clientes.</p>
-      <form class="admin-card" id="loyaltyForm">
-        <h3 style="margin-bottom:14px">Cartão de fidelização</h3>
+    <section class="panel" id="panel-loyalty">
+      <h1 class="page-title">Fidelização &amp; Referidos</h1>
+      <p class="page-sub mb-5">Programa de recompensas para clientes</p>
+      <form class="card" id="loyaltyForm">
+        <div class="card__head"><div class="card__title">Cartão de fidelização</div></div>
         <div class="grid-2">
           <div class="field">
             <label for="loyaltyVisits">Visitas para desconto</label>
-            <input type="number" id="loyaltyVisits" min="1" placeholder="10" />
+            <input type="number" id="loyaltyVisits" min="1" />
             <div class="field__hint">Visitas pagas para ganhar recompensa.</div>
           </div>
           <div class="field">
             <label for="loyaltyDiscount">Desconto (%)</label>
-            <input type="number" id="loyaltyDiscount" min="1" max="100" placeholder="20" />
+            <input type="number" id="loyaltyDiscount" min="1" max="100" />
             <div class="field__hint">% na próxima visita.</div>
           </div>
         </div>
-        <h3 style="margin:18px 0 14px">Referidos</h3>
-        <div class="field">
-          <label for="referralDiscount">Desconto por referido (%)</label>
-          <input type="number" id="referralDiscount" min="1" max="100" placeholder="10" />
-          <div class="field__hint">Desconto dado ao referidor e ao referido.</div>
+        <div class="divider"></div>
+        <div class="grid-2">
+          <div class="field">
+            <label for="referralDiscount">Desconto referido (%)</label>
+            <input type="number" id="referralDiscount" min="1" max="100" />
+          </div>
+          <div class="field">
+            <label for="noShowPenalty">Pontos por "não compareceu"</label>
+            <input type="number" id="noShowPenalty" min="0" />
+            <div class="field__hint">Pontos deduzidos. 0 desativa.</div>
+          </div>
         </div>
-        <h3 style="margin:18px 0 14px">Não-comparência</h3>
-        <div class="field">
-          <label for="noShowPenalty">Pontos deduzidos por "Não compareceu"</label>
-          <input type="number" id="noShowPenalty" min="0" placeholder="5" />
-          <div class="field__hint">Reduz pontos quando o cliente não aparece sem cancelar.</div>
-        </div>
-        <button class="btn btn--primary" type="submit">Guardar configurações</button>
+        <button class="btn btn--primary mt-4" type="submit">Guardar</button>
       </form>
     </section>
 
-    <!-- SETTINGS -->
-    <section class="panel" id="panel-settings" aria-labelledby="t-settings">
-      <h1 class="panel-title" id="t-settings">Configurações</h1>
-      <p class="panel-sub">Informações gerais do salão</p>
-      <form class="admin-card" id="settingsForm">
+    <section class="panel" id="panel-settings">
+      <h1 class="page-title">Configurações</h1>
+      <p class="page-sub mb-5">Informações gerais do salão</p>
+      <form class="card" id="settingsForm">
         <div class="field"><label for="cfgName">Nome do salão</label><input type="text" id="cfgName" /></div>
         <div class="field"><label for="cfgTagline">Tagline</label><input type="text" id="cfgTagline" /></div>
         <div class="field"><label for="cfgAddress">Morada</label><input type="text" id="cfgAddress" /></div>
@@ -310,77 +399,120 @@
         </div>
         <div class="field">
           <label for="cfgColor">Cor principal</label>
-          <div class="row" style="gap:10px">
-            <input type="text" id="cfgColor" placeholder="#6b7c5a" style="flex:1" />
-            <input type="color" id="cfgColorPicker" aria-label="Escolher cor" style="width:42px;height:42px;border-radius:10px;border:1px solid var(--line);padding:2px" />
+          <div class="flex" style="gap:8px">
+            <input type="text" id="cfgColor" placeholder="#6b7c5a" style="flex:1;font-family:var(--font-mono)" />
+            <input type="color" id="cfgColorPicker" aria-label="Escolher cor" style="width:36px;height:36px;border-radius:var(--r-md);border:1px solid var(--border);padding:2px" />
           </div>
         </div>
         <div class="field">
           <label for="cfgBdayDiscount">Desconto de aniversário (%)</label>
-          <input type="number" id="cfgBdayDiscount" min="1" max="100" placeholder="15" />
-          <div class="field__hint">Aplicado automaticamente no mês de aniversário.</div>
+          <input type="number" id="cfgBdayDiscount" min="1" max="100" />
         </div>
         <div class="field field--password" data-revealed="false">
-          <label for="cfgTeamPw">Password da equipa <span class="field__hint" style="display:inline">(staff.html)</span></label>
-          <input type="password" id="cfgTeamPw" placeholder="Define uma password única" />
+          <label for="cfgTeamPw">Password da equipa <span class="text-muted text-sm" style="font-weight:400">(staff.html)</span></label>
+          <input type="password" id="cfgTeamPw" placeholder="Define ou altera" />
           <button type="button" class="pw-toggle" data-action="toggle-pw" aria-label="Mostrar password"></button>
-          <div class="field__hint">Os colaboradores usam esta password para entrar no portal. Muda-a quando alguém sair.</div>
+          <div class="field__hint">Hashada antes de gravar. Muda quando alguém sair da equipa.</div>
         </div>
-        <button class="btn btn--primary" type="submit">Guardar configurações</button>
+        <button class="btn btn--primary mt-3" type="submit">Guardar configurações</button>
       </form>
     </section>
 
   </main>
 </div>
 
-<!-- Sidebar backdrop (mobile) -->
-<div id="sidebarBackdrop" class="modal-overlay" data-action="close-sidebar" style="background:rgba(40,34,26,.35)"></div>
+<div id="sidebarBackdrop" class="modal-overlay" data-action="close-sidebar"></div>
 
-<!-- ── Payment modal ─────────────────────────────────────── -->
+<!-- Payment modal -->
 <div id="payModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="payTitle" aria-hidden="true">
   <div class="modal">
-    <button class="modal__close" type="button" data-action="close-pay" aria-label="Fechar">✕</button>
+    <button class="modal__close" type="button" data-action="close-pay" aria-label="Fechar">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
     <h2 class="modal__title" id="payTitle">Registar pagamento</h2>
     <p class="modal__sub" id="paySub">—</p>
-    <div class="pay-methods">
-      <button type="button" class="pay-method" data-action="pick-method" data-method="balcao">
-        <div class="pay-method__icon">💵</div>
-        <div class="pay-method__name">Balcão</div>
-        <div class="pay-method__sub">Dinheiro · MB · TPA</div>
+    <div class="methods">
+      <button type="button" class="method" data-action="pick-method" data-method="balcao">
+        <div class="method__icon">💵</div>
+        <div class="method__name">Balcão</div>
+        <div class="method__sub">Dinheiro · MB</div>
       </button>
-      <button type="button" class="pay-method" data-action="pick-method" data-method="online">
-        <div class="pay-method__icon">💳</div>
-        <div class="pay-method__name">Online</div>
-        <div class="pay-method__sub">MB Way · Stripe</div>
+      <button type="button" class="method" data-action="pick-method" data-method="online">
+        <div class="method__icon">💳</div>
+        <div class="method__name">Online</div>
+        <div class="method__sub">MB Way · Stripe</div>
       </button>
     </div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:14px">
-      Ao confirmar, atribui-se <strong id="payPoints">10</strong> pontos ao cliente e a marcação é concluída.
+    <p class="text-sm text-muted mb-4">
+      Ao confirmar, atribuem-se <strong id="payPoints">10</strong> pontos ao cliente e a marcação fica concluída.
     </p>
-    <div class="btn-group btn-group--full">
-      <button class="btn btn--ghost" type="button" data-action="close-pay">Cancelar</button>
-      <button class="btn btn--primary" type="button" id="payConfirmBtn" data-action="confirm-pay" disabled>Confirmar pagamento</button>
+    <div class="btn-group--full">
+      <button class="btn" type="button" data-action="close-pay">Cancelar</button>
+      <button class="btn btn--primary" type="button" id="payConfirmBtn" data-action="confirm-pay" disabled>Confirmar</button>
     </div>
+  </div>
+</div>
+
+<!-- New booking modal -->
+<div id="newBookingModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="nbTitle" aria-hidden="true">
+  <div class="modal modal--wide">
+    <button class="modal__close" type="button" data-action="close-new-booking" aria-label="Fechar">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <h2 class="modal__title" id="nbTitle">Nova marcação</h2>
+    <p class="modal__sub">Cria uma marcação manualmente (cliente ao telefone, walk-in…)</p>
+
+    <form id="newBookingForm">
+      <div class="grid-2">
+        <div class="field"><label for="nbClient">Cliente *</label><input type="text" id="nbClient" required placeholder="Nome" /></div>
+        <div class="field"><label for="nbPhone">Telefone *</label><input type="tel" id="nbPhone" required /></div>
+      </div>
+      <div class="field"><label for="nbEmail">Email (opcional)</label><input type="email" id="nbEmail" /></div>
+      <div class="grid-2">
+        <div class="field"><label for="nbService">Serviço *</label><select id="nbService" required></select></div>
+        <div class="field"><label for="nbStaff">Colaborador</label><select id="nbStaff"><option value="">Sem preferência</option></select></div>
+      </div>
+      <div class="grid-2">
+        <div class="field"><label for="nbDate">Data *</label><input type="date" id="nbDate" required /></div>
+        <div class="field"><label for="nbTime">Hora *</label><input type="time" id="nbTime" required step="900" /></div>
+      </div>
+      <div class="field"><label for="nbNotes">Notas</label><textarea id="nbNotes"></textarea></div>
+      <div id="nbErr" class="error-msg" role="alert"></div>
+      <div class="btn-group--full">
+        <button class="btn" type="button" data-action="close-new-booking">Cancelar</button>
+        <button class="btn btn--primary" type="submit" id="nbSubmit">Criar marcação</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Command palette -->
+<div id="cmdkOverlay" class="cmdk-overlay" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="cmdk" role="combobox" aria-expanded="true">
+    <input type="text" class="cmdk__input" id="cmdkInput" placeholder="Procurar comandos, clientes, marcações…" autocomplete="off" />
+    <div class="cmdk__list" id="cmdkList"></div>
   </div>
 </div>
 
 <script type="module">
 import {
   db, auth, collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, deleteDoc,
-  query, where, orderBy, serverTimestamp,
-  signOut, onAuthStateChanged, increment
+  query, where, orderBy, limit, serverTimestamp, onSnapshot,
+  signOut, onAuthStateChanged
 } from './firebase.js';
 import {
-  $, $$, on, toast, toastSuccess, toastError, escapeHTML, html, htmlMix, raw,
-  MONTHS_FULL, formatDate, formatDatePT, formatPrice,
-  STATUS_LABELS, statusBadge
+  $, $$, on, toast, toastSuccess, toastError, escapeHTML, htmlMix, raw,
+  MONTHS_FULL, formatDate, formatDatePT, formatPrice, todayISO, relativeDay,
+  STATUS_LABELS, statusBadge, withLock,
+  hashPassword, debounce, toggleTheme, getTheme, setTheme,
+  markBookingPaid, markBookingNoShow, downloadCSV, subscribe, trapFocus,
+  isEmail, isPhone, isHexColor
 } from './app.js';
 
-let salonId = null;
-let salon   = null;
-let allStaff = [];
-let editingServiceId = null;
-let payContext = null;   // { bookingId, method }
+let salonId = null, salon = null, allStaff = [], allServices = [], allClients = [];
+let editingServiceId = null, payContext = null;
+let unsubToday = null, unsubBookings = null;
+let cachedBookings = [];
 
 const DAYS_CONFIG = [
   { key: 'monday',    label: 'Segunda-feira' },
@@ -392,50 +524,47 @@ const DAYS_CONFIG = [
   { key: 'sunday',    label: 'Domingo' },
 ];
 
-/* ── AUTH GUARD ────────────────────────────────────────── */
+/* ── AUTH ────────────────────────────────────────────────── */
 onAuthStateChanged(auth, async (user) => {
   if (!user) { window.location.href = 'login.html'; return; }
   try {
     await loadSalon(user.uid);
     $('#adminApp').style.display = 'flex';
-    initDashboard();
+    syncThemeIcon();
+    subscribeToday();
+    subscribeBookings();
     loadServices();
     loadSchedule();
     loadPromotions();
     loadClients();
     loadLoyalty();
-    loadStaff();  // <-- now loads on init so the schedule select isn't empty
+    loadStaff();
   } catch (e) {
-    console.error(e);
-    toastError('Erro ao carregar painel.');
+    console.error(e); toastError('Erro ao carregar painel.');
   }
 });
 
-/* ── LOAD SALON ────────────────────────────────────────── */
 async function loadSalon(uid) {
   const snap = await getDocs(query(collection(db,'salons'), where('adminUid','==', uid)));
   if (snap.empty) {
-    alert('Salão não encontrado para este utilizador. Faz setup em setup.html.');
-    window.location.href = 'setup.html';
-    return;
+    alert('Salão não encontrado. Faz setup em setup.html');
+    window.location.href = 'setup.html'; return;
   }
   const d = snap.docs[0];
-  salonId = d.id;
-  salon = d.data();
+  salonId = d.id; salon = d.data();
 
-  $('#sidebarMark').textContent = salon.name?.charAt(0) || 'B';
+  const brand = (s) => (s.name || 'B').charAt(0).toUpperCase();
+  $('#sidebarMark').textContent = brand(salon);
   $('#sidebarName').textContent = salon.name || 'Book It';
-  $('#mobileMark').textContent  = salon.name?.charAt(0) || 'B';
+  $('#mobileMark').textContent  = brand(salon);
   $('#mobileName').textContent  = salon.name || 'Book It';
 
   const qs = `?salon=${encodeURIComponent(salonId)}`;
-  $('#viewSiteLink').href    = `index.html${qs}`;
-  $('#viewAccountLink').href = `account.html${qs}`;
-  $('#viewStaffLink').href   = `staff.html${qs}`;
+  $('#viewSiteLink').href  = `index.html${qs}`;
+  $('#viewStaffLink').href = `staff.html${qs}`;
 
   if (salon.primaryColor) document.documentElement.style.setProperty('--brand', salon.primaryColor);
 
-  // Settings form
   $('#cfgName').value     = salon.name || '';
   $('#cfgTagline').value  = salon.tagline || '';
   $('#cfgAddress').value  = salon.address || '';
@@ -444,21 +573,20 @@ async function loadSalon(uid) {
   $('#cfgColor').value    = salon.primaryColor || '#6b7c5a';
   $('#cfgColorPicker').value = salon.primaryColor || '#6b7c5a';
   $('#cfgBdayDiscount').value = salon.birthdayDiscount || 15;
-  $('#cfgTeamPw').value   = salon.teamPassword || '';
+  $('#cfgTeamPw').value = ''; // Never display existing hash; user retypes to change
 
-  $('#cfgColorPicker').addEventListener('input', e => {
+  $('#cfgColorPicker').addEventListener('input', debounce(e => {
     $('#cfgColor').value = e.target.value;
     document.documentElement.style.setProperty('--brand', e.target.value);
-  });
-  $('#cfgColor').addEventListener('input', e => {
-    if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) {
+  }, 80));
+  $('#cfgColor').addEventListener('input', debounce(e => {
+    if (isHexColor(e.target.value)) {
       $('#cfgColorPicker').value = e.target.value;
       document.documentElement.style.setProperty('--brand', e.target.value);
     }
-  });
+  }, 80));
 }
 
-/* ── PASSWORD TOGGLE ──────────────────────────────────── */
 on('toggle-pw', (el) => {
   const field = el.closest('.field');
   const reveal = field.getAttribute('data-revealed') !== 'true';
@@ -466,25 +594,32 @@ on('toggle-pw', (el) => {
   field.querySelector('input').type = reveal ? 'text' : 'password';
 });
 
-/* ── SIDEBAR (mobile drawer) ──────────────────────────── */
-const sidebar = $('#adminSidebar');
-const backdrop = $('#sidebarBackdrop');
+/* Theme toggle */
+function syncThemeIcon() {
+  const isDark = getTheme() === 'dark';
+  $('#themeLabel').textContent = isDark ? 'Tema claro' : 'Tema escuro';
+  $('#themeIcon').innerHTML = isDark
+    ? '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>'
+    : '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+}
+on('toggle-theme', () => { toggleTheme(); syncThemeIcon(); });
+
+/* Sidebar */
+const sidebar = $('#adminSidebar'), backdrop = $('#sidebarBackdrop');
 $('#adminBurger').addEventListener('click', () => {
   const open = sidebar.classList.toggle('open');
   $('#adminBurger').setAttribute('aria-expanded', String(open));
   backdrop.classList.toggle('show', open);
 });
 on('close-sidebar', () => {
-  sidebar.classList.remove('open');
-  backdrop.classList.remove('show');
-  $('#adminBurger').setAttribute('aria-expanded', 'false');
+  sidebar.classList.remove('open'); backdrop.classList.remove('show');
+  $('#adminBurger').setAttribute('aria-expanded','false');
 });
 
-/* ── PANEL SWITCHING ───────────────────────────────────── */
 on('show-panel', (el) => {
   const id = el.dataset.panel;
   $$('.panel').forEach(p => p.classList.remove('active'));
-  $$('.sidebar-link').forEach(l => l.classList.remove('active'));
+  $$('.sidebar__link').forEach(l => l.classList.remove('active'));
   $('#panel-' + id).classList.add('active');
   el.classList.add('active');
   if (id === 'bookings')   loadBookings();
@@ -492,319 +627,392 @@ on('show-panel', (el) => {
   if (id === 'services')   loadServices();
   if (id === 'promotions') loadPromotions();
   if (id === 'staff')      loadStaff();
-  if (id === 'dashboard')  initDashboard();
-  // close drawer on mobile
-  sidebar.classList.remove('open');
-  backdrop.classList.remove('show');
+  if (id === 'dayview')    initDayview();
+  sidebar.classList.remove('open'); backdrop.classList.remove('show');
 });
 
 on('logout', async () => { await signOut(auth); window.location.href = 'login.html'; });
 
-/* ── DASHBOARD ─────────────────────────────────────────── */
-async function initDashboard() {
+/* ── DASHBOARD live ──────────────────────────────────────── */
+function subscribeToday() {
+  if (unsubToday) unsubToday();
   const today = new Date();
-  $('#dashDate').textContent = `${today.getDate()} de ${MONTHS_FULL[today.getMonth()]} de ${today.getFullYear()}`;
+  $('#dashDate').textContent = `${today.getDate()} ${MONTHS_FULL[today.getMonth()]} ${today.getFullYear()}`;
   const dateStr = formatDate(today);
 
-  try {
-    const todaySnap = await getDocs(query(
-      collection(db,'salons',salonId,'bookings'), where('date','==', dateStr)
-    ));
-    const todayBookings = todaySnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const q = query(collection(db,'salons',salonId,'bookings'), where('date','==', dateStr));
+  unsubToday = onSnapshot(q, snap => {
+    const todayBookings = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => a.time.localeCompare(b.time));
+    const active = todayBookings.filter(b => b.status !== 'cancelled');
+    $('#statToday').textContent     = active.length;
+    $('#statPending').textContent   = active.filter(b => b.status === 'pending').length;
+    $('#statConfirmed').textContent = active.filter(b => b.status === 'confirmed').length;
+    const revenue = active.filter(b => b.paid).reduce((s,b) => s + (Number(b.finalPrice) || Number(b.servicePrice) || 0), 0);
+    $('#statRevenue').textContent = `${revenue}€`;
 
-    $('#statToday').textContent     = todayBookings.filter(b => b.status !== 'cancelled').length;
-    $('#statPending').textContent   = todayBookings.filter(b => b.status === 'pending').length;
-    $('#statConfirmed').textContent = todayBookings.filter(b => b.status === 'confirmed').length;
-    const revenue = todayBookings.filter(b => b.paid).reduce((s, b) => s + (Number(b.finalPrice) || Number(b.servicePrice) || 0), 0);
-    $('#statRevenue').textContent   = `${revenue}€`;
+    const pending = active.filter(b => b.status === 'pending').length;
+    const navBadge = $('#navPendingCount');
+    if (pending > 0) { navBadge.hidden = false; navBadge.textContent = pending; }
+    else { navBadge.hidden = true; }
 
-    const clientsSnap = await getDocs(collection(db,'salons',salonId,'clients'));
-    $('#statClients').textContent   = clientsSnap.size;
+    renderTodayList(todayBookings);
+    if ($('#panel-dayview').classList.contains('active')) renderDayview();
+  });
 
-    const tbEl = $('#todayBookings');
-    if (!todayBookings.length) {
-      tbEl.innerHTML = `<div class="empty-state" style="background:transparent;border:none;padding:24px 0">
-        <div class="empty-state__icon" aria-hidden="true">📅</div>
-        <div class="empty-state__title">Sem marcações hoje</div></div>`;
-      return;
-    }
-    todayBookings.sort((a,b) => a.time.localeCompare(b.time));
-    tbEl.innerHTML = `<div class="table-scroll"><table class="data-table">
-      <thead><tr>
-        <th>Hora</th><th>Cliente</th><th>Serviço</th><th>Estado</th><th class="actions">Ação</th>
-      </tr></thead>
-      <tbody>
-        ${todayBookings.map(b => htmlMix`
-          <tr>
-            <td><strong>${b.time}</strong></td>
-            <td>${b.clientName}${b.forSomeone ? raw(htmlMix`<br><span style="font-size:11px;color:var(--muted)">para ${b.forSomeone}</span>`) : ''}</td>
-            <td>${b.serviceName}</td>
-            <td>${raw(statusBadge(b.status))}</td>
-            <td class="actions">${raw(bookingActions(b))}</td>
-          </tr>`).join('')}
-      </tbody></table></div>`;
-  } catch (e) {
-    console.error(e);
-    toastError('Erro ao carregar dashboard.');
-  }
+  getDocs(collection(db,'salons',salonId,'clients')).then(s => $('#statClients').textContent = s.size);
+  $('#liveBadge').innerHTML = '<span class="dot" style="margin-right:6px"></span>Em tempo real';
 }
-on('refresh-dashboard', initDashboard);
 
-/* ── BOOKINGS ──────────────────────────────────────────── */
+function renderTodayList(bookings) {
+  const el = $('#todayBookings');
+  if (!bookings.length) {
+    el.innerHTML = `<div class="empty-state" style="background:transparent;border:none;padding:var(--s-6) var(--s-4)">
+      <div class="empty-state__icon">📅</div>
+      <div class="empty-state__title">Sem marcações hoje</div></div>`;
+    return;
+  }
+  el.innerHTML = `<table class="data-table">
+    <thead><tr><th>Hora</th><th>Cliente</th><th>Serviço</th><th>Colaborador</th><th>Estado</th><th class="actions">Ações</th></tr></thead>
+    <tbody>${bookings.map(b => htmlMix`
+      <tr>
+        <td class="tabular"><strong>${b.time}</strong></td>
+        <td><strong>${b.clientName}</strong>${b.forSomeone ? raw(htmlMix`<br><span class="text-xs text-muted">para ${b.forSomeone}</span>`) : ''}</td>
+        <td>${b.serviceName}</td>
+        <td class="text-muted">${b.staffName || '—'}</td>
+        <td>${raw(statusBadge(b.status))}${b.paid ? raw(' <span class="badge badge--green">Pago</span>') : ''}</td>
+        <td class="actions">${raw(bookingActions(b))}</td>
+      </tr>`).join('')}</tbody></table>`;
+}
+
+on('refresh-dashboard', () => { subscribeToday(); subscribeBookings(); });
+
+/* ── BOOKINGS live ───────────────────────────────────────── */
+function subscribeBookings() {
+  if (unsubBookings) unsubBookings();
+  const q = query(collection(db,'salons',salonId,'bookings'), orderBy('date','desc'), limit(500));
+  unsubBookings = onSnapshot(q, snap => {
+    cachedBookings = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if ($('#panel-bookings').classList.contains('active')) loadBookings();
+  });
+}
+
+const onSearch = debounce(loadBookings, 200);
+$('#bookingsSearch').addEventListener('input', onSearch);
 on('filter-bookings', loadBookings);
 on('clear-filters', () => {
-  $('#filterStatus').value = '';
-  $('#filterDate').value = '';
+  $('#filterStatus').value=''; $('#filterDate').value=''; $('#bookingsSearch').value='';
   loadBookings();
 });
 
-async function loadBookings() {
+function loadBookings() {
   if (!salonId) return;
   const el = $('#bookingsList');
-  el.innerHTML = `<div class="loading-state"><span class="spinner" aria-hidden="true"></span><div>A carregar…</div></div>`;
-  try {
-    const statusFilter = $('#filterStatus').value;
-    const dateFilter   = $('#filterDate').value;
-    const snap = await getDocs(query(collection(db,'salons',salonId,'bookings'), orderBy('date','desc')));
-    let bookings = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    if (statusFilter) bookings = bookings.filter(b => b.status === statusFilter);
-    if (dateFilter)   bookings = bookings.filter(b => b.date === dateFilter);
-
-    if (!bookings.length) {
-      el.innerHTML = `<div class="empty-state" style="background:transparent;border:none">
-        <div class="empty-state__icon" aria-hidden="true">📭</div>
-        <div class="empty-state__title">Sem marcações</div>
-        <div class="empty-state__desc">Nenhuma marcação corresponde aos filtros.</div></div>`;
-      return;
-    }
-    el.innerHTML = `<div class="table-scroll"><table class="data-table">
-      <thead><tr>
-        <th>Data</th><th>Hora</th><th>Cliente</th><th>Serviço</th><th>Colaborador</th>
-        <th>Preço</th><th>Estado</th><th class="actions">Ações</th>
-      </tr></thead>
-      <tbody>
-        ${bookings.map(b => htmlMix`
-          <tr>
-            <td>${raw(formatDatePT(b.date, { short: true }))}</td>
-            <td><strong>${b.time}</strong></td>
-            <td>${b.clientName}<br><span style="font-size:11px;color:var(--muted)">${b.clientPhone || ''}</span>${b.forSomeone ? raw(htmlMix`<br><span style="font-size:11px;color:var(--muted)">→ ${b.forSomeone}</span>`) : ''}</td>
-            <td>${b.serviceName}</td>
-            <td>${b.staffName || '—'}</td>
-            <td>${formatPrice(b.finalPrice ?? b.servicePrice)}${b.referralDiscount ? raw(htmlMix`<br><span style="font-size:11px;color:var(--brand)">-${b.referralDiscount}%</span>`) : ''}</td>
-            <td>${raw(statusBadge(b.status))}${b.paid ? raw(' <span class="badge badge--green" style="font-size:10px">Pago</span>') : ''}</td>
-            <td class="actions">${raw(bookingActions(b))}</td>
-          </tr>`).join('')}
-      </tbody></table></div>`;
-  } catch (e) {
-    console.error(e);
-    el.innerHTML = `<div class="error-state"><div class="error-state__icon" aria-hidden="true">⚠️</div><div class="error-state__title">Erro a carregar</div></div>`;
+  const statusFilter = $('#filterStatus').value;
+  const dateFilter   = $('#filterDate').value;
+  const search       = $('#bookingsSearch').value.trim().toLowerCase();
+  let bookings = cachedBookings.slice();
+  if (statusFilter) bookings = bookings.filter(b => b.status === statusFilter);
+  if (dateFilter)   bookings = bookings.filter(b => b.date === dateFilter);
+  if (search) {
+    bookings = bookings.filter(b =>
+      (b.clientName || '').toLowerCase().includes(search) ||
+      (b.clientPhone || '').includes(search) ||
+      (b.serviceName || '').toLowerCase().includes(search)
+    );
   }
+  if (!bookings.length) {
+    el.innerHTML = `<div class="empty-state" style="background:transparent;border:none;padding:var(--s-6) var(--s-4)">
+      <div class="empty-state__icon">📭</div>
+      <div class="empty-state__title">Sem marcações</div>
+      <div class="empty-state__desc">Nenhuma corresponde aos filtros.</div></div>`;
+    return;
+  }
+  el.innerHTML = `<div class="table-scroll"><table class="data-table">
+    <thead><tr><th>Data</th><th>Hora</th><th>Cliente</th><th>Serviço</th><th>Colaborador</th><th>Preço</th><th>Estado</th><th class="actions">Ações</th></tr></thead>
+    <tbody>${bookings.map(b => htmlMix`
+      <tr>
+        <td class="text-muted">${raw(relativeDay(b.date))}</td>
+        <td class="tabular"><strong>${b.time}</strong></td>
+        <td><strong>${b.clientName}</strong><br><span class="text-xs text-muted tabular">${b.clientPhone || ''}</span>${b.forSomeone ? raw(htmlMix`<br><span class="text-xs text-muted">→ ${b.forSomeone}</span>`) : ''}</td>
+        <td>${b.serviceName}</td>
+        <td class="text-muted">${b.staffName || '—'}</td>
+        <td class="tabular">${formatPrice(b.finalPrice ?? b.servicePrice)}${b.referralDiscount ? raw(htmlMix`<br><span class="text-xs" style="color:var(--brand)">-${b.referralDiscount}%</span>`) : ''}</td>
+        <td>${raw(statusBadge(b.status))}${b.paid ? raw(' <span class="badge badge--green">Pago</span>') : ''}</td>
+        <td class="actions">${raw(bookingActions(b))}</td>
+      </tr>`).join('')}</tbody></table></div>`;
 }
 
 function bookingActions(b) {
   const btns = [];
-  if (b.status === 'pending') {
-    btns.push(htmlMix`<button class="btn btn--sm btn--success" type="button" data-action="confirm-booking" data-id="${b.id}">✓ Confirmar</button>`);
-  }
-  if (!b.paid && !['cancelled','noshow'].includes(b.status)) {
-    btns.push(htmlMix`<button class="btn btn--sm btn--primary" type="button" data-action="open-pay" data-id="${b.id}" data-client="${b.clientName}" data-amount="${b.finalPrice ?? b.servicePrice}">💰 Pagamento</button>`);
-  }
-  if (['pending','confirmed'].includes(b.status)) {
-    btns.push(htmlMix`<button class="btn btn--sm btn--ghost" type="button" data-action="noshow-booking" data-id="${b.id}">Não compareceu</button>`);
-  }
-  if (!['cancelled','noshow','completed'].includes(b.status)) {
-    btns.push(htmlMix`<button class="btn btn--sm btn--danger" type="button" data-action="cancel-booking" data-id="${b.id}">✕ Cancelar</button>`);
-  }
+  if (b.status === 'pending')
+    btns.push(htmlMix`<button class="btn btn--sm btn--success" type="button" data-action="confirm-booking" data-id="${b.id}">Confirmar</button>`);
+  if (!b.paid && !['cancelled','noshow'].includes(b.status))
+    btns.push(htmlMix`<button class="btn btn--sm btn--primary" type="button" data-action="open-pay" data-id="${b.id}" data-client="${b.clientName}" data-amount="${b.finalPrice ?? b.servicePrice}">Pagamento</button>`);
+  if (['pending','confirmed'].includes(b.status))
+    btns.push(htmlMix`<button class="btn btn--sm" type="button" data-action="noshow-booking" data-id="${b.id}">Não compareceu</button>`);
+  if (!['cancelled','noshow','completed'].includes(b.status))
+    btns.push(htmlMix`<button class="btn btn--sm btn--danger" type="button" data-action="cancel-booking" data-id="${b.id}">Cancelar</button>`);
   return btns.join(' ');
 }
 
 on('confirm-booking', async (el) => {
   await updateDoc(doc(db,'salons',salonId,'bookings', el.dataset.id), { status: 'confirmed' });
   toastSuccess('Marcação confirmada.');
-  loadBookings(); initDashboard();
 });
 
 on('cancel-booking', async (el) => {
-  if (!confirm('Cancelar esta marcação?')) return;
-  await updateDoc(doc(db,'salons',salonId,'bookings', el.dataset.id),
+  const id = el.dataset.id;
+  const snap = await getDoc(doc(db,'salons',salonId,'bookings', id));
+  if (!snap.exists()) return;
+  const prev = snap.data().status;
+  await updateDoc(doc(db,'salons',salonId,'bookings', id),
     { status: 'cancelled', cancelledAt: serverTimestamp() });
-  toastSuccess('Marcação cancelada.');
-  loadBookings(); initDashboard();
+  toastSuccess('Cancelada.', { undo: async () => {
+    await updateDoc(doc(db,'salons',salonId,'bookings', id), { status: prev, cancelledAt: null });
+    toastSuccess('Cancelamento anulado.');
+  }});
 });
 
 on('noshow-booking', async (el) => {
-  if (!confirm('Marcar como "Não compareceu"? Isto irá deduzir pontos ao cliente.')) return;
-  const id = el.dataset.id;
-  const bSnap = await getDoc(doc(db,'salons',salonId,'bookings', id));
-  if (!bSnap.exists()) return;
-  const b = bSnap.data();
-  await updateDoc(doc(db,'salons',salonId,'bookings', id), { status: 'noshow', noShowAt: serverTimestamp() });
-  if (b.clientId) {
-    const penalty = salon.noShowPenalty || 5;
-    await updateDoc(doc(db,'salons',salonId,'clients', b.clientId), { points: increment(-penalty) });
-  }
-  toastSuccess('Marcado como "Não compareceu".');
-  loadBookings(); initDashboard();
+  if (!confirm('Marcar como "Não compareceu"? Vão ser deduzidos pontos ao cliente.')) return;
+  try {
+    await markBookingNoShow({ salonId, bookingId: el.dataset.id, penalty: salon.noShowPenalty || 0 });
+    toastSuccess('Marcado como "Não compareceu".');
+  } catch (e) { console.error(e); toastError('Erro.'); }
 });
 
-/* ── PAYMENT MODAL ─────────────────────────────────────── */
+/* ── PAYMENT MODAL ───────────────────────────────────────── */
+let releasePayFocus = null;
 on('open-pay', (el) => {
-  payContext = { bookingId: el.dataset.id, method: null, client: el.dataset.client, amount: el.dataset.amount };
+  payContext = { bookingId: el.dataset.id, method: null };
   $('#paySub').textContent = `${el.dataset.client} · ${el.dataset.amount}€`;
   $('#payPoints').textContent = String(salon.pointsPerVisit || 10);
-  $$('.pay-method').forEach(m => m.classList.remove('selected'));
+  $$('.method').forEach(m => m.classList.remove('selected'));
   $('#payConfirmBtn').disabled = true;
-  const overlay = $('#payModal');
-  overlay.classList.add('show');
-  overlay.setAttribute('aria-hidden', 'false');
+  const o = $('#payModal');
+  o.classList.add('show'); o.setAttribute('aria-hidden','false');
+  releasePayFocus = trapFocus(o.querySelector('.modal'));
 });
-
 on('pick-method', (el) => {
   payContext.method = el.dataset.method;
-  $$('.pay-method').forEach(m => m.classList.toggle('selected', m === el));
+  $$('.method').forEach(m => m.classList.toggle('selected', m === el));
   $('#payConfirmBtn').disabled = false;
 });
-
 on('close-pay', () => {
   $('#payModal').classList.remove('show');
-  $('#payModal').setAttribute('aria-hidden', 'true');
+  $('#payModal').setAttribute('aria-hidden','true');
   payContext = null;
+  if (releasePayFocus) { releasePayFocus(); releasePayFocus = null; }
 });
+$('#payModal').addEventListener('click', (e) => { if (e.target === e.currentTarget) callPayClose(); });
+function callPayClose() { document.querySelector('[data-action="close-pay"]').click(); }
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#payModal').classList.contains('show')) callPayClose(); });
 
-on('confirm-pay', async () => {
+on('confirm-pay', withLock('confirm-pay', async () => {
   if (!payContext?.method) return;
-  const btn = $('#payConfirmBtn'); btn.disabled = true;
+  $('#payConfirmBtn').disabled = true;
   try {
-    const bRef = doc(db,'salons',salonId,'bookings', payContext.bookingId);
-    const bSnap = await getDoc(bRef);
-    if (!bSnap.exists()) throw new Error('Booking not found');
-    const b = bSnap.data();
-    const pts = salon.pointsPerVisit || 10;
-    await updateDoc(bRef, {
-      paid: true, status: 'completed',
-      paidAt: serverTimestamp(),
-      paymentMethod: payContext.method,
-      pointsAwarded: pts
+    await markBookingPaid({
+      salonId, bookingId: payContext.bookingId, method: payContext.method,
+      pointsPerVisit: salon.pointsPerVisit, loyaltyVisits: salon.loyaltyVisits,
+      loyaltyDiscount: salon.loyaltyDiscount,
     });
-
-    if (b.clientId) {
-      const cRef  = doc(db,'salons',salonId,'clients', b.clientId);
-      const cSnap = await getDoc(cRef);
-      if (cSnap.exists()) {
-        const c = cSnap.data();
-        const visits = (c.visits || 0) + 1;
-        const points = (c.points || 0) + pts;
-        const spent  = (c.totalSpent || 0) + (Number(b.finalPrice) || Number(b.servicePrice) || 0);
-        const target   = salon.loyaltyVisits   || 10;
-        const discount = salon.loyaltyDiscount || 20;
-        const updates = { visits, points, totalSpent: spent };
-        if (visits > 0 && visits % target === 0) {
-          updates.discounts = [...(c.discounts || []), {
-            type: 'loyalty',
-            title: '⭐ Desconto de Fidelização',
-            description: `${discount}% — ${visits} visitas atingidas!`,
-            code: `LOYAL${visits}-${(c.referralCode || '').split('-')[1] || Math.floor(Math.random()*999)}`,
-            discount, expiresAt: null, used: false,
-            createdAt: new Date().toISOString()
-          }];
-        }
-        await updateDoc(cRef, updates);
-      }
-    }
     toastSuccess('Pagamento registado · pontos atribuídos.');
-    on('close-pay')();
-    loadBookings(); initDashboard();
+    callPayClose();
   } catch (e) {
     console.error(e);
     toastError('Erro ao registar pagamento.');
-    btn.disabled = false;
+    $('#payConfirmBtn').disabled = false;
   }
-});
-$('#payModal').addEventListener('click', (e) => { if (e.target === e.currentTarget) on('close-pay')(); });
+}));
 
-/* ── CLIENTS ───────────────────────────────────────────── */
+/* ── NEW BOOKING ─────────────────────────────────────────── */
+let releaseNbFocus = null;
+on('open-new-booking', () => {
+  const o = $('#newBookingModal');
+  $('#nbService').innerHTML = '<option value="">— escolhe —</option>' +
+    allServices.filter(s => s.active !== false).map(s => htmlMix`<option value="${s.id}">${s.name} · ${s.price}€ · ${s.duration}min</option>`).join('');
+  $('#nbStaff').innerHTML = '<option value="">Sem preferência</option>' +
+    allStaff.filter(s => s.active !== false).map(s => htmlMix`<option value="${s.id}">${s.name}</option>`).join('');
+  $('#nbDate').value = todayISO();
+  $('#newBookingForm').reset();
+  $('#nbDate').value = todayISO();
+  $('#nbErr').classList.remove('show');
+  o.classList.add('show'); o.setAttribute('aria-hidden','false');
+  releaseNbFocus = trapFocus(o.querySelector('.modal'));
+});
+on('close-new-booking', () => {
+  $('#newBookingModal').classList.remove('show');
+  $('#newBookingModal').setAttribute('aria-hidden','true');
+  if (releaseNbFocus) { releaseNbFocus(); releaseNbFocus = null; }
+});
+$('#newBookingModal').addEventListener('click', (e) => { if (e.target === e.currentTarget) document.querySelector('[data-action="close-new-booking"]').click(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#newBookingModal').classList.contains('show')) document.querySelector('[data-action="close-new-booking"]').click(); });
+
+$('#newBookingForm').addEventListener('submit', withLock('nb', async (e) => {
+  e.preventDefault();
+  const err = $('#nbErr'); err.classList.remove('show');
+  const clientName = $('#nbClient').value.trim();
+  const clientPhone = $('#nbPhone').value.trim();
+  const clientEmail = $('#nbEmail').value.trim();
+  const serviceId = $('#nbService').value;
+  const staffId = $('#nbStaff').value;
+  const date = $('#nbDate').value;
+  const time = $('#nbTime').value;
+  const notes = $('#nbNotes').value.trim();
+  if (!clientName || !clientPhone || !serviceId || !date || !time) {
+    err.textContent = 'Preenche os campos obrigatórios.'; err.classList.add('show'); return;
+  }
+  if (!isPhone(clientPhone)) { err.textContent = 'Telefone inválido.'; err.classList.add('show'); return; }
+  if (clientEmail && !isEmail(clientEmail)) { err.textContent = 'Email inválido.'; err.classList.add('show'); return; }
+
+  try {
+    const s = allServices.find(x => x.id === serviceId);
+    const staff = staffId ? allStaff.find(x => x.id === staffId) : null;
+
+    // Conflict check
+    if (staff) {
+      const conflicts = cachedBookings.filter(b =>
+        b.date === date && b.time === time && b.staffId === staff.id &&
+        ['pending','confirmed'].includes(b.status));
+      if (conflicts.length && !confirm('Já existe uma marcação para este colaborador na mesma hora. Continuar?')) return;
+    }
+
+    let clientId = null;
+    if (clientEmail) {
+      const existing = await getDocs(query(collection(db,'salons',salonId,'clients'), where('email','==', clientEmail)));
+      if (!existing.empty) clientId = existing.docs[0].id;
+    }
+
+    await addDoc(collection(db,'salons',salonId,'bookings'), {
+      clientId, clientName, clientEmail: clientEmail || '', clientPhone,
+      serviceId, serviceName: s.name, serviceDuration: s.duration, servicePrice: s.price,
+      finalPrice: s.price,
+      staffId: staff?.id || null, staffName: staff?.name || 'Sem preferência',
+      date, time, notes, forSomeone: null,
+      status: 'confirmed', paid: false,
+      salonId, source: 'admin',
+      createdAt: serverTimestamp()
+    });
+    toastSuccess('Marcação criada.');
+    document.querySelector('[data-action="close-new-booking"]').click();
+  } catch (e) {
+    console.error(e); err.textContent = 'Erro a criar marcação.'; err.classList.add('show');
+  }
+}));
+
+/* ── CLIENTS ─────────────────────────────────────────────── */
 async function loadClients() {
   if (!salonId) return;
   const el = $('#clientsList');
   try {
     const snap = await getDocs(query(collection(db,'salons',salonId,'clients'), orderBy('visits','desc')));
-    const clients = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    if (!clients.length) {
-      el.innerHTML = `<div class="empty-state" style="background:transparent;border:none">
-        <div class="empty-state__icon" aria-hidden="true">👤</div>
-        <div class="empty-state__title">Sem clientes ainda</div>
-        <div class="empty-state__desc">Os clientes aparecem aqui assim que fizerem a primeira marcação.</div></div>`;
-      return;
-    }
-    const loyalty = salon?.loyaltyVisits || 10;
-    el.innerHTML = `<div class="table-scroll"><table class="data-table">
-      <thead><tr>
-        <th>Nome</th><th>Email</th><th>Visitas</th><th>Pontos</th><th>Gasto total</th><th>Fidelização</th><th>Código ref.</th>
-      </tr></thead>
-      <tbody>
-        ${clients.map(c => {
-          const pct = Math.min(100, Math.round((c.visits || 0) / loyalty * 100));
-          return htmlMix`<tr>
-            <td><strong>${c.name}</strong></td>
-            <td style="font-size:12px;color:var(--muted)">${c.email || '—'}</td>
-            <td>${c.visits || 0}</td>
-            <td><strong style="color:var(--brand)">${c.points || 0}</strong></td>
-            <td>${c.totalSpent || 0}€</td>
-            <td style="min-width:120px">
-              <div style="font-size:11px;color:var(--muted);margin-bottom:3px">${c.visits || 0}/${loyalty} visitas</div>
-              <div class="loyalty-bar"><div class="loyalty-fill" style="width:${pct}%"></div></div>
-            </td>
-            <td><code>${c.referralCode || '—'}</code></td>
-          </tr>`;
-        }).join('')}
-      </tbody></table></div>`;
+    allClients = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(c => !c.deleted);
+    renderClients();
   } catch (e) {
     console.error(e);
-    el.innerHTML = `<div class="error-state"><div class="error-state__icon" aria-hidden="true">⚠️</div><div class="error-state__title">Erro a carregar</div></div>`;
+    el.innerHTML = `<div class="error-state"><div class="error-state__icon">⚠️</div><div class="error-state__title">Erro a carregar</div></div>`;
   }
 }
+const onClientsSearch = debounce(renderClients, 200);
+$('#clientsSearch').addEventListener('input', onClientsSearch);
 
-/* ── SERVICES ──────────────────────────────────────────── */
+function renderClients() {
+  const el = $('#clientsList');
+  const search = $('#clientsSearch').value.trim().toLowerCase();
+  let clients = allClients;
+  if (search) clients = clients.filter(c =>
+    (c.name || '').toLowerCase().includes(search) ||
+    (c.email || '').toLowerCase().includes(search) ||
+    (c.referralCode || '').toLowerCase().includes(search));
+  if (!clients.length) {
+    el.innerHTML = `<div class="empty-state" style="background:transparent;border:none;padding:var(--s-6) var(--s-4)">
+      <div class="empty-state__icon">👤</div>
+      <div class="empty-state__title">Sem clientes</div></div>`;
+    return;
+  }
+  const loyalty = salon?.loyaltyVisits || 10;
+  el.innerHTML = `<div class="table-scroll"><table class="data-table">
+    <thead><tr><th>Nome</th><th>Email</th><th>Visitas</th><th>Pontos</th><th>Gasto</th><th>Fidelização</th><th>Código</th></tr></thead>
+    <tbody>${clients.map(c => {
+      const pct = Math.min(100, Math.round((c.visits || 0) / loyalty * 100));
+      return htmlMix`<tr>
+        <td><strong>${c.name}</strong></td>
+        <td class="text-muted">${c.email || '—'}</td>
+        <td class="tabular">${c.visits || 0}</td>
+        <td class="tabular"><strong style="color:var(--brand)">${c.points || 0}</strong></td>
+        <td class="tabular">${c.totalSpent || 0}€</td>
+        <td style="min-width:140px">
+          <div class="text-xs text-muted mb-1 tabular">${c.visits || 0}/${loyalty}</div>
+          <div class="progress"><div class="progress__fill" style="width:${pct}%"></div></div>
+        </td>
+        <td><code>${c.referralCode || '—'}</code></td>
+      </tr>`;
+    }).join('')}</tbody></table></div>`;
+}
+
+on('export-clients', () => {
+  const rows = allClients.map(c => ({
+    nome: c.name, email: c.email, telefone: c.phone || '',
+    visitas: c.visits || 0, pontos: c.points || 0,
+    gasto: c.totalSpent || 0, codigo: c.referralCode || '',
+    membro_desde: c.createdAt?.seconds ? new Date(c.createdAt.seconds*1000).toISOString().slice(0,10) : ''
+  }));
+  downloadCSV(`clientes-${todayISO()}.csv`, rows);
+  toastSuccess(`${rows.length} clientes exportados.`);
+});
+
+on('export-bookings', () => {
+  const rows = cachedBookings.map(b => ({
+    data: b.date, hora: b.time,
+    cliente: b.clientName, telefone: b.clientPhone || '',
+    servico: b.serviceName, colaborador: b.staffName || '',
+    preco: b.finalPrice ?? b.servicePrice,
+    estado: STATUS_LABELS[b.status] || b.status,
+    pago: b.paid ? 'Sim' : 'Não',
+    metodo: b.paymentMethod || ''
+  }));
+  downloadCSV(`marcacoes-${todayISO()}.csv`, rows);
+  toastSuccess(`${rows.length} marcações exportadas.`);
+});
+
+/* ── SERVICES ────────────────────────────────────────────── */
 async function loadServices() {
   if (!salonId) return;
   const el = $('#servicesList');
   try {
     const snap = await getDocs(query(collection(db,'salons',salonId,'services'), orderBy('order','asc')));
-    const services = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    if (!services.length) {
-      el.innerHTML = `<p style="color:var(--muted);font-size:13px">Nenhum serviço ainda.</p>`;
+    allServices = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (!allServices.length) {
+      el.innerHTML = `<p class="text-muted text-sm" style="padding:var(--s-4)">Nenhum serviço ainda.</p>`;
       return;
     }
     el.innerHTML = `<div class="table-scroll"><table class="data-table">
       <thead><tr><th>Serviço</th><th>Tipo</th><th>Duração</th><th>Preço</th><th>Estado</th><th class="actions">Ações</th></tr></thead>
-      <tbody>
-        ${services.map(s => htmlMix`
-          <tr>
-            <td>
-              <strong>${s.name}</strong>
-              ${s.description ? raw(htmlMix`<br><span style="font-size:11px;color:var(--muted)">${s.description}</span>`) : ''}
-              ${s.includes ? raw(htmlMix`<br><span style="font-size:11px;color:var(--muted)">Inclui: ${s.includes}</span>`) : ''}
-            </td>
-            <td>${s.isPackage ? raw('<span class="badge badge--green">Pacote</span>') : raw('<span class="badge badge--gray">Individual</span>')}</td>
-            <td>${s.duration} min</td>
-            <td><strong>${s.price}€</strong>${s.isPackage && s.originalPrice ? raw(htmlMix`<br><span style="font-size:11px;color:var(--muted);text-decoration:line-through">${s.originalPrice}€</span>`) : ''}</td>
-            <td>${raw(`<span class="badge ${s.active ? 'badge--green' : 'badge--red'}">${s.active ? 'Ativo' : 'Inativo'}</span>`)}</td>
-            <td class="actions">
-              <button class="btn btn--sm btn--ghost" type="button" data-action="edit-service" data-id="${s.id}">Editar</button>
-              <button class="btn btn--sm btn--ghost" type="button" data-action="toggle-service" data-id="${s.id}" data-active="${s.active}">${s.active ? 'Desativar' : 'Ativar'}</button>
-              <button class="btn btn--sm btn--danger" type="button" data-action="delete-service" data-id="${s.id}">Remover</button>
-            </td>
-          </tr>`).join('')}
-      </tbody></table></div>`;
+      <tbody>${allServices.map(s => htmlMix`
+        <tr>
+          <td>
+            <strong>${s.name}</strong>
+            ${s.description ? raw(htmlMix`<br><span class="text-xs text-muted">${s.description}</span>`) : ''}
+            ${s.includes ? raw(htmlMix`<br><span class="text-xs text-muted">Inclui: ${s.includes}</span>`) : ''}
+          </td>
+          <td>${raw(s.isPackage ? '<span class="badge badge--green">Pacote</span>' : '<span class="badge badge--gray">Individual</span>')}</td>
+          <td class="tabular">${s.duration} min</td>
+          <td class="tabular"><strong>${s.price}€</strong>${s.isPackage && s.originalPrice ? raw(htmlMix`<br><span class="text-xs text-muted" style="text-decoration:line-through">${s.originalPrice}€</span>`) : ''}</td>
+          <td>${raw(`<span class="badge ${s.active ? 'badge--green' : 'badge--gray'}">${s.active ? 'Ativo' : 'Inativo'}</span>`)}</td>
+          <td class="actions">
+            <button class="btn btn--sm" type="button" data-action="edit-service" data-id="${s.id}">Editar</button>
+            <button class="btn btn--sm" type="button" data-action="toggle-service" data-id="${s.id}" data-active="${s.active}">${s.active ? 'Desativar' : 'Ativar'}</button>
+            <button class="btn btn--sm btn--danger" type="button" data-action="delete-service" data-id="${s.id}">Remover</button>
+          </td>
+        </tr>`).join('')}</tbody></table></div>`;
   } catch (e) {
     console.error(e);
-    el.innerHTML = `<div class="error-state"><div class="error-state__icon" aria-hidden="true">⚠️</div><div class="error-state__title">Erro a carregar</div></div>`;
+    el.innerHTML = `<div class="error-state"><div class="error-state__icon">⚠️</div><div class="error-state__title">Erro a carregar</div></div>`;
   }
 }
 
-$('#svcType').addEventListener('change', e => {
-  $('#packageFields').hidden = e.target.value !== 'package';
-});
+$('#svcType').addEventListener('change', e => { $('#packageFields').hidden = e.target.value !== 'package'; });
 
 $('#serviceForm').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -816,7 +1024,6 @@ $('#serviceForm').addEventListener('submit', async (e) => {
   const originalPrice = isPackage ? parseFloat($('#svcOriginal').value) || null : null;
   const includes = isPackage ? $('#svcIncludes').value.trim() : '';
   if (!name || !(price >= 0) || !duration) return toast('Preenche nome, preço e duração.');
-
   try {
     if (editingServiceId) {
       await updateDoc(doc(db,'salons',salonId,'services', editingServiceId), {
@@ -825,19 +1032,14 @@ $('#serviceForm').addEventListener('submit', async (e) => {
       });
       toastSuccess('Serviço atualizado.');
     } else {
-      const snap = await getDocs(collection(db,'salons',salonId,'services'));
       await addDoc(collection(db,'salons',salonId,'services'), {
         name, price, duration, description: desc, isPackage, originalPrice, includes,
-        active: true, order: snap.size + 1, createdAt: serverTimestamp()
+        active: true, order: allServices.length + 1, createdAt: serverTimestamp()
       });
       toastSuccess('Serviço adicionado.');
     }
-    resetServiceForm();
-    loadServices();
-  } catch (e) {
-    console.error(e);
-    toastError('Erro a guardar serviço.');
-  }
+    resetServiceForm(); loadServices();
+  } catch (e) { console.error(e); toastError('Erro a guardar.'); }
 });
 
 function resetServiceForm() {
@@ -848,17 +1050,15 @@ function resetServiceForm() {
   $('#svcSubmitBtn').textContent = 'Adicionar serviço';
   $('#svcCancelBtn').hidden = true;
 }
-
 on('cancel-edit-service', resetServiceForm);
 
 on('edit-service', async (el) => {
-  const s = (await getDoc(doc(db,'salons',salonId,'services', el.dataset.id))).data();
-  editingServiceId = el.dataset.id;
-  $('#svcName').value     = s.name;
-  $('#svcPrice').value    = s.price;
-  $('#svcDuration').value = s.duration;
-  $('#svcDesc').value     = s.description || '';
-  $('#svcType').value     = s.isPackage ? 'package' : 'single';
+  const s = allServices.find(x => x.id === el.dataset.id);
+  if (!s) return;
+  editingServiceId = s.id;
+  $('#svcName').value = s.name; $('#svcPrice').value = s.price;
+  $('#svcDuration').value = s.duration; $('#svcDesc').value = s.description || '';
+  $('#svcType').value = s.isPackage ? 'package' : 'single';
   $('#packageFields').hidden = !s.isPackage;
   if (s.isPackage) {
     $('#svcOriginal').value = s.originalPrice || '';
@@ -872,20 +1072,22 @@ on('edit-service', async (el) => {
 });
 
 on('toggle-service', async (el) => {
-  const active = el.dataset.active === 'true';
-  await updateDoc(doc(db,'salons',salonId,'services', el.dataset.id), { active: !active });
-  toastSuccess('Estado atualizado.');
+  await updateDoc(doc(db,'salons',salonId,'services', el.dataset.id), { active: el.dataset.active !== 'true' });
   loadServices();
 });
 
 on('delete-service', async (el) => {
-  if (!confirm('Remover este serviço?')) return;
+  const s = allServices.find(x => x.id === el.dataset.id);
+  if (!s || !confirm(`Remover serviço "${s.name}"?`)) return;
   await deleteDoc(doc(db,'salons',salonId,'services', el.dataset.id));
-  toastSuccess('Serviço removido.');
+  toastSuccess('Removido.', { undo: async () => {
+    await setDoc(doc(db,'salons',salonId,'services', el.dataset.id), s);
+    loadServices();
+  }});
   loadServices();
 });
 
-/* ── SCHEDULE ──────────────────────────────────────────── */
+/* ── SCHEDULE ────────────────────────────────────────────── */
 async function loadSchedule() {
   if (!salonId) return;
   const schedDoc = await getDoc(doc(db,'salons',salonId,'config','schedule'));
@@ -906,10 +1108,8 @@ async function loadSchedule() {
   }).join('');
 }
 on('toggle-schedule-day', (el) => {
-  const key = el.dataset.key;
-  const checked = $('#sx-' + key).checked;
-  $('#so-' + key).disabled = checked;
-  $('#sc-' + key).disabled = checked;
+  const key = el.dataset.key, checked = $('#sx-' + key).checked;
+  $('#so-' + key).disabled = checked; $('#sc-' + key).disabled = checked;
 });
 on('save-schedule', async () => {
   const sched = {};
@@ -917,33 +1117,31 @@ on('save-schedule', async () => {
     const closed = $('#sx-' + d.key).checked;
     sched[d.key] = {
       open:  closed ? '' : $('#so-' + d.key).value,
-      close: closed ? '' : $('#sc-' + d.key).value,
-      closed
+      close: closed ? '' : $('#sc-' + d.key).value, closed
     };
   });
   await setDoc(doc(db,'salons',salonId,'config','schedule'), sched);
   toastSuccess('Horário guardado.');
 });
 
-/* ── PROMOTIONS ────────────────────────────────────────── */
+/* ── PROMOTIONS ──────────────────────────────────────────── */
 async function loadPromotions() {
   if (!salonId) return;
   const el = $('#promotionsList');
   const snap = await getDocs(collection(db,'salons',salonId,'promotions'));
   const promos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   if (!promos.length) {
-    el.innerHTML = `<p style="color:var(--muted);font-size:13px">Nenhuma promoção ainda.</p>`;
-    return;
+    el.innerHTML = `<p class="text-muted text-sm" style="padding:var(--s-4)">Nenhuma promoção ainda.</p>`; return;
   }
   el.innerHTML = promos.map(p => htmlMix`
-    <div class="list-row">
-      <div class="list-row__main">
-        <div class="list-row__title">${p.title}</div>
-        <div class="list-row__meta">${p.description}</div>
+    <div class="row-card">
+      <div class="row-card__main">
+        <div class="row-card__title">${p.title}</div>
+        <div class="row-card__meta">${p.description}</div>
       </div>
-      <div class="row" style="gap:8px">
-        ${raw(`<span class="badge ${p.active ? 'badge--green' : 'badge--red'}">${p.active ? 'Ativa' : 'Inativa'}</span>`)}
-        <button class="btn btn--sm btn--ghost" type="button" data-action="toggle-promo" data-id="${p.id}" data-active="${p.active}">${p.active ? 'Desativar' : 'Ativar'}</button>
+      <div class="cluster">
+        ${raw(`<span class="badge ${p.active ? 'badge--green' : 'badge--gray'}">${p.active ? 'Ativa' : 'Inativa'}</span>`)}
+        <button class="btn btn--sm" type="button" data-action="toggle-promo" data-id="${p.id}" data-active="${p.active}">${p.active ? 'Desativar' : 'Ativar'}</button>
         <button class="btn btn--sm btn--danger" type="button" data-action="delete-promo" data-id="${p.id}">Remover</button>
       </div>
     </div>`).join('');
@@ -954,16 +1152,13 @@ $('#promoForm').addEventListener('submit', async (e) => {
   const desc  = $('#promoDesc').value.trim();
   const badge = $('#promoBadge').value.trim();
   if (!title || !desc) return toast('Preenche título e descrição.');
-  await addDoc(collection(db,'salons',salonId,'promotions'), {
-    title, description: desc, badgeText: badge, active: true, createdAt: serverTimestamp()
-  });
+  await addDoc(collection(db,'salons',salonId,'promotions'),
+    { title, description: desc, badgeText: badge, active: true, createdAt: serverTimestamp() });
   $('#promoForm').reset();
-  toastSuccess('Promoção publicada.');
-  loadPromotions();
+  toastSuccess('Promoção publicada.'); loadPromotions();
 });
 on('toggle-promo', async (el) => {
-  const active = el.dataset.active === 'true';
-  await updateDoc(doc(db,'salons',salonId,'promotions', el.dataset.id), { active: !active });
+  await updateDoc(doc(db,'salons',salonId,'promotions', el.dataset.id), { active: el.dataset.active !== 'true' });
   loadPromotions();
 });
 on('delete-promo', async (el) => {
@@ -972,13 +1167,13 @@ on('delete-promo', async (el) => {
   loadPromotions();
 });
 
-/* ── LOYALTY ───────────────────────────────────────────── */
+/* ── LOYALTY ─────────────────────────────────────────────── */
 function loadLoyalty() {
   if (!salon) return;
   $('#loyaltyVisits').value    = salon.loyaltyVisits   || 10;
   $('#loyaltyDiscount').value  = salon.loyaltyDiscount || 20;
   $('#referralDiscount').value = salon.referralDiscount || 10;
-  $('#noShowPenalty').value    = salon.noShowPenalty || 5;
+  $('#noShowPenalty').value    = salon.noShowPenalty != null ? salon.noShowPenalty : 5;
 }
 $('#loyaltyForm').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -994,7 +1189,7 @@ $('#loyaltyForm').addEventListener('submit', async (e) => {
   toastSuccess('Configurações guardadas.');
 });
 
-/* ── SETTINGS ──────────────────────────────────────────── */
+/* ── SETTINGS ────────────────────────────────────────────── */
 $('#settingsForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const name    = $('#cfgName').value.trim();
@@ -1004,51 +1199,51 @@ $('#settingsForm').addEventListener('submit', async (e) => {
   const email   = $('#cfgEmail').value.trim();
   const color   = $('#cfgColor').value.trim();
   const bdayDiscount = parseInt($('#cfgBdayDiscount').value, 10) || 15;
-  const teamPassword = $('#cfgTeamPw').value;
+  const teamPasswordRaw = $('#cfgTeamPw').value;
   if (!name) return toast('O nome do salão é obrigatório.');
-  await updateDoc(doc(db,'salons', salonId), {
-    name, tagline, address, phone, email, primaryColor: color,
-    birthdayDiscount: bdayDiscount, teamPassword
-  });
-  Object.assign(salon, { name, tagline, address, phone, email, primaryColor: color, birthdayDiscount: bdayDiscount, teamPassword });
+  const updates = { name, tagline, address, phone, email, primaryColor: color, birthdayDiscount: bdayDiscount };
+  if (teamPasswordRaw && teamPasswordRaw.length >= 4) {
+    updates.teamPasswordHash = await hashPassword(teamPasswordRaw);
+    salon.teamPasswordHash = updates.teamPasswordHash;
+  }
+  await updateDoc(doc(db,'salons', salonId), updates);
+  Object.assign(salon, updates);
   $('#sidebarMark').textContent = name.charAt(0);
   $('#sidebarName').textContent = name;
   $('#mobileName').textContent  = name;
+  $('#cfgTeamPw').value = '';
   toastSuccess('Configurações guardadas.');
 });
 
-/* ── STAFF ─────────────────────────────────────────────── */
+/* ── STAFF ───────────────────────────────────────────────── */
 async function loadStaff() {
   if (!salonId) return;
   try {
     const snap = await getDocs(query(collection(db,'salons',salonId,'staff'), orderBy('order','asc')));
     allStaff = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderStaffList();
-    renderStaffSelect();
-  } catch (e) {
-    console.error(e);
-  }
+    renderStaffList(); renderStaffSelect();
+  } catch (e) { console.error(e); }
 }
 
 function renderStaffList() {
   const el = $('#staffList');
   $('#staffCount').textContent = allStaff.length;
   if (!allStaff.length) {
-    el.innerHTML = `<p style="color:var(--muted);font-size:13px">Nenhum colaborador ainda.</p>`;
+    el.innerHTML = `<p class="text-muted text-sm" style="padding:var(--s-4) 0">Nenhum colaborador ainda.</p>`;
     return;
   }
   el.innerHTML = allStaff.map(s => htmlMix`
-    <div class="list-row">
-      <div class="row" style="gap:14px">
-        <div class="option-item__avatar" aria-hidden="true">${s.name?.charAt(0) || '?'}</div>
+    <div class="row-card">
+      <div class="flex">
+        <div class="select-item__avatar" aria-hidden="true">${(s.name || '?').charAt(0)}</div>
         <div>
-          <div class="list-row__title">${s.name}</div>
-          <div class="list-row__meta">${s.role || 'Colaborador/a'}${s.specialties ? ' · ' + s.specialties : ''}</div>
+          <div class="row-card__title">${s.name}</div>
+          <div class="row-card__meta">${s.role || 'Colaborador/a'}${s.specialties ? ' · ' + s.specialties : ''}</div>
         </div>
       </div>
-      <div class="row" style="gap:6px">
-        ${raw(`<span class="badge ${s.active !== false ? 'badge--green' : 'badge--red'}">${s.active !== false ? 'Ativo' : 'Inativo'}</span>`)}
-        <button class="btn btn--sm btn--ghost" type="button" data-action="toggle-staff" data-id="${s.id}" data-active="${s.active !== false}">${s.active !== false ? 'Desativar' : 'Ativar'}</button>
+      <div class="cluster">
+        ${raw(`<span class="badge ${s.active !== false ? 'badge--green' : 'badge--gray'}">${s.active !== false ? 'Ativo' : 'Inativo'}</span>`)}
+        <button class="btn btn--sm" type="button" data-action="toggle-staff" data-id="${s.id}" data-active="${s.active !== false}">${s.active !== false ? 'Desativar' : 'Ativar'}</button>
         <button class="btn btn--sm btn--danger" type="button" data-action="delete-staff" data-id="${s.id}">Remover</button>
       </div>
     </div>`).join('');
@@ -1056,20 +1251,19 @@ function renderStaffList() {
 
 function renderStaffSelect() {
   const sel = $('#staffSchedSelect');
-  sel.innerHTML = '<option value="">— escolhe —</option>' +
+  sel.innerHTML = '<option value="">—</option>' +
     allStaff.map(s => htmlMix`<option value="${s.id}">${s.name}</option>`).join('');
 }
 
 $('#staffForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const name        = $('#staffName').value.trim();
-  const role        = $('#staffRole').value.trim();
-  const specialties = $('#staffSpecialties').value.trim();
-  const email       = $('#staffEmail').value.trim();
-  const bio         = $('#staffBio').value.trim();
+  const name = $('#staffName').value.trim();
   if (!name) return toast('O nome é obrigatório.');
   await addDoc(collection(db,'salons',salonId,'staff'), {
-    name, role, specialties, email, bio,
+    name, role: $('#staffRole').value.trim(),
+    specialties: $('#staffSpecialties').value.trim(),
+    email: $('#staffEmail').value.trim(),
+    bio: $('#staffBio').value.trim(),
     active: true, order: allStaff.length + 1,
     createdAt: serverTimestamp()
   });
@@ -1077,20 +1271,16 @@ $('#staffForm').addEventListener('submit', async (e) => {
   toastSuccess('Colaborador adicionado.');
   loadStaff();
 });
-
 on('toggle-staff', async (el) => {
-  const active = el.dataset.active === 'true';
-  await updateDoc(doc(db,'salons',salonId,'staff', el.dataset.id), { active: !active });
+  await updateDoc(doc(db,'salons',salonId,'staff', el.dataset.id), { active: el.dataset.active !== 'true' });
   loadStaff();
 });
-
 on('delete-staff', async (el) => {
-  if (!confirm('Remover este colaborador?')) return;
+  if (!confirm('Remover colaborador?')) return;
   await deleteDoc(doc(db,'salons',salonId,'staff', el.dataset.id));
   loadStaff();
 });
 
-/* ── STAFF SCHEDULE ────────────────────────────────────── */
 const DAYS_STAFF = [
   { key:'monday',label:'Segunda' },{ key:'tuesday',label:'Terça' },
   { key:'wednesday',label:'Quarta' },{ key:'thursday',label:'Quinta' },
@@ -1120,29 +1310,155 @@ on('load-staff-schedule', async () => {
       </div>`;
   }).join('');
 });
-
 on('toggle-staff-day', (el) => {
-  const key = el.dataset.key;
-  const checked = $('#ssx-' + key).checked;
-  $('#sso-' + key).disabled = checked;
-  $('#ssc-' + key).disabled = checked;
+  const key = el.dataset.key, checked = $('#ssx-' + key).checked;
+  $('#sso-' + key).disabled = checked; $('#ssc-' + key).disabled = checked;
 });
-
 on('save-staff-schedule', async () => {
-  const id = $('#staffSchedSelect').value;
-  if (!id) return;
+  const id = $('#staffSchedSelect').value; if (!id) return;
   const schedule = {};
   DAYS_STAFF.forEach(d => {
     const closed = $('#ssx-' + d.key).checked;
     schedule[d.key] = {
       open:  closed ? '' : $('#sso-' + d.key).value,
-      close: closed ? '' : $('#ssc-' + d.key).value,
-      closed
+      close: closed ? '' : $('#ssc-' + d.key).value, closed
     };
   });
   await updateDoc(doc(db,'salons',salonId,'staff', id), { schedule });
   toastSuccess('Horário do colaborador guardado.');
 });
+
+/* ── DAY VIEW ────────────────────────────────────────────── */
+function initDayview() {
+  const today = todayISO();
+  if (!$('#dayviewDate').value) $('#dayviewDate').value = today;
+  renderDayviewHours();
+  renderDayview();
+}
+function renderDayviewHours() {
+  $('#dayviewHours').innerHTML = Array.from({length: 12}, (_, i) => {
+    const h = 8 + i;
+    return `<div class="dayview__hour">${String(h).padStart(2,'0')}:00</div>`;
+  }).join('');
+}
+on('dayview-prev', () => {
+  const d = new Date($('#dayviewDate').value); d.setDate(d.getDate() - 1);
+  $('#dayviewDate').value = formatDate(d); renderDayview();
+});
+on('dayview-next', () => {
+  const d = new Date($('#dayviewDate').value); d.setDate(d.getDate() + 1);
+  $('#dayviewDate').value = formatDate(d); renderDayview();
+});
+on('dayview-today', () => { $('#dayviewDate').value = todayISO(); renderDayview(); });
+on('dayview-change', renderDayview);
+
+function renderDayview() {
+  const date = $('#dayviewDate').value || todayISO();
+  const d = new Date(date);
+  $('#dayviewTitle').textContent = `${d.getDate()} ${MONTHS_FULL[d.getMonth()]} ${d.getFullYear()}`;
+  const bookings = cachedBookings.filter(b => b.date === date && b.status !== 'cancelled');
+  $('#dayviewCount').textContent = `${bookings.length} marcação${bookings.length !== 1 ? 'es' : ''}`;
+
+  const slots = $('#dayviewSlots');
+  slots.style.height = `${12 * 64}px`;
+  const HOUR_START = 8, PX_PER_MIN = 64 / 60;
+  slots.innerHTML = bookings.map(b => {
+    const [h, m] = b.time.split(':').map(Number);
+    const top = ((h - HOUR_START) * 60 + m) * PX_PER_MIN;
+    const height = Math.max(28, (b.serviceDuration || 30) * PX_PER_MIN);
+    if (top < 0) return '';
+    return htmlMix`
+      <div class="dayview__event dayview__event--${raw(b.status)}" style="top:${raw(top)}px;height:${raw(height)}px"
+           data-action="open-pay" data-id="${b.id}" data-client="${b.clientName}" data-amount="${b.finalPrice ?? b.servicePrice}">
+        <div class="dayview__event-title">${b.time} · ${b.clientName}</div>
+        <div class="dayview__event-meta">${b.serviceName}${b.staffName && b.staffName !== 'Sem preferência' ? ' · ' + b.staffName : ''}</div>
+      </div>`;
+  }).join('');
+}
+
+/* ── COMMAND PALETTE (Cmd+K) ─────────────────────────────── */
+const cmdkOverlay = $('#cmdkOverlay'), cmdkInput = $('#cmdkInput'), cmdkList = $('#cmdkList');
+let cmdkActive = 0, cmdkResults = [];
+
+function openCmdk() {
+  cmdkOverlay.classList.add('show'); cmdkOverlay.setAttribute('aria-hidden','false');
+  cmdkInput.value = ''; cmdkInput.focus();
+  renderCmdk('');
+}
+function closeCmdk() {
+  cmdkOverlay.classList.remove('show'); cmdkOverlay.setAttribute('aria-hidden','true');
+}
+on('open-cmdk', openCmdk);
+cmdkOverlay.addEventListener('click', e => { if (e.target === cmdkOverlay) closeCmdk(); });
+
+const NAV_COMMANDS = [
+  { id:'nav-dashboard', label:'Ir para Dashboard', icon:'◈', panel:'dashboard' },
+  { id:'nav-bookings',  label:'Ir para Marcações', icon:'📅', panel:'bookings' },
+  { id:'nav-dayview',   label:'Ir para Vista de dia', icon:'🗓', panel:'dayview' },
+  { id:'nav-clients',   label:'Ir para Clientes', icon:'👤', panel:'clients' },
+  { id:'nav-services',  label:'Ir para Serviços', icon:'✂', panel:'services' },
+  { id:'nav-staff',     label:'Ir para Equipa', icon:'👥', panel:'staff' },
+  { id:'nav-schedule',  label:'Ir para Horários', icon:'🕐', panel:'schedule' },
+  { id:'nav-settings',  label:'Ir para Configurações', icon:'⚙', panel:'settings' },
+  { id:'act-new-booking', label:'Criar nova marcação', icon:'＋', action:'open-new-booking' },
+  { id:'act-toggle-theme', label:'Alternar tema claro / escuro', icon:'🌓', action:'toggle-theme' },
+];
+
+cmdkInput.addEventListener('input', () => renderCmdk(cmdkInput.value));
+cmdkInput.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowDown') { cmdkActive = Math.min(cmdkActive + 1, cmdkResults.length - 1); updateCmdkActive(); e.preventDefault(); }
+  if (e.key === 'ArrowUp')   { cmdkActive = Math.max(cmdkActive - 1, 0); updateCmdkActive(); e.preventDefault(); }
+  if (e.key === 'Enter')     { const r = cmdkResults[cmdkActive]; if (r) executeCmdk(r); }
+  if (e.key === 'Escape')    closeCmdk();
+});
+
+function renderCmdk(q) {
+  const search = (q || '').toLowerCase().trim();
+  const navMatches = NAV_COMMANDS.filter(c => c.label.toLowerCase().includes(search));
+  const clientMatches = !search ? [] : allClients
+    .filter(c => (c.name||'').toLowerCase().includes(search) || (c.email||'').toLowerCase().includes(search))
+    .slice(0, 5).map(c => ({ id: 'client-'+c.id, label: c.name, icon: '👤', subtitle: c.email, action: 'nav-clients' }));
+
+  cmdkResults = [...navMatches, ...clientMatches];
+  cmdkActive = 0;
+  if (!cmdkResults.length) {
+    cmdkList.innerHTML = `<div class="cmdk__group-label">Sem resultados</div>`;
+    return;
+  }
+  const html = [];
+  if (navMatches.length) {
+    html.push(`<div class="cmdk__group-label">Navegação</div>`);
+    html.push(...navMatches.map((c, i) =>
+      htmlMix`<button class="cmdk__item ${raw(i === 0 ? 'active' : '')}" data-cmdk-id="${c.id}"><span class="cmdk__item-icon">${c.icon}</span><span>${c.label}</span></button>`));
+  }
+  if (clientMatches.length) {
+    html.push(`<div class="cmdk__group-label">Clientes</div>`);
+    html.push(...clientMatches.map(c =>
+      htmlMix`<button class="cmdk__item" data-cmdk-id="${c.id}"><span class="cmdk__item-icon">${c.icon}</span><span>${c.label}</span></button>`));
+  }
+  cmdkList.innerHTML = html.join('');
+  cmdkList.querySelectorAll('.cmdk__item').forEach((btn, i) => {
+    btn.addEventListener('mouseenter', () => { cmdkActive = i; updateCmdkActive(); });
+    btn.addEventListener('click', () => executeCmdk(cmdkResults[i]));
+  });
+}
+function updateCmdkActive() {
+  cmdkList.querySelectorAll('.cmdk__item').forEach((b, i) => b.classList.toggle('active', i === cmdkActive));
+}
+function executeCmdk(cmd) {
+  closeCmdk();
+  if (cmd.panel) document.querySelector(`[data-action="show-panel"][data-panel="${cmd.panel}"]`)?.click();
+  else if (cmd.action === 'open-new-booking') document.querySelector('[data-action="open-new-booking"]')?.click();
+  else if (cmd.action === 'toggle-theme') { toggleTheme(); syncThemeIcon(); }
+  else if (cmd.action === 'nav-clients') document.querySelector('[data-action="show-panel"][data-panel="clients"]')?.click();
+}
+
+document.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); openCmdk(); }
+  if (e.key === 'Escape' && cmdkOverlay.classList.contains('show')) closeCmdk();
+});
+
+$('#globalSearch').addEventListener('focus', () => openCmdk());
 </script>
 </body>
 </html>

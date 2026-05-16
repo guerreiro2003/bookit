@@ -5,36 +5,36 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="Configura o teu salão Book It em minutos." />
   <meta name="robots" content="noindex" />
-  <meta name="theme-color" content="#6b7c5a" />
-  <title>Setup inicial — Book It</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet" />
+  <meta name="theme-color" content="#09090b" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+  <title>Setup — Book It</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 
-  <main style="padding: 48px 0 80px">
-    <div class="container">
-
-      <div style="text-align:center;margin-bottom:32px">
-        <div class="auth-box__logo" style="margin-bottom:14px" aria-hidden="true">B</div>
-        <h1 style="font-size:24px;font-weight:500;margin-bottom:4px">Book It — Setup inicial</h1>
-        <p style="color:var(--muted);font-size:13.5px">Configura o teu salão pela primeira vez · ~2 minutos</p>
+  <main>
+    <div class="container--md" style="padding: var(--s-8) 0 var(--s-10)">
+      <div class="text-center mb-6">
+        <div class="auth-card__mark" style="margin: 0 auto var(--s-4)" aria-hidden="true">B</div>
+        <h1 class="page-title">Setup do salão</h1>
+        <p class="page-sub">Configura o teu salão pela primeira vez · ~2 minutos</p>
       </div>
 
       <form id="setupForm" novalidate>
 
-        <div class="card" style="margin-bottom:16px">
-          <h3 class="card__title">Dados do salão</h3>
+        <div class="card mb-3">
+          <div class="card__head">
+            <div class="card__title">Dados do salão</div>
+            <div class="text-sm text-muted">Passo 1 de 3</div>
+          </div>
           <div class="field">
             <label for="sName">Nome do salão *</label>
             <input type="text" id="sName" required placeholder="Ex: Zen Organic Hair Concept" autocomplete="organization" />
           </div>
           <div class="field">
-            <label for="sSlug">Slug (ID único, sem espaços) *</label>
-            <input type="text" id="sSlug" required placeholder="Ex: zenorganic" pattern="[a-z0-9-]+" />
-            <div class="field__hint">Aparece nos URLs (?salon=…). Apenas letras minúsculas, números e hífens.</div>
+            <label for="sSlug">Slug *</label>
+            <input type="text" id="sSlug" required placeholder="Ex: zenorganic" pattern="[a-z0-9-]+" style="font-family:var(--font-mono)" />
+            <div class="field__hint">Aparece nos URLs (?salon=…). Apenas letras minúsculas, números e hífens. Não pode ser alterado depois.</div>
           </div>
           <div class="grid-2">
             <div class="field">
@@ -43,45 +43,52 @@
             </div>
             <div class="field">
               <label for="sPhone">Telefone</label>
-              <input type="tel" id="sPhone" placeholder="Ex: 213 456 789" autocomplete="tel" />
+              <input type="tel" id="sPhone" placeholder="213 456 789" autocomplete="tel" />
             </div>
           </div>
           <div class="field">
             <label for="sAddress">Morada</label>
-            <input type="text" id="sAddress" placeholder="Ex: R. Prof. Francisco Gentil 16A, Lisboa" autocomplete="street-address" />
+            <input type="text" id="sAddress" placeholder="Rua, número, cidade" autocomplete="street-address" />
           </div>
-          <div class="grid-2">
+          <div class="grid-2" style="margin-bottom:0">
             <div class="field">
               <label for="sEmail">Email do salão</label>
               <input type="email" id="sEmail" placeholder="contacto@exemplo.com" />
             </div>
             <div class="field">
               <label for="sColor">Cor principal</label>
-              <div class="row" style="gap:8px">
-                <input type="text" id="sColor" value="#6b7c5a" style="flex:1" pattern="^#[0-9A-Fa-f]{6}$" />
+              <div class="flex" style="gap:8px">
+                <input type="text" id="sColor" value="#6b7c5a" style="flex:1;font-family:var(--font-mono)" pattern="^#[0-9A-Fa-f]{6}$" />
                 <input type="color" id="sColorPicker" value="#6b7c5a"
-                       style="width:42px;height:42px;border-radius:10px;border:1px solid var(--line);padding:2px;cursor:pointer" aria-label="Escolher cor" />
+                       style="width:36px;height:36px;border-radius:var(--r-md);border:1px solid var(--border);padding:2px;cursor:pointer" aria-label="Escolher cor" />
               </div>
             </div>
           </div>
         </div>
 
-        <div class="card" style="margin-bottom:16px">
-          <h3 class="card__title">Conta admin</h3>
+        <div class="card mb-3">
+          <div class="card__head">
+            <div class="card__title">Conta admin</div>
+            <div class="text-sm text-muted">Passo 2 de 3</div>
+          </div>
           <div class="field">
             <label for="aEmail">Email do admin *</label>
             <input type="email" id="aEmail" required placeholder="admin@exemplo.com" autocomplete="email" />
           </div>
-          <div class="field field--password" data-revealed="false">
-            <label for="aPw">Password * <span class="field__hint" style="display:inline">(mínimo 6 caracteres)</span></label>
-            <input type="password" id="aPw" required minlength="6" autocomplete="new-password" placeholder="••••••••" />
+          <div class="field field--password" data-revealed="false" style="margin-bottom:0">
+            <label for="aPw">Password *</label>
+            <input type="password" id="aPw" required minlength="6" autocomplete="new-password" placeholder="Mínimo 6 caracteres" />
             <button type="button" class="pw-toggle" data-action="toggle-pw" aria-label="Mostrar password"></button>
+            <div class="field__hint">A password é usada para entrar em <code>admin.html</code>.</div>
           </div>
         </div>
 
-        <div class="card" style="margin-bottom:16px">
-          <h3 class="card__title">Horário de funcionamento</h3>
-          <p class="card__sub">Podes ajustar depois nas Configurações.</p>
+        <div class="card mb-3">
+          <div class="card__head">
+            <div class="card__title">Horário</div>
+            <div class="text-sm text-muted">Passo 3 de 3</div>
+          </div>
+          <p class="card__sub" style="margin-top:-8px;margin-bottom:var(--s-3)">Podes ajustar depois nas Configurações.</p>
           <div id="scheduleFields"></div>
         </div>
 
@@ -90,8 +97,8 @@
         <button type="submit" id="setupBtn" class="btn btn--primary btn--full btn--lg">
           <span class="btn__label">Criar salão e conta admin</span>
         </button>
-        <p style="text-align:center;font-size:12px;color:var(--muted);margin-top:14px">
-          Este setup só precisa de ser feito uma vez por salão.
+        <p class="text-center text-sm text-muted mt-3">
+          Só precisas de fazer este setup uma vez por salão.
         </p>
       </form>
     </div>
@@ -99,10 +106,13 @@
 
 <script type="module">
 import {
-  db, auth, doc, setDoc, collection, addDoc, serverTimestamp,
+  db, auth, doc, setDoc, collection, serverTimestamp,
   writeBatch, createUserWithEmailAndPassword
 } from './firebase.js';
-import { on, toast, toastSuccess, toastError, authErrorMessage, $, escapeHTML, html } from './app.js';
+import {
+  on, toastSuccess, authErrorMessage, $, hashPassword,
+  isSlug, isEmail, withLock, WEEKDAY_KEYS
+} from './app.js';
 
 const DAYS = [
   { key: 'monday',    label: 'Segunda' },
@@ -123,16 +133,15 @@ const defaults = {
   sunday:    { open:'',      close:'',      closed: true  },
 };
 
-// Render schedule fields
 const sf = $('#scheduleFields');
 sf.innerHTML = DAYS.map(d => {
   const v = defaults[d.key];
   return `
     <div class="time-row" id="row-${d.key}">
       <div class="time-row__day">${d.label}</div>
-      <input type="time" id="open-${d.key}"  value="${v.open}"  aria-label="Hora de abertura ${d.label}"  ${v.closed ? 'disabled' : ''} />
+      <input type="time" id="open-${d.key}"  value="${v.open}"  aria-label="Abre"  ${v.closed ? 'disabled' : ''} />
       <span class="time-row__sep">até</span>
-      <input type="time" id="close-${d.key}" value="${v.close}" aria-label="Hora de fecho ${d.label}"    ${v.closed ? 'disabled' : ''} />
+      <input type="time" id="close-${d.key}" value="${v.close}" aria-label="Fecha" ${v.closed ? 'disabled' : ''} />
       <label class="time-row__closed">
         <input type="checkbox" id="closed-${d.key}" data-action="toggle-day" data-day="${d.key}" ${v.closed ? 'checked' : ''} />
         Fechado
@@ -152,12 +161,10 @@ on('toggle-pw', (el) => {
   const reveal = field.getAttribute('data-revealed') !== 'true';
   field.setAttribute('data-revealed', String(reveal));
   field.querySelector('input').type = reveal ? 'text' : 'password';
-  el.setAttribute('aria-label', reveal ? 'Esconder password' : 'Mostrar password');
 });
 
-// Slug auto-derive from name (only if user hasn't typed it)
-const nameEl = $('#sName');
-const slugEl = $('#sSlug');
+// Slug auto-derive
+const nameEl = $('#sName'), slugEl = $('#sSlug');
 let slugTouched = false;
 slugEl.addEventListener('input', () => { slugTouched = true; });
 nameEl.addEventListener('input', () => {
@@ -167,9 +174,8 @@ nameEl.addEventListener('input', () => {
     .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 });
 
-// Sync color picker ↔ input
-const colorEl = $('#sColor');
-const pickEl  = $('#sColorPicker');
+// Color sync
+const colorEl = $('#sColor'), pickEl = $('#sColorPicker');
 colorEl.addEventListener('input', () => {
   if (/^#[0-9A-Fa-f]{6}$/.test(colorEl.value)) {
     pickEl.value = colorEl.value;
@@ -181,23 +187,19 @@ pickEl.addEventListener('input', () => {
   document.documentElement.style.setProperty('--brand', pickEl.value);
 });
 
-const errEl   = $('#setupErr');
-const btn     = $('#setupBtn');
-const btnText = btn.querySelector('.btn__label');
+const errEl   = $('#setupErr'), btn = $('#setupBtn'), btnText = btn.querySelector('.btn__label');
 function setError(msg) { errEl.textContent = msg; errEl.classList.toggle('show', !!msg); }
 function setLoading(loading) {
   btn.disabled = loading;
-  btnText.innerHTML = loading
-    ? '<span class="spinner" aria-hidden="true"></span> A criar salão...'
-    : 'Criar salão e conta admin';
+  btnText.innerHTML = loading ? '<span class="spinner" aria-hidden="true"></span> A criar salão…' : 'Criar salão e conta admin';
 }
 
-$('#setupForm').addEventListener('submit', async (e) => {
+$('#setupForm').addEventListener('submit', withLock('setup', async (e) => {
   e.preventDefault();
   setError('');
 
   const name    = nameEl.value.trim();
-  const slug    = slugEl.value.trim().toLowerCase().replace(/\s+/g, '-');
+  const slug    = slugEl.value.trim().toLowerCase();
   const tagline = $('#sTagline').value.trim();
   const address = $('#sAddress').value.trim();
   const phone   = $('#sPhone').value.trim();
@@ -206,37 +208,34 @@ $('#setupForm').addEventListener('submit', async (e) => {
   const aEmail  = $('#aEmail').value.trim();
   const aPw     = $('#aPw').value;
 
-  if (!name || !slug || !aEmail || !aPw) { setError('Preenche todos os campos obrigatórios (*).'); return; }
-  if (!/^[a-z0-9-]+$/.test(slug))         { setError('Slug inválido: usa apenas letras minúsculas, números e hífens.'); return; }
-  if (aPw.length < 6)                     { setError('A password deve ter pelo menos 6 caracteres.'); return; }
+  if (!name || !slug || !aEmail || !aPw) return setError('Preenche todos os campos obrigatórios (*).');
+  if (!isSlug(slug))   return setError('Slug inválido: apenas letras minúsculas, números e hífens.');
+  if (!isEmail(aEmail)) return setError('Email do admin inválido.');
+  if (aPw.length < 6)  return setError('A password deve ter pelo menos 6 caracteres.');
 
-  // Collect schedule
   const schedule = {};
   DAYS.forEach(d => {
     const closed = $(`#closed-${d.key}`).checked;
     schedule[d.key] = {
-      open:   closed ? '' : $(`#open-${d.key}`).value,
-      close:  closed ? '' : $(`#close-${d.key}`).value,
+      open:  closed ? '' : $(`#open-${d.key}`).value,
+      close: closed ? '' : $(`#close-${d.key}`).value,
       closed
     };
   });
 
   setLoading(true);
   try {
-    // 1) Auth account
     const userCred = await createUserWithEmailAndPassword(auth, aEmail, aPw);
     const uid = userCred.user.uid;
 
-    // 2-N) Batch all Firestore writes for atomicity & speed
     const batch = writeBatch(db);
-    const salonRef = doc(db, 'salons', slug);
-    batch.set(salonRef, {
+    batch.set(doc(db, 'salons', slug), {
       name, slug, tagline, address, phone, email,
       primaryColor: color, primaryColorDark: color, primaryColorLight: '#eef3e8',
       loyaltyVisits: 10, loyaltyDiscount: 20,
       referralDiscount: 10, birthdayDiscount: 15,
       noShowPenalty: 5, pointsPerVisit: 10,
-      teamPassword: '',
+      teamPasswordHash: '',
       adminUid: uid, adminEmail: aEmail,
       createdAt: serverTimestamp()
     });
@@ -244,7 +243,6 @@ $('#setupForm').addEventListener('submit', async (e) => {
     batch.set(doc(db, 'salons', slug, 'users', uid), {
       email: aEmail, role: 'admin', createdAt: serverTimestamp()
     });
-    // Example services
     const exServices = [
       { name: 'Corte + Brushing',  duration: 45, price: 35, order: 1, description: '' },
       { name: 'Coloração',         duration: 90, price: 45, order: 2, description: 'A partir de' },
@@ -260,14 +258,13 @@ $('#setupForm').addEventListener('submit', async (e) => {
     await batch.commit();
 
     toastSuccess('Salão criado com sucesso!');
-    setTimeout(() => { window.location.href = 'login.html'; }, 1400);
-
+    setTimeout(() => { window.location.href = 'login.html'; }, 1200);
   } catch (e) {
     console.error(e);
     setError(authErrorMessage(e.code) || 'Erro ao criar salão. Tenta novamente.');
     setLoading(false);
   }
-});
+}));
 </script>
 </body>
 </html>

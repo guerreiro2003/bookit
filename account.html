@@ -3,45 +3,42 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Área pessoal: vê as tuas marcações, pontos Zen Club, descontos e referidos." />
+  <meta name="description" content="Área pessoal: marcações, pontos Zen Club, descontos e referidos." />
   <meta name="robots" content="noindex" />
-  <meta name="theme-color" content="#6b7c5a" />
+  <meta name="theme-color" content="#09090b" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
   <title>A minha conta — Book It</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 
-  <header class="header">
-    <div class="header__inner">
-      <a class="header__brand" href="#" aria-label="Página inicial">
-        <div class="header__mark" id="headerMark" aria-hidden="true">B</div>
+  <header class="appbar">
+    <div class="appbar__inner">
+      <a class="appbar__brand" href="index.html" aria-label="Página inicial">
+        <div class="appbar__mark" id="headerMark" aria-hidden="true">B</div>
         <div>
-          <div class="header__name" id="headerName">Book It</div>
-          <div class="header__sub" id="headerSub">A minha conta</div>
+          <div class="appbar__name" id="headerName">Book It</div>
+          <div class="appbar__sub" id="headerSub">A minha conta</div>
         </div>
       </a>
-      <div class="header__actions" id="headerActions"></div>
+      <div class="appbar__actions" id="headerActions"></div>
     </div>
   </header>
 
-  <main style="padding: 28px 0 64px">
-    <div class="container">
+  <main>
+    <div class="container--md" style="padding: var(--s-5) 0 var(--s-9)">
 
-      <!-- ── AUTH SCREEN (login / register) ─────────────── -->
       <div id="screenAuth">
-        <div class="tabs" role="tablist">
-          <button class="tab active" type="button" role="tab" aria-selected="true" id="tabLogin"
-                  data-action="switch-auth" data-which="login">Entrar</button>
-          <button class="tab" type="button" role="tab" aria-selected="false" id="tabRegister"
-                  data-action="switch-auth" data-which="register">Criar conta</button>
+        <div class="tabs">
+          <button class="tab active" type="button" role="tab" id="tabLogin"
+                  data-action="switch-auth" data-which="login" aria-selected="true">Entrar</button>
+          <button class="tab" type="button" role="tab" id="tabRegister"
+                  data-action="switch-auth" data-which="register" aria-selected="false">Criar conta</button>
         </div>
 
-        <form id="authLogin" class="card" style="border-top-left-radius:0" novalidate>
-          <h1 class="section-title" style="margin-bottom:4px">Bem-vindo/a!</h1>
-          <p class="section-sub">Entra para ver os teus pontos, descontos e histórico.</p>
+        <form id="authLogin" class="card" novalidate>
+          <h1 class="section-title">Bem-vindo/a!</h1>
+          <p class="section-sub">Entra para ver pontos, descontos e histórico.</p>
           <div id="loginErr" class="error-msg" role="alert"></div>
           <div class="field">
             <label for="loginEmail">Email</label>
@@ -49,38 +46,40 @@
           </div>
           <div class="field field--password" data-revealed="false">
             <label for="loginPw">Password</label>
-            <input type="password" id="loginPw" autocomplete="current-password" required placeholder="••••••••" />
+            <input type="password" id="loginPw" autocomplete="current-password" required />
             <button type="button" class="pw-toggle" data-action="toggle-pw" aria-label="Mostrar password"></button>
           </div>
           <button class="btn btn--primary btn--full" type="submit" id="loginBtn">
             <span class="btn__label">Entrar</span>
           </button>
-          <div class="auth-box__footer">
+          <div class="auth-card__footer">
             <a data-action="forgot-pw" role="link" tabindex="0">Esqueci-me da password</a>
           </div>
         </form>
 
-        <form id="authRegister" class="card" style="border-top-left-radius:0;display:none" novalidate>
-          <h1 class="section-title" style="margin-bottom:4px">Criar conta</h1>
-          <p class="section-sub">Acompanha pontos, descontos e histórico de visitas.</p>
+        <form id="authRegister" class="card" style="display:none" novalidate>
+          <h1 class="section-title">Criar conta</h1>
+          <p class="section-sub">Acompanha pontos, descontos e histórico.</p>
           <div id="registerErr" class="error-msg" role="alert"></div>
           <div class="field"><label for="regName">Nome completo *</label><input type="text" id="regName" required autocomplete="name" /></div>
           <div class="field"><label for="regEmail">Email *</label><input type="email" id="regEmail" required autocomplete="email" /></div>
-          <div class="field"><label for="regPhone">Telemóvel</label><input type="tel" id="regPhone" autocomplete="tel" placeholder="9XX XXX XXX" /></div>
+          <div class="field"><label for="regPhone">Telemóvel</label><input type="tel" id="regPhone" autocomplete="tel" placeholder="912 345 678" /></div>
           <div class="field">
             <label for="regBirthday">Data de nascimento</label>
             <input type="date" id="regBirthday" />
-            <div class="field__hint">Para receberes desconto especial no teu mês 🎂</div>
+            <div class="field__hint">Recebes desconto especial no teu mês 🎂</div>
           </div>
-          <div class="field field--password" data-revealed="false">
-            <label for="regPw">Password * <span class="field__hint" style="display:inline">(mínimo 6)</span></label>
-            <input type="password" id="regPw" required minlength="6" autocomplete="new-password" />
-            <button type="button" class="pw-toggle" data-action="toggle-pw" aria-label="Mostrar password"></button>
-          </div>
-          <div class="field field--password" data-revealed="false">
-            <label for="regPw2">Confirmar password *</label>
-            <input type="password" id="regPw2" required minlength="6" autocomplete="new-password" />
-            <button type="button" class="pw-toggle" data-action="toggle-pw" aria-label="Mostrar password"></button>
+          <div class="grid-2">
+            <div class="field field--password" data-revealed="false">
+              <label for="regPw">Password * <span class="text-muted text-sm" style="font-weight:400">(mín. 6)</span></label>
+              <input type="password" id="regPw" required minlength="6" autocomplete="new-password" />
+              <button type="button" class="pw-toggle" data-action="toggle-pw" aria-label="Mostrar password"></button>
+            </div>
+            <div class="field field--password" data-revealed="false">
+              <label for="regPw2">Confirmar *</label>
+              <input type="password" id="regPw2" required minlength="6" autocomplete="new-password" />
+              <button type="button" class="pw-toggle" data-action="toggle-pw" aria-label="Mostrar password"></button>
+            </div>
           </div>
           <button class="btn btn--primary btn--full" type="submit" id="registerBtn">
             <span class="btn__label">Criar conta</span>
@@ -88,55 +87,51 @@
         </form>
       </div>
 
-      <!-- ── PROFILE ──────────────────────────────────── -->
       <div id="screenProfile" hidden>
 
-        <!-- Birthday banner -->
-        <div id="bdayBanner" class="bday-banner" hidden>
-          <div class="bday-banner__emoji" aria-hidden="true">🎂</div>
-          <div style="font-size:16px;font-weight:500;color:#6b4c2e">Feliz aniversário!</div>
-          <div style="font-size:13px;color:#8f6e52;margin-top:4px">Tens um desconto especial este mês. Vê o separador "Descontos".</div>
+        <div id="bdayBanner" class="bday" hidden>
+          <div class="bday__icon" aria-hidden="true">🎂</div>
+          <div>
+            <div class="bday__title">Feliz aniversário!</div>
+            <div class="bday__sub">Tens um desconto especial este mês. Vê o separador "Descontos".</div>
+          </div>
         </div>
 
-        <!-- Profile header -->
-        <div class="profile-header">
+        <div class="profile-card">
           <div class="profile-avatar" id="profileAvatar" aria-hidden="true">?</div>
           <div class="profile-info">
             <div class="profile-name" id="profileName">—</div>
             <div class="profile-email" id="profileEmail">—</div>
-            <div class="profile-since" id="profileSince"></div>
+            <div class="profile-meta" id="profileSince"></div>
           </div>
           <button class="btn btn--sm btn--ghost" type="button" data-action="logout">Sair</button>
         </div>
 
-        <!-- Stats summary -->
-        <div class="grid-3" style="margin-bottom:20px">
-          <div class="stat-card">
-            <div class="stat-value" id="profileVisits">0</div>
-            <div class="stat-label">Visitas</div>
+        <div class="stats" style="margin-bottom:var(--s-4)">
+          <div class="stat">
+            <div class="stat__label">Visitas</div>
+            <div class="stat__value tabular" id="profileVisits">0</div>
           </div>
-          <div class="stat-card stat-card--accent">
-            <div class="stat-value" id="profilePoints">0</div>
-            <div class="stat-label">Pontos Zen Club</div>
+          <div class="stat">
+            <div class="stat__label">Pontos Zen Club</div>
+            <div class="stat__value tabular" id="profilePoints" style="color:var(--brand)">0</div>
           </div>
-          <div class="stat-card">
-            <div class="stat-value" id="profileSpent">0€</div>
-            <div class="stat-label">Gasto total</div>
+          <div class="stat">
+            <div class="stat__label">Gasto total</div>
+            <div class="stat__value tabular" id="profileSpent">0€</div>
           </div>
         </div>
 
-        <!-- Loyalty -->
-        <div class="card" style="margin-bottom:16px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-            <div style="font-size:14px;font-weight:500">Cartão de fidelização</div>
-            <div style="font-size:12px;color:var(--muted)" id="loyaltyLabel">— / —</div>
+        <div class="card mb-4">
+          <div class="split mb-2">
+            <div style="font-weight:600;font-size:var(--text-md)">Cartão de fidelização</div>
+            <div class="text-sm text-muted tabular" id="loyaltyLabel">— / —</div>
           </div>
-          <div class="loyalty-bar"><div class="loyalty-fill" id="loyaltyFill" style="width:0%"></div></div>
-          <div style="font-size:12px;color:var(--muted);margin-top:6px" id="loyaltyMsg">A carregar…</div>
+          <div class="progress"><div class="progress__fill" id="loyaltyFill" style="width:0%"></div></div>
+          <div class="text-sm text-muted mt-2" id="loyaltyMsg">A carregar…</div>
         </div>
 
-        <!-- Tabs -->
-        <div class="tabs" role="tablist">
+        <div class="tabs">
           <button class="tab active" type="button" role="tab" data-action="switch-tab" data-tab="upcoming"  aria-selected="true">Próximas</button>
           <button class="tab"        type="button" role="tab" data-action="switch-tab" data-tab="history"   aria-selected="false">Histórico</button>
           <button class="tab"        type="button" role="tab" data-action="switch-tab" data-tab="discounts" aria-selected="false">Descontos</button>
@@ -144,91 +139,97 @@
           <button class="tab"        type="button" role="tab" data-action="switch-tab" data-tab="settings"  aria-selected="false">Dados</button>
         </div>
 
-        <!-- Próximas -->
         <div id="tab-upcoming" class="tab-content active" role="tabpanel">
           <div class="card">
-            <div class="admin-card__head" style="margin-bottom:14px">
-              <h3>Próximas marcações</h3>
-              <a class="btn btn--primary btn--sm" id="newBookingLink" href="index.html">＋ Nova marcação</a>
+            <div class="card__head">
+              <div class="card__title">Próximas marcações</div>
+              <a class="btn btn--primary btn--sm" id="newBookingLink" href="index.html">＋ Nova</a>
             </div>
-            <div id="upcomingList"><div class="loading-state"><span class="spinner" aria-hidden="true"></span><div>A carregar…</div></div></div>
+            <div id="upcomingList"><div class="loading-state"><span class="spinner" aria-hidden="true"></span></div></div>
           </div>
         </div>
 
-        <!-- Histórico -->
         <div id="tab-history" class="tab-content" role="tabpanel">
           <div class="card">
-            <h3 class="card__title">Histórico de visitas</h3>
-            <div id="historyList"><div class="loading-state"><span class="spinner" aria-hidden="true"></span><div>A carregar…</div></div></div>
+            <div class="card__head"><div class="card__title">Histórico de visitas</div></div>
+            <div id="historyList"><div class="loading-state"><span class="spinner" aria-hidden="true"></span></div></div>
           </div>
         </div>
 
-        <!-- Descontos -->
         <div id="tab-discounts" class="tab-content" role="tabpanel">
-          <div id="discountsList"><div class="loading-state"><span class="spinner" aria-hidden="true"></span><div>A carregar…</div></div></div>
-          <div class="card" style="margin-top:12px">
-            <h3 class="card__title">Usar um código de desconto</h3>
-            <div class="row" style="gap:8px">
-              <input type="text" id="discountCodeInput" placeholder="Ex: BDAY2026-XXX" style="flex:1;text-transform:uppercase" />
-              <button class="btn btn--primary" type="button" data-action="apply-discount">Aplicar</button>
+          <div id="discountsList"><div class="loading-state"><span class="spinner" aria-hidden="true"></span></div></div>
+          <div class="card mt-3">
+            <div class="card__head"><div class="card__title">Tens um código de desconto?</div></div>
+            <div class="flex" style="gap:8px">
+              <input type="text" id="discountCodeInput" placeholder="Ex: BDAY2026-XXX" style="flex:1;text-transform:uppercase;font-family:var(--font-mono)" />
+              <button class="btn btn--primary" type="button" data-action="apply-discount">Verificar</button>
             </div>
-            <p id="discountCodeMsg" style="font-size:12.5px;margin-top:8px;display:none"></p>
+            <p id="discountCodeMsg" class="text-sm mt-2" style="display:none"></p>
           </div>
         </div>
 
-        <!-- Referidos -->
         <div id="tab-referrals" class="tab-content" role="tabpanel">
-          <div class="card" style="margin-bottom:12px">
-            <h3 class="card__title">O teu código de referido</h3>
-            <div class="ref-code-box">
-              <div style="font-size:12px;color:var(--muted)">Partilha este código com amigos</div>
-              <div class="ref-code-value" id="refCodeDisplay">—</div>
+          <div class="card mb-3">
+            <div class="card__head"><div class="card__title">O teu código de referido</div></div>
+            <div class="refcode-box">
+              <div class="text-sm text-muted">Partilha com amigos</div>
+              <div class="refcode-value" id="refCodeDisplay">—</div>
               <button class="btn btn--primary btn--sm" type="button" data-action="copy-ref">Copiar código</button>
             </div>
-            <div style="font-size:12.5px;color:var(--muted);margin-top:8px;text-align:center">
+            <div class="text-sm text-muted text-center mt-3">
               Quando um amigo usar o teu código na primeira marcação, <strong>ambos ganham desconto</strong>.
             </div>
           </div>
 
           <div class="card">
-            <div style="font-size:14px;font-weight:500;margin-bottom:12px">
-              Amigos que trouxeste
-              <span class="badge badge--green" style="margin-left:8px" id="refCount">0</span>
+            <div class="card__head">
+              <div class="card__title">Amigos trazidos <span class="badge badge--green" id="refCount" style="margin-left:6px">0</span></div>
             </div>
-            <div id="refList"><div class="loading-state"><span class="spinner" aria-hidden="true"></span><div>A carregar…</div></div></div>
-            <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line)">
-              <div style="font-size:13px;color:var(--muted)">Total ganho em descontos partilhados</div>
-              <div style="font-size:20px;font-weight:500;color:var(--brand);margin-top:2px" id="refEarned">0€</div>
+            <div id="refList"><div class="loading-state"><span class="spinner" aria-hidden="true"></span></div></div>
+            <div class="divider"></div>
+            <div class="split">
+              <div class="text-sm text-muted">Total ganho em descontos</div>
+              <div style="font-size:var(--text-2xl);font-weight:600;color:var(--brand)" class="tabular" id="refEarned">0€</div>
             </div>
           </div>
         </div>
 
-        <!-- Dados -->
         <div id="tab-settings" class="tab-content" role="tabpanel">
-          <form class="card" id="settingsForm">
-            <h3 class="card__title">Os meus dados</h3>
+          <form class="card mb-3" id="settingsForm">
+            <div class="card__head"><div class="card__title">Os meus dados</div></div>
             <div class="field"><label for="settingsName">Nome</label><input type="text" id="settingsName" autocomplete="name" /></div>
             <div class="field"><label for="settingsPhone">Telemóvel</label><input type="tel" id="settingsPhone" autocomplete="tel" /></div>
-            <div class="field">
+            <div class="field" style="margin-bottom:var(--s-3)">
               <label for="settingsBirthday">Data de nascimento</label>
               <input type="date" id="settingsBirthday" />
             </div>
             <button class="btn btn--primary" type="submit">Guardar dados</button>
           </form>
-          <form class="card" id="passwordForm" style="margin-top:12px">
-            <h3 class="card__title">Alterar password</h3>
+
+          <form class="card mb-3" id="passwordForm">
+            <div class="card__head"><div class="card__title">Alterar password</div></div>
             <div class="field field--password" data-revealed="false">
               <label for="newPw">Nova password</label>
               <input type="password" id="newPw" minlength="6" autocomplete="new-password" />
               <button type="button" class="pw-toggle" data-action="toggle-pw" aria-label="Mostrar password"></button>
             </div>
-            <div class="field field--password" data-revealed="false">
+            <div class="field field--password" data-revealed="false" style="margin-bottom:var(--s-3)">
               <label for="newPw2">Confirmar</label>
               <input type="password" id="newPw2" minlength="6" autocomplete="new-password" />
               <button type="button" class="pw-toggle" data-action="toggle-pw" aria-label="Mostrar password"></button>
             </div>
-            <button class="btn btn--ghost" type="submit">Alterar password</button>
+            <button class="btn" type="submit">Alterar password</button>
           </form>
+
+          <div class="card" style="border-color: var(--danger-border)">
+            <div class="card__head">
+              <div>
+                <div class="card__title" style="color:var(--danger-fg)">Zona de risco</div>
+                <div class="card__sub">Apagar a conta remove todos os teus dados pessoais permanentemente. As marcações passadas mantêm-se anonimizadas.</div>
+              </div>
+            </div>
+            <button class="btn btn--danger" type="button" data-action="delete-account">Apagar a minha conta</button>
+          </div>
         </div>
 
       </div>
@@ -237,23 +238,22 @@
 
 <script type="module">
 import {
-  db, auth, collection, doc, getDoc, getDocs, updateDoc, setDoc,
-  query, where, orderBy, serverTimestamp,
-  onAuthStateChanged, signOut,
+  db, auth, collection, doc, getDoc, getDocs, updateDoc, setDoc, deleteDoc,
+  query, where, orderBy, runTransaction, serverTimestamp,
+  onAuthStateChanged, signOut, deleteUser,
   signInWithEmailAndPassword, createUserWithEmailAndPassword,
   sendPasswordResetEmail, updatePassword
 } from './firebase.js';
 import {
-  $, $$, on, toast, toastSuccess, toastError, escapeHTML, html, htmlMix, raw,
-  MONTHS_FULL, formatDate, formatDatePT, formatDateLongPT, formatPrice,
+  $, $$, on, toast, toastSuccess, toastError, escapeHTML, htmlMix, raw,
+  MONTHS_FULL, formatDate, formatDatePT, formatPrice, todayISO,
   getSalonId, loadSalon, applySalonBranding,
-  generateReferralCode, authErrorMessage, statusBadge, STATUS_LABELS
+  generateReferralCode, authErrorMessage, statusBadge, withLock,
+  isEmail
 } from './app.js';
 
 const salonId = getSalonId();
-let salon = null;
-let user  = null;
-let client = null;
+let salon = null, user = null, client = null, bookingsCache = null;
 
 (async () => {
   salon = await loadSalon(salonId);
@@ -262,28 +262,24 @@ let client = null;
 
 onAuthStateChanged(auth, async (u) => {
   if (u) {
-    // Redirect admin away to admin panel
-    const adminSnap = await getDocs(query(collection(db,'salons'), where('adminUid','==',u.uid)));
+    const adminSnap = await getDocs(query(collection(db,'salons'), where('adminUid','==', u.uid)));
     if (!adminSnap.empty) { window.location.href = 'admin.html'; return; }
     user = u;
     await loadClient(u);
     showProfile();
   } else {
-    user = null; client = null;
+    user = null; client = null; bookingsCache = null;
     showAuth();
   }
 });
 
-/* ── PASSWORD TOGGLE (shared with all .field--password) ── */
 on('toggle-pw', (el) => {
   const field = el.closest('.field');
   const reveal = field.getAttribute('data-revealed') !== 'true';
   field.setAttribute('data-revealed', String(reveal));
   field.querySelector('input').type = reveal ? 'text' : 'password';
-  el.setAttribute('aria-label', reveal ? 'Esconder password' : 'Mostrar password');
 });
 
-/* ── AUTH SWITCH ───────────────────────────────────────── */
 on('switch-auth', (el) => {
   const which = el.dataset.which;
   const isLogin = which === 'login';
@@ -301,8 +297,7 @@ function setErr(id, msg) {
   el.classList.toggle('show', !!msg);
 }
 
-/* ── LOGIN ─────────────────────────────────────────────── */
-$('#authLogin').addEventListener('submit', async (e) => {
+$('#authLogin').addEventListener('submit', withLock('login', async (e) => {
   e.preventDefault();
   setErr('loginErr', '');
   const email = $('#loginEmail').value.trim();
@@ -311,19 +306,18 @@ $('#authLogin').addEventListener('submit', async (e) => {
   const btn = $('#loginBtn'); btn.disabled = true;
   try { await signInWithEmailAndPassword(auth, email, pw); }
   catch (err) { setErr('loginErr', authErrorMessage(err.code)); btn.disabled = false; }
-});
+}));
 
 on('forgot-pw', async () => {
   const email = $('#loginEmail').value.trim();
-  if (!email) { setErr('loginErr', 'Escreve o email primeiro.'); return; }
+  if (!email) return setErr('loginErr', 'Escreve o email primeiro.');
   try {
     await sendPasswordResetEmail(auth, email);
     toastSuccess('Email de recuperação enviado.');
   } catch (e) { setErr('loginErr', authErrorMessage(e.code)); }
 });
 
-/* ── REGISTER ──────────────────────────────────────────── */
-$('#authRegister').addEventListener('submit', async (e) => {
+$('#authRegister').addEventListener('submit', withLock('register', async (e) => {
   e.preventDefault();
   setErr('registerErr', '');
   const name     = $('#regName').value.trim();
@@ -333,8 +327,9 @@ $('#authRegister').addEventListener('submit', async (e) => {
   const pw       = $('#regPw').value;
   const pw2      = $('#regPw2').value;
   if (!name || !email || !pw) return setErr('registerErr', 'Preenche os campos obrigatórios.');
+  if (!isEmail(email))         return setErr('registerErr', 'Email inválido.');
   if (pw !== pw2)              return setErr('registerErr', 'As passwords não coincidem.');
-  if (pw.length < 6)           return setErr('registerErr', 'Password com mínimo 6 caracteres.');
+  if (pw.length < 6)           return setErr('registerErr', 'Mínimo 6 caracteres.');
 
   const btn = $('#registerBtn'); btn.disabled = true;
   try {
@@ -342,31 +337,31 @@ $('#authRegister').addEventListener('submit', async (e) => {
     const uid  = cred.user.uid;
     const refCode = generateReferralCode(name, salonId);
 
-    const existing = await getDocs(query(collection(db,'salons',salonId,'clients'), where('email','==', email)));
-    if (!existing.empty) {
-      await updateDoc(doc(db,'salons',salonId,'clients', existing.docs[0].id), {
-        uid, name, phone, birthday: birthday || null, referralCode: refCode, updatedAt: serverTimestamp()
-      });
-    } else {
-      await setDoc(doc(db,'salons',salonId,'clients', uid), {
-        uid, name, email, phone, birthday: birthday || null,
-        referralCode: refCode,
-        visits: 0, points: 0, totalSpent: 0,
-        referredBy: null, referrals: [], discounts: [],
-        createdAt: serverTimestamp()
-      });
-    }
+    // Atomically: if email already in clients, link to UID; otherwise create new
+    await runTransaction(db, async (tx) => {
+      const existing = await getDocs(query(collection(db,'salons',salonId,'clients'), where('email','==', email)));
+      if (!existing.empty) {
+        const ref = doc(db,'salons',salonId,'clients', existing.docs[0].id);
+        tx.update(ref, { uid, name, phone, birthday: birthday || null, referralCode: refCode, updatedAt: serverTimestamp() });
+      } else {
+        tx.set(doc(db,'salons',salonId,'clients', uid), {
+          uid, name, email, phone, birthday: birthday || null,
+          referralCode: refCode,
+          visits: 0, points: 0, totalSpent: 0,
+          referredBy: null, referrals: [], discounts: [],
+          createdAt: serverTimestamp()
+        });
+      }
+    });
     toastSuccess('Conta criada com sucesso!');
   } catch (err) {
-    setErr('registerErr', authErrorMessage(err.code));
+    setErr('registerErr', authErrorMessage(err.code) || err.message);
     btn.disabled = false;
   }
-});
+}));
 
-/* ── LOGOUT ────────────────────────────────────────────── */
 on('logout', async () => { await signOut(auth); });
 
-/* ── LOAD CLIENT ───────────────────────────────────────── */
 async function loadClient(u) {
   try {
     let snap = await getDoc(doc(db,'salons',salonId,'clients', u.uid));
@@ -403,9 +398,8 @@ async function loadClient(u) {
   }
 }
 
-/* ── UI HELPERS ────────────────────────────────────────── */
 function showAuth() {
-  $('#screenAuth').hidden    = false; $('#screenAuth').style.display = '';
+  $('#screenAuth').hidden = false; $('#screenAuth').style.display = '';
   $('#screenProfile').hidden = true;
   $('#headerActions').innerHTML = '';
 }
@@ -413,79 +407,79 @@ function showProfile() {
   $('#screenAuth').style.display = 'none';
   $('#screenProfile').hidden = false;
 }
+
 on('switch-tab', (el) => {
   const tab = el.dataset.tab;
   $$('.tab-content').forEach(t => t.classList.remove('active'));
-  $$('.tabs .tab').forEach(t => { t.classList.remove('active'); t.setAttribute('aria-selected','false'); });
+  $$('#screenProfile .tabs .tab').forEach(t => { t.classList.remove('active'); t.setAttribute('aria-selected','false'); });
   $('#tab-' + tab).classList.add('active');
   el.classList.add('active');
   el.setAttribute('aria-selected','true');
 });
 
-/* ── PROFILE ───────────────────────────────────────────── */
 function renderProfile() {
   const c = client;
   const name = c.name || c.email?.split('@')[0] || '?';
   $('#profileAvatar').textContent = name.charAt(0).toUpperCase();
   $('#profileName').textContent   = name;
   $('#profileEmail').textContent  = c.email || '—';
-
   if (c.createdAt?.seconds) {
     const d = new Date(c.createdAt.seconds * 1000);
-    $('#profileSince').textContent = `Membro desde ${d.getDate()} de ${MONTHS_FULL[d.getMonth()]} de ${d.getFullYear()}`;
+    $('#profileSince').textContent = `Membro desde ${d.getDate()} ${MONTHS_FULL[d.getMonth()]} ${d.getFullYear()}`;
   }
   $('#profileVisits').textContent = c.visits || 0;
   $('#profilePoints').textContent = c.points || 0;
   $('#profileSpent').textContent  = `${c.totalSpent || 0}€`;
   $('#refCodeDisplay').textContent = c.referralCode || '—';
 
-  const target  = salon?.loyaltyVisits || 10;
-  const visits  = c.visits || 0;
-  const pct     = Math.min(100, Math.round(visits / target * 100));
+  const target = salon?.loyaltyVisits || 10;
+  const visits = c.visits || 0;
+  const pct = Math.min(100, Math.round(visits / target * 100));
   const remaining = Math.max(0, target - visits);
   $('#loyaltyLabel').textContent = `${visits} / ${target} visitas`;
   $('#loyaltyFill').style.width  = pct + '%';
-  $('#loyaltyMsg').textContent   =
-    remaining === 0
-      ? `🎉 Parabéns! Tens direito a ${salon?.loyaltyDiscount || 20}% de desconto na próxima visita!`
-      : `Faltam ${remaining} visita${remaining > 1 ? 's' : ''} para o teu desconto de ${salon?.loyaltyDiscount || 20}%`;
+  $('#loyaltyMsg').textContent   = remaining === 0
+    ? `🎉 Tens direito a ${salon?.loyaltyDiscount || 20}% de desconto na próxima visita!`
+    : `Faltam ${remaining} visita${remaining > 1 ? 's' : ''} para ${salon?.loyaltyDiscount || 20}% de desconto.`;
 
   const qs = `?salon=${encodeURIComponent(salonId)}`;
   $('#newBookingLink').href = `index.html${qs}`;
-  $('#headerActions').innerHTML = htmlMix`<a class="btn btn--primary btn--sm" href="index.html${raw(qs)}">＋ Nova marcação</a>`;
+  $('#headerActions').innerHTML = htmlMix`<a class="btn btn--primary btn--sm" href="index.html${raw(qs)}">＋ Marcar</a>`;
 }
 
-/* ── BOOKINGS (Próximas + Histórico) ───────────────────── */
 async function fetchBookings() {
+  if (bookingsCache) return bookingsCache;
   const snap = await getDocs(query(
     collection(db,'salons',salonId,'bookings'),
     where('clientId','==', client.id),
     orderBy('date','desc')
   ));
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  bookingsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return bookingsCache;
 }
+function invalidateCache() { bookingsCache = null; }
 
 async function loadUpcoming() {
   const el = $('#upcomingList');
   try {
     const all = await fetchBookings();
-    const today = formatDate(new Date());
+    const today = todayISO();
     const upcoming = all
       .filter(b => b.date >= today && !['cancelled','noshow'].includes(b.status))
       .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
     if (!upcoming.length) {
       el.innerHTML = htmlMix`<div class="empty-state">
-        <div class="empty-state__icon" aria-hidden="true">📅</div>
+        <div class="empty-state__icon">📅</div>
         <div class="empty-state__title">Sem marcações futuras</div>
-        <div class="empty-state__desc">Faz a tua próxima marcação em segundos.</div>
-        <a class="btn btn--primary" href="index.html?salon=${raw(encodeURIComponent(salonId))}">＋ Nova marcação</a>
+        <div class="empty-state__desc">Marca a tua próxima visita em segundos.</div>
+        <a class="btn btn--primary btn--sm" href="index.html?salon=${raw(encodeURIComponent(salonId))}">＋ Nova marcação</a>
       </div>`;
       return;
     }
     el.innerHTML = upcoming.map(b => renderBookingRow(b, true)).join('');
   } catch (e) {
     console.error(e);
-    el.innerHTML = `<div class="error-state"><div class="error-state__icon" aria-hidden="true">⚠️</div><div class="error-state__title">Erro a carregar</div></div>`;
+    el.innerHTML = `<div class="error-state"><div class="error-state__icon">⚠️</div><div class="error-state__title">Erro a carregar</div></div>`;
   }
 }
 
@@ -493,39 +487,43 @@ async function loadHistory() {
   const el = $('#historyList');
   try {
     const all = await fetchBookings();
-    const today = formatDate(new Date());
+    const today = todayISO();
     const past = all.filter(b => b.date < today || ['cancelled','noshow','completed'].includes(b.status));
     if (!past.length) {
-      el.innerHTML = `<p style="color:var(--muted);font-size:13px">Ainda não tens visitas registadas.</p>`;
+      el.innerHTML = `<p class="text-muted text-sm" style="padding:var(--s-4) 0">Ainda sem visitas registadas.</p>`;
       return;
     }
     el.innerHTML = past.map(b => renderBookingRow(b, false)).join('');
   } catch (e) {
     console.error(e);
-    el.innerHTML = `<div class="error-state"><div class="error-state__icon" aria-hidden="true">⚠️</div><div class="error-state__title">Erro a carregar</div></div>`;
+    el.innerHTML = `<div class="error-state"><div class="error-state__icon">⚠️</div><div class="error-state__title">Erro a carregar</div></div>`;
   }
 }
 
 function renderBookingRow(b, upcoming) {
-  const isToday = b.date === formatDate(new Date());
+  const isToday = b.date === todayISO();
   const canCancel = upcoming && ['pending','confirmed'].includes(b.status);
   return htmlMix`
-    <div class="list-row ${raw(upcoming && isToday ? 'list-row--today' : '')}">
-      <div class="list-row__main">
-        <div class="list-row__title">${b.serviceName}${b.forSomeone ? ' (para ' + escapeHTML(b.forSomeone) + ')' : ''}</div>
-        <div class="list-row__meta">
-          ${raw(isToday && upcoming ? '<span class="badge badge--green" style="margin-right:6px">📍 Hoje</span>' : '')}
-          ${raw(formatDatePT(b.date))} às ${b.time}${b.staffName && b.staffName !== 'Sem preferência' ? ' · ' + escapeHTML(b.staffName) : ''}
+    <div class="row-card ${raw(upcoming && isToday ? 'row-card--accent' : '')}">
+      <div class="row-card__main">
+        <div class="row-card__title">
+          <strong>${b.time}</strong>
+          <span class="row-card__dot" aria-hidden="true">·</span>
+          <span>${b.serviceName}</span>
+          ${b.forSomeone ? raw(htmlMix`<span class="row-card__for"> (para ${b.forSomeone})</span>`) : ''}
+        </div>
+        <div class="row-card__meta">
+          ${raw(isToday && upcoming ? '<span class="badge badge--green badge--dot">Hoje</span> ' : '')}${raw(formatDatePT(b.date))}${b.staffName && b.staffName !== 'Sem preferência' ? ' · ' + escapeHTML(b.staffName) : ''}
         </div>
       </div>
-      <div class="list-row__side">
-        <div class="list-row__price">${formatPrice(b.finalPrice ?? b.servicePrice)}</div>
-        <div class="list-row__sub" style="display:flex;gap:5px;justify-content:flex-end;margin-top:4px;flex-wrap:wrap">
+      <div class="row-card__side">
+        <div class="row-card__price">${formatPrice(b.finalPrice ?? b.servicePrice)}</div>
+        <div class="row-card__badges">
           ${raw(statusBadge(b.status))}
           ${raw(b.paid ? '<span class="badge badge--green">Pago</span>' : '')}
         </div>
-        ${b.paid && b.pointsAwarded ? raw(htmlMix`<div class="list-row__sub" style="color:var(--brand);margin-top:3px">+${b.pointsAwarded} pontos</div>`) : ''}
-        ${canCancel ? raw(htmlMix`<button class="btn btn--danger btn--sm" type="button" data-action="cancel-booking" data-id="${b.id}" style="margin-top:6px">Cancelar</button>`) : ''}
+        ${b.paid && b.pointsAwarded ? raw(htmlMix`<div class="text-sm text-muted">+${b.pointsAwarded} pts</div>`) : ''}
+        ${canCancel ? raw(htmlMix`<button class="btn btn--danger btn--sm" type="button" data-action="cancel-booking" data-id="${b.id}">Cancelar</button>`) : ''}
       </div>
     </div>`;
 }
@@ -536,41 +534,37 @@ on('cancel-booking', async (el) => {
     await updateDoc(doc(db,'salons',salonId,'bookings', el.dataset.id),
       { status: 'cancelled', cancelledAt: serverTimestamp(), cancelledBy: 'client' });
     toastSuccess('Marcação cancelada.');
+    invalidateCache();
     loadUpcoming(); loadHistory();
-  } catch (e) {
-    console.error(e);
-    toastError('Erro ao cancelar.');
-  }
+  } catch (e) { console.error(e); toastError('Erro ao cancelar.'); }
 });
 
-/* ── DISCOUNTS ─────────────────────────────────────────── */
 function loadDiscounts() {
   const discounts = client.discounts || [];
   const el = $('#discountsList');
   if (!discounts.length) {
-    el.innerHTML = `<div class="card"><div class="empty-state" style="background:transparent;border:none;padding:24px 0">
-      <div class="empty-state__icon" aria-hidden="true">🎁</div>
+    el.innerHTML = `<div class="empty-state">
+      <div class="empty-state__icon">🎁</div>
       <div class="empty-state__title">Ainda sem descontos</div>
-      <div class="empty-state__desc">Continua a visitar-nos para ganhares recompensas.</div>
-    </div></div>`;
+      <div class="empty-state__desc">Continua a visitar-nos para ganhar recompensas.</div></div>`;
     return;
   }
   const now = new Date();
   const active = discounts.filter(d => !d.used);
   if (!active.length) {
-    el.innerHTML = `<div class="card"><p style="color:var(--muted);text-align:center;padding:18px 0">Todos os descontos já foram usados.</p></div>`;
+    el.innerHTML = `<div class="card"><p class="text-muted text-center" style="padding:var(--s-4) 0">Todos os descontos já foram usados.</p></div>`;
     return;
   }
   el.innerHTML = active.map(d => {
     const expired = d.expiresAt && new Date(d.expiresAt) < now;
     return htmlMix`
-      <div class="discount-card ${raw(expired ? 'expired' : '')}">
-        <div class="discount-card__title">${d.title}</div>
-        <div class="discount-card__desc">${d.description}</div>
-        ${d.expiresAt ? raw(htmlMix`<div class="discount-card__exp">Válido até ${raw(formatDatePT(d.expiresAt.split('T')[0]))}</div>`) : ''}
+      <div class="discount ${raw(expired ? 'expired' : '')}">
+        <div class="discount__title">${d.title}</div>
+        <div class="discount__desc">${d.description}</div>
+        ${d.expiresAt ? raw(htmlMix`<div class="discount__exp">Válido até ${raw(formatDatePT(d.expiresAt.split('T')[0]))}</div>`) : ''}
         ${expired
-          ? raw('<div style="color:var(--danger);font-size:12px;margin-top:6px">⚠️ Expirado</div>')
-          : raw(htmlMix`<div class="discount-card__code">${d.code}</div>`)}
+          ? raw('<div class="text-sm" style="color:var(--danger);margin-top:6px">⚠️ Expirado</div>')
+          : raw(htmlMix`<div class="discount__code">${d.code}</div>`)}
       </div>`;
   }).join('');
 }
@@ -581,38 +575,37 @@ on('apply-discount', () => {
   if (!code) return;
   const disc = (client.discounts || []).find(d => d.code === code && !d.used);
   if (disc) {
-    msg.textContent = `✓ Código válido: ${disc.title} — ${disc.description}`;
+    msg.textContent = `✓ Código válido: ${disc.title}`;
     msg.style.color = 'var(--success)';
   } else {
-    msg.textContent = '❌ Código inválido ou já utilizado.';
+    msg.textContent = '✗ Código inválido ou já utilizado';
     msg.style.color = 'var(--danger)';
   }
   msg.style.display = 'block';
 });
 
-/* ── REFERRALS ─────────────────────────────────────────── */
 async function loadReferrals() {
   try {
+    const code = client.referralCode || '__none__';
     const snap = await getDocs(query(
       collection(db,'salons',salonId,'clients'),
-      where('referredBy','==', client.referralCode || '__none__')
-    ));
+      where('referredBy','==', code)));
     const refs = snap.docs.map(d => d.data());
     const refDisc = salon?.referralDiscount || 10;
     $('#refCount').textContent  = refs.length;
-    $('#refEarned').textContent = `${refs.length * refDisc}€ em descontos`;
+    $('#refEarned').textContent = `${refs.length * refDisc}€`;
     const el = $('#refList');
     if (!refs.length) {
-      el.innerHTML = `<p style="color:var(--muted);font-size:13px">Ainda não trouxeste ninguém — partilha o teu código!</p>`;
+      el.innerHTML = `<p class="text-muted text-sm" style="padding:var(--s-3) 0">Ainda sem amigos trazidos — partilha o teu código!</p>`;
       return;
     }
     el.innerHTML = refs.map(r => htmlMix`
-      <div class="list-row">
-        <div class="list-row__main">
-          <div class="list-row__title">${r.name}</div>
-          <div class="list-row__meta">Veio com o teu código</div>
+      <div class="row-card">
+        <div class="row-card__main">
+          <div class="row-card__title">${r.name}</div>
+          <div class="row-card__meta">Veio com o teu código</div>
         </div>
-        <span class="badge badge--green">+${refDisc}% desconto</span>
+        <span class="badge badge--green">+${refDisc}%</span>
       </div>`).join('');
   } catch (e) { console.error(e); }
 }
@@ -620,15 +613,14 @@ async function loadReferrals() {
 on('copy-ref', async () => {
   try {
     await navigator.clipboard.writeText(client.referralCode || '');
-    toastSuccess('Código copiado!');
+    toastSuccess('Código copiado');
   } catch { toastError('Não foi possível copiar.'); }
 });
 
-/* ── BIRTHDAY DISCOUNT ─────────────────────────────────── */
 async function checkBirthdayDiscount() {
   if (!client.birthday) return;
   const today = new Date();
-  const bday  = new Date(client.birthday);
+  const bday = new Date(client.birthday);
   if (bday.getMonth() !== today.getMonth()) return;
   $('#bdayBanner').hidden = false;
   const thisYear = today.getFullYear();
@@ -639,7 +631,7 @@ async function checkBirthdayDiscount() {
   const newDisc = {
     type: 'birthday', year: thisYear,
     title: '🎂 Desconto de Aniversário',
-    description: `${pct}% no teu mês de aniversário!`,
+    description: `${pct}% no teu mês de aniversário`,
     code: `BDAY${thisYear}-${(client.referralCode || '').split('-')[1] || Math.floor(Math.random()*999)}`,
     discount: pct, expiresAt: expiry.toISOString(),
     used: false, createdAt: new Date().toISOString()
@@ -649,12 +641,12 @@ async function checkBirthdayDiscount() {
   client.discounts = updated;
 }
 
-/* ── SETTINGS ──────────────────────────────────────────── */
 function fillSettings() {
   $('#settingsName').value     = client.name || '';
   $('#settingsPhone').value    = client.phone || '';
   $('#settingsBirthday').value = client.birthday || '';
 }
+
 $('#settingsForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const name     = $('#settingsName').value.trim();
@@ -666,9 +658,7 @@ $('#settingsForm').addEventListener('submit', async (e) => {
     Object.assign(client, { name, phone, birthday: birthday || null });
     renderProfile();
     toastSuccess('Dados guardados.');
-  } catch (e) {
-    toastError('Erro ao guardar.');
-  }
+  } catch (e) { toastError('Erro ao guardar.'); }
 });
 
 $('#passwordForm').addEventListener('submit', async (e) => {
@@ -682,8 +672,32 @@ $('#passwordForm').addEventListener('submit', async (e) => {
     await updatePassword(user, pw);
     $('#newPw').value = ''; $('#newPw2').value = '';
     toastSuccess('Password alterada.');
+  } catch (e) { toastError(authErrorMessage(e.code)); }
+});
+
+on('delete-account', async () => {
+  if (!confirm('Tens a certeza? Esta ação não pode ser anulada. Vamos manter o histórico de visitas anonimizado por motivos contabilísticos.')) return;
+  try {
+    // Anonymize client document (don't delete to preserve booking history references)
+    await updateDoc(doc(db,'salons',salonId,'clients', client.id), {
+      name: 'Cliente anonimizado',
+      email: 'anonimo@deleted.local',
+      phone: '',
+      birthday: null,
+      uid: null,
+      deleted: true,
+      deletedAt: serverTimestamp()
+    });
+    await deleteUser(user);
+    toastSuccess('Conta apagada.');
+    setTimeout(() => window.location.href = 'index.html', 1500);
   } catch (e) {
-    toastError(authErrorMessage(e.code));
+    console.error(e);
+    if (e.code === 'auth/requires-recent-login') {
+      toastError('Por segurança, sai e entra de novo antes de apagar a conta.');
+    } else {
+      toastError('Erro ao apagar conta. Contacta-nos.');
+    }
   }
 });
 </script>
