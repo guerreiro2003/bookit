@@ -3,6 +3,9 @@
 Multi-tenant salon booking SaaS built with plain HTML / CSS / JS and
 Firebase (Auth + Firestore). No build step. Hosted as a static site.
 
+> **🌐 Production:** [https://bookit-51575.web.app](https://bookit-51575.web.app) (Firebase Hosting)
+> **📦 Source:** [github.com/guerreiro2003/bookit](https://github.com/guerreiro2003/bookit)
+>
 > Production v2 — fully redesigned (Linear / Stripe / Cal.com aesthetic),
 > dark-mode-first, real-time, with command palette and atomic transactions.
 > See [CHANGELOG.md](CHANGELOG.md) for the full diff from v1.
