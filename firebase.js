@@ -3,11 +3,13 @@ import {
   getFirestore, collection, doc, getDoc, getDocs,
   addDoc, setDoc, updateDoc, deleteDoc, query, where,
   orderBy, limit, onSnapshot, serverTimestamp, writeBatch,
-  arrayUnion, arrayRemove, increment
+  arrayUnion, arrayRemove, increment, runTransaction,
+  startAfter, endBefore
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import {
   getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
-  signOut, onAuthStateChanged, sendPasswordResetEmail, updatePassword
+  signOut, onAuthStateChanged, sendPasswordResetEmail,
+  updatePassword, updateProfile, deleteUser
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -26,8 +28,10 @@ const auth = getAuth(app);
 export {
   db, auth,
   collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, deleteDoc,
-  query, where, orderBy, limit, onSnapshot, serverTimestamp, writeBatch,
+  query, where, orderBy, limit, startAfter, endBefore,
+  onSnapshot, serverTimestamp, writeBatch, runTransaction,
   arrayUnion, arrayRemove, increment,
   signInWithEmailAndPassword, createUserWithEmailAndPassword,
-  signOut, onAuthStateChanged, sendPasswordResetEmail, updatePassword
+  signOut, onAuthStateChanged, sendPasswordResetEmail,
+  updatePassword, updateProfile, deleteUser
 };
