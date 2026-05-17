@@ -240,8 +240,13 @@ $('#setupForm').addEventListener('submit', withLock('setup', async (e) => {
     const userCred = await createUserWithEmailAndPassword(auth, aEmail, aPw);
     const uid = userCred.user.uid;
 
-    const batch = writeBatch(db);
-    batch.set(doc(db, 'salons', slug), {
+    /* Firestore rules can't reference docs being created in the same batch:
+     * services/staff/promotions writes call isAdmin(salonId) which reads the
+     * salon doc. So we commit in two phases — first the salon (creatable by
+     * any authed user as long as adminUid == self), then everything that
+     * depends on the salon existing for the rule check. */
+    const salonBatch = writeBatch(db);
+    salonBatch.set(doc(db, 'salons', slug), {
       name, slug, tagline, address, phone, email,
       primaryColor: color, primaryColorDark: color, primaryColorLight: '#eef3e8',
       loyaltyVisits: 10, loyaltyDiscount: 20,
@@ -251,6 +256,9 @@ $('#setupForm').addEventListener('submit', withLock('setup', async (e) => {
       adminUid: uid, adminEmail: aEmail,
       createdAt: serverTimestamp()
     });
+    await salonBatch.commit();
+
+    const batch = writeBatch(db);
     batch.set(doc(db, 'salons', slug, 'config', 'schedule'), schedule);
     batch.set(doc(db, 'salons', slug, 'users', uid), {
       email: aEmail, role: 'admin', createdAt: serverTimestamp()
