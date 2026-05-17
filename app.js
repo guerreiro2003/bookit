@@ -126,7 +126,10 @@ export function relativeDay(dateStr) {
 }
 
 /* ── URL / Salon ─────────────────────────────────────────── */
-const DEFAULT_SALON = 'zenorganic';
+/* Default salon when no ?salon=... query param. Points at the fully-populated
+ * canonical demo (admin@bookit.demo / Demo2026!). The legacy "zenorganic"
+ * salon is no longer the default because it's not fully provisioned. */
+const DEFAULT_SALON = 'demo';
 export function getSalonId() {
   const params = new URLSearchParams(window.location.search);
   return (params.get('salon') || DEFAULT_SALON).trim();
@@ -198,13 +201,17 @@ document.addEventListener('keydown', (e) => {
 /* ── Fatal error ─────────────────────────────────────────── */
 export function showFatalError(msg) {
   const main = document.querySelector('main') || document.body;
+  const isDemoAlready = getSalonId() === DEFAULT_SALON;
   main.innerHTML = `
     <div class="container" style="padding: 80px 0">
       <div class="error-state">
         <div class="error-state__icon" aria-hidden="true">⚠️</div>
         <div class="error-state__title">Algo correu mal</div>
         <div class="error-state__desc">${escapeHTML(msg)}</div>
-        <button class="btn btn--ghost" type="button" data-action="reload-page">Tentar novamente</button>
+        <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap">
+          <button class="btn" type="button" data-action="reload-page">Tentar novamente</button>
+          ${isDemoAlready ? '' : '<a class="btn btn--primary" href="?salon=' + DEFAULT_SALON + '">Ir para o salão demo</a>'}
+        </div>
       </div>
     </div>`;
 }

@@ -263,7 +263,20 @@ let salon = null, user = null, client = null, bookingsCache = null;
 
 (async () => {
   salon = await loadSalon(salonId);
-  if (salon) applySalonBranding(salon, { titlePrefix: 'A minha conta' });
+  if (!salon) {
+    /* Salão não existe — mostra erro útil em vez de página em branco */
+    document.querySelector('main').innerHTML = `
+      <div class="container" style="padding: var(--s-9) 0; text-align:center">
+        <div class="empty-state__icon" style="margin:0 auto var(--s-4)">🏝️</div>
+        <h1 class="page-title">Salão não encontrado</h1>
+        <p class="page-sub" style="max-width: 40ch; margin: var(--s-3) auto var(--s-6)">
+          O salão <code>${escapeHTML(salonId)}</code> não existe ou foi removido.
+        </p>
+        <a class="btn btn--primary" href="account.html?salon=demo">Ir para o salão demo</a>
+      </div>`;
+    return;
+  }
+  applySalonBranding(salon, { titlePrefix: 'A minha conta' });
 })();
 
 onAuthStateChanged(auth, async (u) => {
