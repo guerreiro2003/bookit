@@ -320,9 +320,21 @@
           <div class="field"><label for="staffEmail">Email</label><input type="email" id="staffEmail" /></div>
         </div>
         <div class="field">
-          <label for="staffPhotoUrl">URL da foto (opcional)</label>
-          <input type="url" id="staffPhotoUrl" placeholder="https://… ou cola URL do Imgur/Cloudinary" />
-          <div class="field__hint">Aparece no site público (Zen Organic) e no portal cliente. Para imagens, recomendamos <a href="https://imgur.com" target="_blank" rel="noopener" style="color:var(--brand)">imgur.com</a> ou <a href="https://cloudinary.com" target="_blank" rel="noopener" style="color:var(--brand)">Cloudinary</a> — fazem upload grátis e dão um URL público.</div>
+          <label for="staffPhotoFile">Foto do colaborador (opcional)</label>
+          <div class="flex" style="gap:10px; align-items:center; flex-wrap:wrap">
+            <label class="btn btn--sm" style="cursor:pointer; margin:0">
+              <span>📷 Carregar imagem</span>
+              <input type="file" id="staffPhotoFile" accept="image/*" hidden />
+            </label>
+            <span class="text-muted text-sm">ou</span>
+            <input type="url" id="staffPhotoUrl" placeholder="Cola um URL (https://…)" style="flex:1; min-width:200px" />
+          </div>
+          <div id="staffPhotoPreview" class="flex mt-3" hidden style="gap:12px; align-items:center">
+            <img id="staffPhotoImg" alt="" style="width:56px; height:56px; border-radius:50%; object-fit:cover; border:1px solid var(--border)" />
+            <span class="text-sm text-muted" id="staffPhotoMeta">—</span>
+            <button type="button" class="btn btn--sm" data-action="clear-staff-photo">Remover</button>
+          </div>
+          <div class="field__hint">JPG, PNG ou WEBP. Será redimensionada automaticamente para 400×400px e guardada na base de dados.</div>
         </div>
         <div class="field"><label for="staffBio">Sobre (opcional)</label><textarea id="staffBio"></textarea></div>
         <button class="btn btn--primary" type="submit">Adicionar colaborador</button>
@@ -1361,13 +1373,39 @@ function renderStaffList() {
 on('edit-staff-photo', async (el) => {
   const staff = allStaff.find(s => s.id === el.dataset.id);
   if (!staff) return;
-  const current = staff.photoUrl || '';
-  const url = prompt(`URL da foto para ${staff.name}\n\nCola um URL público (ex: imgur.com, cloudinary).\nDeixa vazio para remover a foto.`, current);
-  if (url === null) return;  // user cancelled
-  const trimmed = url.trim();
-  await updateDoc(doc(db,'salons',salonId,'staff', staff.id), { photoUrl: trimmed || null });
-  toastSuccess(trimmed ? 'Foto atualizada.' : 'Foto removida.');
-  loadStaff();
+  /* 3-option flow (browser-native to avoid building a modal):
+   *   1 = upload from device
+   *   2 = paste URL
+   *   3 = remove existing photo (only if one exists)
+   */
+  const hasPhoto = !!staff.photoUrl;
+  const choice = window.prompt(
+    `Foto de ${staff.name}\n\nEscreve:\n  1 — carregar imagem do computador\n  2 — colar URL\n${hasPhoto ? '  3 — remover foto atual\n' : ''}\n(deixa vazio para cancelar)`,
+    '1'
+  );
+  if (!choice) return;
+  let newPhoto = undefined;
+  try {
+    if (choice.trim() === '1') {
+      const file = await pickImage();
+      if (!file) return;
+      newPhoto = await fileToResizedDataURL(file);
+    } else if (choice.trim() === '2') {
+      const url = window.prompt(`URL da foto para ${staff.name}:`, staff.photoUrl || '');
+      if (url === null) return;
+      newPhoto = url.trim() || null;
+    } else if (choice.trim() === '3' && hasPhoto) {
+      if (!confirm('Remover foto atual?')) return;
+      newPhoto = null;
+    } else {
+      return;
+    }
+    await updateDoc(doc(db,'salons',salonId,'staff', staff.id), { photoUrl: newPhoto });
+    toastSuccess(newPhoto ? 'Foto atualizada.' : 'Foto removida.');
+    loadStaff();
+  } catch (err) {
+    toastError(err.message || 'Erro a guardar foto.');
+  }
 });
 
 function renderStaffSelect() {
@@ -1375,6 +1413,70 @@ function renderStaffSelect() {
   sel.innerHTML = '<option value="">—</option>' +
     allStaff.map(s => htmlMix`<option value="${s.id}">${s.name}</option>`).join('');
 }
+
+/* ── Photo upload (resize → base64) ──────────────────────── */
+async function fileToResizedDataURL(file, maxSize = 400, quality = 0.82) {
+  if (!file.type.startsWith('image/')) throw new Error('Selecciona uma imagem.');
+  if (file.size > 8 * 1024 * 1024) throw new Error('Imagem demasiado grande (max 8MB).');
+  const img = new Image();
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej(new Error('Imagem inválida.')); img.src = objectUrl; });
+  } finally { URL.revokeObjectURL(objectUrl); }
+  const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+  const w = Math.round(img.width * scale);
+  const h = Math.round(img.height * scale);
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  // White-fill bg in case of transparent PNG; JPEG doesn't support alpha
+  ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(img, 0, 0, w, h);
+  return canvas.toDataURL('image/jpeg', quality);
+}
+
+function pickImage() {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = 'image/*';
+    input.onchange = () => resolve(input.files?.[0] || null);
+    input.oncancel = () => resolve(null);
+    input.click();
+  });
+}
+
+function showPhotoPreview(dataUrl, sizeLabel) {
+  $('#staffPhotoPreview').hidden = false;
+  $('#staffPhotoImg').src = dataUrl;
+  $('#staffPhotoMeta').textContent = sizeLabel || '';
+}
+function clearPhotoPreview() {
+  $('#staffPhotoPreview').hidden = true;
+  $('#staffPhotoImg').src = '';
+  $('#staffPhotoUrl').value = '';
+  $('#staffPhotoFile').value = '';
+}
+on('clear-staff-photo', clearPhotoPreview);
+
+$('#staffPhotoFile').addEventListener('change', async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  try {
+    const dataUrl = await fileToResizedDataURL(file);
+    $('#staffPhotoUrl').value = dataUrl;
+    const sizeKB = Math.round(dataUrl.length * 0.75 / 1024); // approx base64 → bytes
+    showPhotoPreview(dataUrl, `${file.name} · ${sizeKB} KB`);
+  } catch (err) { toastError(err.message); }
+});
+
+$('#staffPhotoUrl').addEventListener('input', () => {
+  const val = $('#staffPhotoUrl').value.trim();
+  if (val && /^(https?:\/\/|data:image)/.test(val)) {
+    showPhotoPreview(val, 'URL externo');
+  } else {
+    $('#staffPhotoPreview').hidden = true;
+  }
+});
 
 $('#staffForm').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -1390,6 +1492,7 @@ $('#staffForm').addEventListener('submit', async (e) => {
     createdAt: serverTimestamp()
   });
   $('#staffForm').reset();
+  clearPhotoPreview();
   toastSuccess('Colaborador adicionado.');
   loadStaff();
 });
