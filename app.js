@@ -344,6 +344,8 @@ export async function markBookingPaid({ salonId, bookingId, method, pointsPerVis
     if (!bSnap.exists()) throw new Error('booking-not-found');
     const b = bSnap.data();
     if (b.paid) return { alreadyPaid: true };
+    if (b.status === 'cancelled') throw new Error('booking-cancelled');
+    if (b.status === 'noshow')    throw new Error('booking-noshow');
 
     const pts = pointsPerVisit || 10;
     tx.update(bRef, {
@@ -388,7 +390,9 @@ export async function markBookingNoShow({ salonId, bookingId, penalty }) {
     const bSnap = await tx.get(bRef);
     if (!bSnap.exists()) throw new Error('booking-not-found');
     const b = bSnap.data();
-    if (b.status === 'noshow') return { alreadyNoShow: true };
+    if (b.status === 'noshow')    return { alreadyNoShow: true };
+    if (b.status === 'completed') throw new Error('booking-completed');
+    if (b.status === 'cancelled') throw new Error('booking-cancelled');
     tx.update(bRef, { status: 'noshow', noShowAt: serverTimestamp() });
     if (b.clientId && penalty > 0) {
       const cRef = doc(db, 'salons', salonId, 'clients', b.clientId);

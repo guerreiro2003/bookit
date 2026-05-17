@@ -22,12 +22,12 @@
           <div class="appbar__sub" id="headerSub">Portal da equipa</div>
         </div>
       </a>
-      <div class="appbar__actions" id="headerActions" hidden>
-        <span class="badge badge--gray" id="modeBadge">Equipa</span>
+      <div class="appbar__actions">
         <button class="icon-btn" type="button" data-action="toggle-theme" aria-label="Alternar tema" id="themeBtn">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="themeIcon"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         </button>
-        <button class="btn btn--sm btn--ghost" type="button" data-action="logout">Sair</button>
+        <span class="badge badge--gray" id="modeBadge" hidden>Equipa</span>
+        <button class="btn btn--sm btn--ghost" type="button" data-action="logout" id="btnLogout" hidden>Sair</button>
       </div>
     </div>
   </header>
@@ -298,12 +298,14 @@ on('logout', async () => {
 function showLogin() {
   $('#screenLogin').hidden = false;
   $('#screenApp').hidden   = true;
-  $('#headerActions').hidden = true;
+  $('#modeBadge').hidden   = true;
+  $('#btnLogout').hidden   = true;
 }
 function showApp() {
   $('#screenLogin').hidden = true;
   $('#screenApp').hidden   = false;
-  $('#headerActions').hidden = false;
+  $('#modeBadge').hidden   = false;
+  $('#btnLogout').hidden   = false;
   $('#modeBadge').textContent = mode === 'admin' ? 'Admin' : 'Equipa';
   $('#modeBadge').classList.toggle('badge--green', mode === 'admin');
   $$('.adminOnly').forEach(t => t.hidden = mode !== 'admin');

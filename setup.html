@@ -15,10 +15,13 @@
 
   <main>
     <div class="container--md" style="padding: var(--s-8) 0 var(--s-10)">
-      <div class="text-center mb-6">
+      <div class="text-center mb-7">
         <div class="auth-card__mark" style="margin: 0 auto var(--s-4)" aria-hidden="true">B</div>
-        <h1 class="page-title">Setup do salão</h1>
-        <p class="page-sub">Configura o teu salão pela primeira vez · ~2 minutos</p>
+        <p class="eyebrow" style="margin-bottom: var(--s-2)">Setup inicial · 2 minutos</p>
+        <h1 class="display" style="margin-bottom: var(--s-3)">Pronto para <em>começar</em>?</h1>
+        <p class="text-md text-muted" style="max-width: 44ch; margin: 0 auto; line-height: 1.55">
+          Configura o teu salão pela primeira vez. Podes alterar qualquer detalhe depois.
+        </p>
       </div>
 
       <form id="setupForm" novalidate>
@@ -107,7 +110,7 @@
 
 <script type="module">
 import {
-  db, auth, doc, setDoc, collection, serverTimestamp,
+  db, auth, doc, getDoc, setDoc, collection, serverTimestamp,
   writeBatch, createUserWithEmailAndPassword
 } from './firebase.js';
 import {
@@ -226,6 +229,14 @@ $('#setupForm').addEventListener('submit', withLock('setup', async (e) => {
 
   setLoading(true);
   try {
+    // Guard: slug must be available — never overwrite an existing salon
+    const existing = await getDoc(doc(db, 'salons', slug));
+    if (existing.exists()) {
+      setError(`Já existe um salão com o slug "${slug}". Escolhe outro.`);
+      setLoading(false);
+      return;
+    }
+
     const userCred = await createUserWithEmailAndPassword(auth, aEmail, aPw);
     const uid = userCred.user.uid;
 

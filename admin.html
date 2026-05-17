@@ -571,8 +571,31 @@ onAuthStateChanged(auth, async (user) => {
 async function loadSalon(uid) {
   const snap = await getDocs(query(collection(db,'salons'), where('adminUid','==', uid)));
   if (snap.empty) {
-    alert('Salão não encontrado. Faz setup em setup.html');
-    window.location.href = 'setup.html'; return;
+    // Logged-in user is NOT an admin of any salon. Could be a client account
+    // accidentally navigating here, or a fresh user who hasn't run setup.
+    // Render a friendly explainer rather than blindly redirecting.
+    document.body.innerHTML = `
+      <main class="auth-shell">
+        <div class="auth-card" style="max-width:480px;text-align:center">
+          <div class="auth-card__mark" style="margin:0 auto var(--s-4)" aria-hidden="true">B</div>
+          <h1 class="auth-card__title">Sem permissões de admin</h1>
+          <p class="auth-card__sub">
+            Estás autenticado como <strong>${(auth.currentUser?.email || '').replace(/[<>]/g, '')}</strong>
+            mas esta conta não está associada a nenhum salão.
+          </p>
+          <div class="btn-group--full" style="margin-top:var(--s-5)">
+            <a class="btn btn--ghost" href="account.html">Área de cliente</a>
+            <a class="btn btn--primary" href="setup.html">Criar novo salão</a>
+          </div>
+          <div class="auth-card__footer" style="margin-top:var(--s-5)">
+            <a id="signoutLink">Sair desta conta</a>
+          </div>
+        </div>
+      </main>`;
+    document.getElementById('signoutLink')?.addEventListener('click', async () => {
+      await signOut(auth); window.location.href = 'login.html';
+    });
+    return;
   }
   const d = snap.docs[0];
   salonId = d.id; salon = d.data();
@@ -645,13 +668,20 @@ on('show-panel', (el) => {
   $$('.panel').forEach(p => p.classList.remove('active'));
   $$('.sidebar__link').forEach(l => l.classList.remove('active'));
   $('#panel-' + id).classList.add('active');
-  el.classList.add('active');
+  // Also highlight the sidebar link that matches (not just the clicked element,
+  // which might be an inline link inside the dashboard onboarding card)
+  const sidebarLink = $(`.sidebar__link[data-panel="${id}"]`);
+  if (sidebarLink) sidebarLink.classList.add('active');
+  else el.classList.add('active');
   if (id === 'bookings')   loadBookings();
   if (id === 'clients')    loadClients();
-  if (id === 'services')   loadServices();
+  if (id === 'services')   { loadServices().then(refreshOnboarding); }
   if (id === 'promotions') loadPromotions();
-  if (id === 'staff')      loadStaff();
+  if (id === 'staff')      { loadStaff().then(refreshOnboarding); }
   if (id === 'dayview')    initDayview();
+  if (id === 'dashboard')  refreshOnboarding();
+  if (id === 'settings')   refreshOnboarding();
+  if (id === 'schedule')   refreshOnboarding();
   sidebar.classList.remove('open'); backdrop.classList.remove('show');
 });
 
@@ -1427,9 +1457,14 @@ function renderDayview() {
     const top = ((h - HOUR_START) * 60 + m) * PX_PER_MIN;
     const height = Math.max(28, (b.serviceDuration || 30) * PX_PER_MIN);
     if (top < 0) return '';
+    // Only allow clicking to open payment for active, unpaid bookings
+    const canPay = !b.paid && !['cancelled', 'noshow', 'completed'].includes(b.status);
+    const clickAttrs = canPay
+      ? htmlMix`data-action="open-pay" data-id="${b.id}" data-client="${b.clientName}" data-amount="${b.finalPrice ?? b.servicePrice}"`
+      : raw('');
     return htmlMix`
       <div class="dayview__event dayview__event--${raw(b.status)}" style="top:${raw(top)}px;height:${raw(height)}px"
-           data-action="open-pay" data-id="${b.id}" data-client="${b.clientName}" data-amount="${b.finalPrice ?? b.servicePrice}">
+           ${clickAttrs}>
         <div class="dayview__event-title">${b.time} · ${b.clientName}</div>
         <div class="dayview__event-meta">${b.serviceName}${b.staffName && b.staffName !== 'Sem preferência' ? ' · ' + b.staffName : ''}</div>
       </div>`;

@@ -29,7 +29,12 @@
   <main>
     <div class="container--md" style="padding: var(--s-5) 0 var(--s-9)">
 
-      <div id="screenAuth">
+      <!-- Initial loading state shown until Firebase auth resolves -->
+      <div id="screenInit" class="loading-state" style="padding: var(--s-10) 0">
+        <span class="spinner spinner--lg" aria-hidden="true"></span>
+      </div>
+
+      <div id="screenAuth" hidden>
         <div class="tabs">
           <button class="tab active" type="button" role="tab" id="tabLogin"
                   data-action="switch-auth" data-which="login" aria-selected="true">Entrar</button>
@@ -400,11 +405,14 @@ async function loadClient(u) {
 }
 
 function showAuth() {
-  $('#screenAuth').hidden = false; $('#screenAuth').style.display = '';
+  $('#screenInit').hidden    = true;
+  $('#screenAuth').hidden    = false;
+  $('#screenAuth').style.display = '';
   $('#screenProfile').hidden = true;
   $('#headerActions').innerHTML = '';
 }
 function showProfile() {
+  $('#screenInit').hidden    = true;
   $('#screenAuth').style.display = 'none';
   $('#screenProfile').hidden = false;
 }
