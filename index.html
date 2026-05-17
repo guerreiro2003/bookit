@@ -124,9 +124,9 @@
             <div class="field__hint">Se preencheres, os pontos Zen Club ficam na tua conta.</div>
           </div>
           <div class="field">
-            <label for="referralCode">Código de referido <span class="text-muted text-sm" style="font-weight:400">(opcional)</span></label>
-            <input type="text" id="referralCode" placeholder="Ex: ZEN-ANA42" style="text-transform:uppercase;font-family:var(--font-mono)" />
-            <div class="field__hint">Tens um código de amigo? Ambos ganham desconto.</div>
+            <label for="referralCode">Código promocional <span class="text-muted text-sm" style="font-weight:400">(opcional)</span></label>
+            <input type="text" id="referralCode" placeholder="Ex: ZEN-ANA42 ou BDAY2026-XX" style="text-transform:uppercase;font-family:var(--font-mono)" />
+            <div class="field__hint">Código de amigo, de aniversário ou de fidelização. Verifica-se ao confirmar.</div>
           </div>
           <div class="field" style="margin-bottom:0">
             <label for="clientNotes">Notas <span class="text-muted text-sm" style="font-weight:400">(opcional)</span></label>
@@ -226,7 +226,7 @@
 
 <script type="module">
 import {
-  db, auth, collection, doc, getDoc, getDocs, addDoc, runTransaction,
+  db, auth, collection, doc, getDoc, getDocs, addDoc, updateDoc, runTransaction,
   query, where, orderBy, serverTimestamp, onAuthStateChanged
 } from './firebase.js';
 import {
@@ -474,7 +474,18 @@ async function loadTimeslots() {
   const open  = dayCfg.open  || '10:00';
   const close = dayCfg.close || '19:00';
   const duration = state.selectedService?.duration || 60;
-  const slots = generateSlots(open, close, duration);
+  let slots = generateSlots(open, close, duration);
+
+  // Filter past time slots if booking for today
+  const todayStr = formatDate(new Date());
+  if (formatDate(date) === todayStr) {
+    const now = new Date();
+    const nowMins = now.getHours() * 60 + now.getMinutes() + 10; // 10 min buffer
+    slots = slots.filter(slot => {
+      const [h, m] = slot.split(':').map(Number);
+      return h * 60 + m >= nowMins;
+    });
+  }
 
   try {
     const dateStr = formatDate(date);
@@ -616,18 +627,45 @@ function fillConfirmation() {
 async function checkReferral() {
   const code = $('#referralCode').value.trim().toUpperCase();
   const wrap = $('#discountInfo'), desc = $('#discountDesc');
-  if (!code) { wrap.hidden = true; state.referralValid = false; return; }
+  state.referralValid = false;
+  state.referralDiscount = 0;
+  state.personalDiscount = null;
+  if (!code) { wrap.hidden = true; return; }
   try {
+    // 1. Check against logged-in user's own discount codes (loyalty/birthday)
+    if (state.clientData && Array.isArray(state.clientData.discounts)) {
+      const myDisc = state.clientData.discounts.find(d => d.code === code && !d.used);
+      if (myDisc) {
+        const now = new Date();
+        if (myDisc.expiresAt && new Date(myDisc.expiresAt) < now) {
+          desc.textContent = `Código "${code}" expirado.`;
+          wrap.hidden = false;
+          return;
+        }
+        state.referralValid = true;
+        state.referralDiscount = Number(myDisc.discount) || 0;
+        state.personalDiscount = myDisc;
+        desc.textContent = `${myDisc.title} · ${myDisc.discount}% de desconto aplicado.`;
+        wrap.hidden = false;
+        return;
+      }
+    }
+    // 2. Otherwise treat as referral code (someone else's)
     const snap = await getDocs(query(
       collection(db,'salons',state.salonId,'clients'),
       where('referralCode','==', code)));
     if (!snap.empty) {
+      // Prevent self-referral
+      if (state.clientData && snap.docs[0].id === state.clientData.id) {
+        desc.textContent = `Não podes usar o teu próprio código de referido.`;
+        wrap.hidden = false;
+        return;
+      }
       const discount = state.salon.referralDiscount || 10;
       state.referralValid = true; state.referralDiscount = discount;
-      desc.textContent = `Código "${code}" válido · ${discount}% de desconto`;
+      desc.textContent = `Código de referido válido · ${discount}% de desconto`;
       wrap.hidden = false;
     } else {
-      state.referralValid = false;
       desc.textContent = `Código "${code}" não encontrado.`;
       wrap.hidden = false;
     }
@@ -649,6 +687,49 @@ on('submit-booking', withLock('submit-booking', async () => {
     const referralCode = $('#referralCode').value.trim().toUpperCase();
     const s = state.selectedService;
     const newReferralCode = generateReferralCode(name, state.salonId);
+    const dateStr = formatDate(state.selectedDate);
+
+    // Re-check slot availability (race protection: someone might have booked it
+    // while the user was filling the form)
+    {
+      let q;
+      if (state.selectedStaff) {
+        q = query(collection(db,'salons',state.salonId,'bookings'),
+              where('date','==', dateStr),
+              where('time','==', state.selectedTime),
+              where('staffId','==', state.selectedStaff.id),
+              where('status','in', ['pending','confirmed']));
+      } else {
+        q = query(collection(db,'salons',state.salonId,'bookings'),
+              where('date','==', dateStr),
+              where('time','==', state.selectedTime),
+              where('status','in', ['pending','confirmed']));
+      }
+      let conflict = false;
+      try {
+        const recheck = await getDocs(q);
+        conflict = !recheck.empty;
+      } catch {
+        const recheck = await getDocs(query(collection(db,'salons',state.salonId,'bookings'),
+          where('date','==', dateStr), where('time','==', state.selectedTime)));
+        conflict = recheck.docs.some(d => {
+          const b = d.data();
+          if (!['pending','confirmed'].includes(b.status)) return false;
+          return !state.selectedStaff || b.staffId === state.selectedStaff.id;
+        });
+      }
+      if (conflict) {
+        $('#screenLoading').hidden = true;
+        $('#screenConfirm').hidden = false;
+        $('#btnConfirm').disabled = false;
+        toastError('Esse horário já foi ocupado. Escolhe outro.');
+        // Force the user back to step 3 to pick a different slot
+        state.selectedTime = null;
+        $('#btnDateNext').disabled = true;
+        setTimeout(() => { goTo(3); loadTimeslots(); }, 800);
+        return;
+      }
+    }
 
     let clientId;
     if (state.authUser && state.clientData) {
@@ -675,6 +756,7 @@ on('submit-booking', withLock('submit-booking', async () => {
     let finalPrice = Number(s.price) || 0;
     if (state.referralValid) finalPrice = Math.round(finalPrice * (1 - state.referralDiscount / 100));
 
+    const isPersonal = !!state.personalDiscount;
     await addDoc(collection(db,'salons',state.salonId,'bookings'), {
       clientId, clientName: name, clientEmail: email, clientPhone: phone,
       serviceId: s.id, serviceName: s.name,
@@ -682,15 +764,26 @@ on('submit-booking', withLock('submit-booking', async () => {
       finalPrice,
       staffId:   state.selectedStaff?.id   || null,
       staffName: state.selectedStaff?.name || 'Sem preferência',
-      date: formatDate(state.selectedDate), time: state.selectedTime,
+      date: dateStr, time: state.selectedTime,
       notes,
       forSomeone: forSomeone || null,
-      referralCode: state.referralValid ? referralCode : null,
+      referralCode: (state.referralValid && !isPersonal) ? referralCode : null,
       referralDiscount: state.referralValid ? state.referralDiscount : 0,
+      discountType: isPersonal ? state.personalDiscount.type : (state.referralValid ? 'referral' : null),
+      discountCode: state.referralValid ? referralCode : null,
       status: 'pending', paid: false,
       salonId: state.salonId,
       createdAt: serverTimestamp()
     });
+
+    // Mark the personal discount as used (loyalty/birthday)
+    if (isPersonal && state.clientData) {
+      const updatedDiscounts = (state.clientData.discounts || []).map(d =>
+        d.code === state.personalDiscount.code ? { ...d, used: true, usedAt: new Date().toISOString() } : d
+      );
+      await updateDoc(doc(db, 'salons', state.salonId, 'clients', state.clientData.id),
+        { discounts: updatedDiscounts });
+    }
 
     const params = new URLSearchParams({
       salon: state.salonId, service: s.name,

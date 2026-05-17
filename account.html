@@ -443,13 +443,20 @@ function renderProfile() {
 
   const target = salon?.loyaltyVisits || 10;
   const visits = c.visits || 0;
-  const pct = Math.min(100, Math.round(visits / target * 100));
-  const remaining = Math.max(0, target - visits);
-  $('#loyaltyLabel').textContent = `${visits} / ${target} visitas`;
-  $('#loyaltyFill').style.width  = pct + '%';
-  $('#loyaltyMsg').textContent   = remaining === 0
-    ? `🎉 Tens direito a ${salon?.loyaltyDiscount || 20}% de desconto na próxima visita!`
-    : `Faltam ${remaining} visita${remaining > 1 ? 's' : ''} para ${salon?.loyaltyDiscount || 20}% de desconto.`;
+  const discount = salon?.loyaltyDiscount || 20;
+  // Progress within the CURRENT cycle (resets after reaching target)
+  const cycleVisits = visits % target;
+  const cyclePct = Math.round((cycleVisits / target) * 100);
+  const remaining = target - cycleVisits;
+  const hasUnredeemed = (c.discounts || []).some(d => d.type === 'loyalty' && !d.used);
+
+  $('#loyaltyLabel').textContent = `${cycleVisits} / ${target} no ciclo atual`;
+  $('#loyaltyFill').style.width  = (cycleVisits === 0 && visits > 0 ? 100 : cyclePct) + '%';
+  $('#loyaltyMsg').textContent   = hasUnredeemed
+    ? `🎉 Tens ${discount}% de desconto disponível — vê o separador "Descontos".`
+    : remaining === target
+      ? `Começa um novo ciclo de fidelização — faltam ${target} visitas para o próximo desconto.`
+      : `Faltam ${remaining} visita${remaining > 1 ? 's' : ''} para ${discount}% de desconto.`;
 
   const qs = `?salon=${encodeURIComponent(salonId)}`;
   $('#newBookingLink').href = `index.html${qs}`;
