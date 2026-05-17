@@ -326,17 +326,25 @@
       <div class="card mb-4">
         <div class="card__head">
           <div>
-            <div class="card__title">Horário por colaborador</div>
-            <div class="card__sub">Folgas e horas individuais.</div>
+            <div class="card__title">Horário individual por colaborador</div>
+            <div class="card__sub">
+              <strong>Opcional.</strong> Por defeito, cada colaborador segue o horário geral do salão (definido em <em>Horários</em>).
+              Usa esta secção para colaboradores com folgas ou horas diferentes (ex: a Marta só trabalha à tarde).
+            </div>
           </div>
         </div>
         <div class="field">
-          <label for="staffSchedSelect">Seleciona colaborador</label>
-          <select id="staffSchedSelect" data-action="load-staff-schedule"><option value="">—</option></select>
+          <label for="staffSchedSelect">1. Seleciona o colaborador</label>
+          <select id="staffSchedSelect" data-action="load-staff-schedule"><option value="">— Escolhe um colaborador —</option></select>
+          <div class="field__hint" id="staffSchedHint">Primeiro adiciona colaboradores acima. Depois aparecem nesta lista para lhes atribuíres horários personalizados.</div>
         </div>
         <div id="staffSchedEditor" hidden>
+          <div class="field__label" style="margin-bottom: 8px">2. Define o horário desta pessoa</div>
+          <p class="text-sm text-muted" style="margin-bottom: var(--s-3)">
+            Para cada dia: deixa as horas para trabalhar nesse dia OU marca "Folga" para não trabalhar.
+          </p>
           <div id="staffSchedFields"></div>
-          <button class="btn btn--primary mt-4" type="button" data-action="save-staff-schedule">Guardar horário</button>
+          <button class="btn btn--primary mt-4" type="button" data-action="save-staff-schedule">Guardar horário deste colaborador</button>
         </div>
       </div>
 

@@ -409,10 +409,12 @@ export async function markBookingNoShow({ salonId, bookingId, penalty }) {
 }
 
 /* ── Theme (light/dark) ──────────────────────────────────── */
+/* Default: LIGHT. We deliberately do NOT honour prefers-color-scheme on first
+ * visit because the booking experience is meant to feel bright and inviting,
+ * not "system mode" by accident. User can toggle and choice is persisted. */
 const THEME_KEY = 'bookit:theme';
 export function getTheme() {
-  return localStorage.getItem(THEME_KEY)
-    || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  return localStorage.getItem(THEME_KEY) || 'light';
 }
 export function setTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
