@@ -5,8 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="Marcação confirmada." />
   <meta name="robots" content="noindex" />
-  <meta name="theme-color" content="#09090b" media="(prefers-color-scheme: dark)" />
-  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#ffffff" />
   <title>Marcação confirmada — Book It</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -34,7 +33,7 @@
       </div>
       <p class="eyebrow" style="margin-bottom: var(--s-3)">Marcação confirmada</p>
       <h1 class="display" style="margin-bottom: var(--s-4)">Até <em>breve</em>.</h1>
-      <p class="text-lg text-muted" style="margin: 0 auto var(--s-7); max-width: 42ch; line-height: 1.55">
+      <p class="text-lg text-muted" id="leadCopy" style="margin: 0 auto var(--s-7); max-width: 42ch; line-height: 1.55">
         Recebes em breve um email com os detalhes. Guarda esta página para referência.
       </p>
 
@@ -50,6 +49,7 @@
         </table>
       </div>
 
+      <!-- Referral code (only for new clients without account) -->
       <div id="referralCard" class="card mb-3" hidden style="text-align:left">
         <div class="card__head">
           <div class="card__title">🎁 O teu código de referido</div>
@@ -61,7 +61,8 @@
         </div>
       </div>
 
-      <div class="card card--accent mb-3" style="text-align:left">
+      <!-- "Create account" invite — ONLY shown when user is NOT logged in -->
+      <div id="inviteCard" class="card card--accent mb-3" hidden style="text-align:left">
         <div class="flex" style="align-items:flex-start;gap:var(--s-3)">
           <div style="font-size:22px">🌿</div>
           <div class="flex-1">
@@ -72,12 +73,20 @@
         </div>
       </div>
 
+      <!-- Logged-in path: show prominent CTA back to portal -->
+      <div id="loggedInActions" hidden style="display: flex; flex-direction: column; gap: 8px">
+        <a class="btn btn--primary btn--full btn--lg" id="btnPortal" href="account.html">Ver as minhas marcações →</a>
+        <a class="btn btn--full" id="btnBackLoggedIn" href="index.html">Marcar mais um serviço</a>
+      </div>
+
+      <!-- Anonymous path: just back to booking -->
       <a class="btn btn--full" id="btnBack" href="index.html">Nova marcação</a>
     </div>
   </main>
 
 <script type="module">
 import { loadSalon, applySalonBranding, getSalonId, on, toastSuccess, toastError } from './app.js';
+import { auth, onAuthStateChanged } from './firebase.js';
 
 const salonId = getSalonId();
 const params  = new URLSearchParams(window.location.search);
@@ -102,8 +111,22 @@ if (refCode) {
 }
 
 const qs = `?salon=${encodeURIComponent(salonId)}`;
-document.getElementById('btnBack').href    = `index.html${qs}`;
-document.getElementById('btnAccount').href = `account.html${qs}`;
+document.getElementById('btnBack').href           = `index.html${qs}`;
+document.getElementById('btnBackLoggedIn').href   = `index.html${qs}`;
+document.getElementById('btnPortal').href         = `account.html${qs}`;
+document.getElementById('btnAccount').href        = `account.html${qs}`;
+
+// Switch UI based on auth state — logged-in users skip the "create account" pitch
+onAuthStateChanged(auth, (user) => {
+  const isLoggedIn = !!user;
+  document.getElementById('loggedInActions').hidden = !isLoggedIn;
+  document.getElementById('btnBack').hidden         = isLoggedIn;
+  document.getElementById('inviteCard').hidden      = isLoggedIn;
+  if (isLoggedIn) {
+    document.getElementById('leadCopy').textContent =
+      'A tua marcação está pendente. Vai acompanhar o estado na tua área pessoal.';
+  }
+});
 
 on('copy-code', async () => {
   if (!refCode) return;
