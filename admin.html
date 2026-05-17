@@ -319,6 +319,11 @@
           <div class="field"><label for="staffSpecialties">Especialidades</label><input type="text" id="staffSpecialties" placeholder="Coloração, Madeixas" /></div>
           <div class="field"><label for="staffEmail">Email</label><input type="email" id="staffEmail" /></div>
         </div>
+        <div class="field">
+          <label for="staffPhotoUrl">URL da foto (opcional)</label>
+          <input type="url" id="staffPhotoUrl" placeholder="https://… ou cola URL do Imgur/Cloudinary" />
+          <div class="field__hint">Aparece no site público (Zen Organic) e no portal cliente. Para imagens, recomendamos <a href="https://imgur.com" target="_blank" rel="noopener" style="color:var(--brand)">imgur.com</a> ou <a href="https://cloudinary.com" target="_blank" rel="noopener" style="color:var(--brand)">Cloudinary</a> — fazem upload grátis e dão um URL público.</div>
+        </div>
         <div class="field"><label for="staffBio">Sobre (opcional)</label><textarea id="staffBio"></textarea></div>
         <button class="btn btn--primary" type="submit">Adicionar colaborador</button>
       </form>
@@ -1330,22 +1335,40 @@ function renderStaffList() {
     el.innerHTML = `<p class="text-muted text-sm" style="padding:var(--s-4) 0">Nenhum colaborador ainda.</p>`;
     return;
   }
-  el.innerHTML = allStaff.map(s => htmlMix`
+  el.innerHTML = allStaff.map(s => {
+    const avatar = s.photoUrl
+      ? `<img src="${escapeHTML(s.photoUrl)}" alt="${escapeHTML(s.name)}" style="width:40px;height:40px;border-radius:50%;object-fit:cover" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'select-item__avatar',textContent:'${escapeHTML(s.name.charAt(0))}'}))"/>`
+      : `<div class="select-item__avatar" aria-hidden="true">${escapeHTML(s.name.charAt(0) || '?')}</div>`;
+    return htmlMix`
     <div class="row-card">
       <div class="flex">
-        <div class="select-item__avatar" aria-hidden="true">${(s.name || '?').charAt(0)}</div>
+        ${raw(avatar)}
         <div>
           <div class="row-card__title">${s.name}</div>
-          <div class="row-card__meta">${s.role || 'Colaborador/a'}${s.specialties ? ' · ' + s.specialties : ''}</div>
+          <div class="row-card__meta">${s.role || 'Colaborador/a'}${s.specialties ? ' · ' + s.specialties : ''}${s.photoUrl ? '' : ' · sem foto'}</div>
         </div>
       </div>
       <div class="cluster">
         ${raw(`<span class="badge ${s.active !== false ? 'badge--green' : 'badge--gray'}">${s.active !== false ? 'Ativo' : 'Inativo'}</span>`)}
+        <button class="btn btn--sm" type="button" data-action="edit-staff-photo" data-id="${s.id}">${s.photoUrl ? 'Mudar foto' : '+ Foto'}</button>
         <button class="btn btn--sm" type="button" data-action="toggle-staff" data-id="${s.id}" data-active="${s.active !== false}">${s.active !== false ? 'Desativar' : 'Ativar'}</button>
         <button class="btn btn--sm btn--danger" type="button" data-action="delete-staff" data-id="${s.id}">Remover</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
+
+on('edit-staff-photo', async (el) => {
+  const staff = allStaff.find(s => s.id === el.dataset.id);
+  if (!staff) return;
+  const current = staff.photoUrl || '';
+  const url = prompt(`URL da foto para ${staff.name}\n\nCola um URL público (ex: imgur.com, cloudinary).\nDeixa vazio para remover a foto.`, current);
+  if (url === null) return;  // user cancelled
+  const trimmed = url.trim();
+  await updateDoc(doc(db,'salons',salonId,'staff', staff.id), { photoUrl: trimmed || null });
+  toastSuccess(trimmed ? 'Foto atualizada.' : 'Foto removida.');
+  loadStaff();
+});
 
 function renderStaffSelect() {
   const sel = $('#staffSchedSelect');
@@ -1361,6 +1384,7 @@ $('#staffForm').addEventListener('submit', async (e) => {
     name, role: $('#staffRole').value.trim(),
     specialties: $('#staffSpecialties').value.trim(),
     email: $('#staffEmail').value.trim(),
+    photoUrl: $('#staffPhotoUrl').value.trim() || null,
     bio: $('#staffBio').value.trim(),
     active: true, order: allStaff.length + 1,
     createdAt: serverTimestamp()
