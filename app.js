@@ -336,10 +336,13 @@ export function throttle(fn, wait = 200) {
 }
 
 /* ── Bookings: atomic helpers ────────────────────────────── */
-/** Mark a booking paid + completed + award points + create loyalty discount if reached. Atomic. */
+/** Mark a booking paid + completed + award points + create loyalty discount if reached. Atomic.
+ *  CRITICAL: Firestore transactions require ALL reads before ANY writes.
+ *  Bug found 2026-05-17 via E2E — never reorder these. */
 export async function markBookingPaid({ salonId, bookingId, method, pointsPerVisit, loyaltyVisits, loyaltyDiscount }) {
   const bRef = doc(db, 'salons', salonId, 'bookings', bookingId);
   return await runTransaction(db, async (tx) => {
+    // ── ALL READS FIRST ──
     const bSnap = await tx.get(bRef);
     if (!bSnap.exists()) throw new Error('booking-not-found');
     const b = bSnap.data();
@@ -347,6 +350,10 @@ export async function markBookingPaid({ salonId, bookingId, method, pointsPerVis
     if (b.status === 'cancelled') throw new Error('booking-cancelled');
     if (b.status === 'noshow')    throw new Error('booking-noshow');
 
+    const cRef = b.clientId ? doc(db, 'salons', salonId, 'clients', b.clientId) : null;
+    const cSnap = cRef ? await tx.get(cRef) : null;
+
+    // ── THEN ALL WRITES ──
     const pts = pointsPerVisit || 10;
     tx.update(bRef, {
       paid: true, status: 'completed',
@@ -355,35 +362,33 @@ export async function markBookingPaid({ salonId, bookingId, method, pointsPerVis
       pointsAwarded: pts,
     });
 
-    if (b.clientId) {
-      const cRef = doc(db, 'salons', salonId, 'clients', b.clientId);
-      const cSnap = await tx.get(cRef);
-      if (cSnap.exists()) {
-        const c = cSnap.data();
-        const visits = (c.visits || 0) + 1;
-        const points = (c.points || 0) + pts;
-        const spent  = (c.totalSpent || 0) + (Number(b.finalPrice) || Number(b.servicePrice) || 0);
-        const target = loyaltyVisits || 10;
-        const discount = loyaltyDiscount || 20;
-        const updates = { visits, points, totalSpent: spent };
-        if (visits > 0 && visits % target === 0) {
-          updates.discounts = [...(c.discounts || []), {
-            type: 'loyalty',
-            title: '⭐ Desconto de Fidelização',
-            description: `${discount}% — ${visits} visitas atingidas`,
-            code: `LOYAL${visits}-${(c.referralCode || '').split('-')[1] || Math.floor(Math.random()*999)}`,
-            discount, expiresAt: null, used: false,
-            createdAt: new Date().toISOString()
-          }];
-        }
-        tx.update(cRef, updates);
+    if (cSnap?.exists()) {
+      const c = cSnap.data();
+      const visits = (c.visits || 0) + 1;
+      const points = (c.points || 0) + pts;
+      const spent  = (c.totalSpent || 0) + (Number(b.finalPrice) || Number(b.servicePrice) || 0);
+      const target = loyaltyVisits || 10;
+      const discount = loyaltyDiscount || 20;
+      const updates = { visits, points, totalSpent: spent };
+      if (visits > 0 && visits % target === 0) {
+        updates.discounts = [...(c.discounts || []), {
+          type: 'loyalty',
+          title: '⭐ Desconto de Fidelização',
+          description: `${discount}% — ${visits} visitas atingidas`,
+          code: `LOYAL${visits}-${(c.referralCode || '').split('-')[1] || Math.floor(Math.random()*999)}`,
+          discount, expiresAt: null, used: false,
+          createdAt: new Date().toISOString()
+        }];
       }
+      tx.update(cRef, updates);
     }
     return { ok: true };
   });
 }
 
-/** Mark booking as no-show + deduct points. Atomic. */
+/** Mark booking as no-show + deduct points. Atomic.
+ *  Single read followed by writes — no reordering issue here, but kept the same
+ *  shape as markBookingPaid for consistency. */
 export async function markBookingNoShow({ salonId, bookingId, penalty }) {
   const bRef = doc(db, 'salons', salonId, 'bookings', bookingId);
   return await runTransaction(db, async (tx) => {
@@ -393,6 +398,7 @@ export async function markBookingNoShow({ salonId, bookingId, penalty }) {
     if (b.status === 'noshow')    return { alreadyNoShow: true };
     if (b.status === 'completed') throw new Error('booking-completed');
     if (b.status === 'cancelled') throw new Error('booking-cancelled');
+    // All writes
     tx.update(bRef, { status: 'noshow', noShowAt: serverTimestamp() });
     if (b.clientId && penalty > 0) {
       const cRef = doc(db, 'salons', salonId, 'clients', b.clientId);
