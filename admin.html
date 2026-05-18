@@ -79,6 +79,14 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
         <span>Promoções</span>
       </button>
+      <button class="sidebar__link" type="button" data-action="show-panel" data-panel="gallery">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        <span>Galeria</span>
+      </button>
+      <button class="sidebar__link" type="button" data-action="show-panel" data-panel="partners">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11l-3 0 0-3"/></svg>
+        <span>Parcerias</span>
+      </button>
       <button class="sidebar__link" type="button" data-action="show-panel" data-panel="loyalty">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
         <span>Fidelização</span>
@@ -402,6 +410,69 @@
       </div>
     </section>
 
+    <section class="panel" id="panel-gallery">
+      <h1 class="page-title">Galeria</h1>
+      <p class="page-sub mb-5">Fotografias que aparecem na secção <em>Galeria</em> do site público.</p>
+
+      <form class="card mb-4" id="galleryForm">
+        <div class="card__head"><div class="card__title">Nova foto</div></div>
+        <div class="field">
+          <label>Imagem *</label>
+          <div class="flex" style="gap:10px; align-items:center; flex-wrap:wrap">
+            <label class="btn btn--sm" style="cursor:pointer; margin:0">
+              <span>📷 Carregar foto</span>
+              <input type="file" id="galPhotoFile" accept="image/*" hidden />
+            </label>
+            <span class="text-muted text-sm">ou</span>
+            <input type="url" id="galPhotoUrl" placeholder="Cola um URL público" style="flex:1; min-width:200px" />
+          </div>
+          <div id="galPhotoPreview" class="mt-3" hidden style="display:flex; gap:12px; align-items:center">
+            <img id="galPhotoImg" alt="" style="width:80px; height:80px; border-radius:8px; object-fit:cover; border:1px solid var(--border)" />
+            <span class="text-sm text-muted" id="galPhotoMeta">—</span>
+          </div>
+          <div class="field__hint">Imagens são redimensionadas para 800×800 px e guardadas no Firestore.</div>
+        </div>
+        <div class="field">
+          <label for="galCaption">Legenda (opcional)</label>
+          <input type="text" id="galCaption" placeholder="Ex: Trabalho da Ana — Madeixas balayage" />
+        </div>
+        <button class="btn btn--primary" type="submit">Adicionar à galeria</button>
+      </form>
+
+      <div class="table-card">
+        <div class="table-card__head">
+          <div class="card__title">Fotos publicadas <span class="badge badge--gray" id="galleryCount" style="margin-left:6px">0</span></div>
+        </div>
+        <div class="table-card__body" id="galleryList" style="padding: var(--s-4) var(--s-5)">
+          <div class="loading-state"><span class="spinner" aria-hidden="true"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-partners">
+      <h1 class="page-title">Parcerias</h1>
+      <p class="page-sub mb-5">Marcas parceiras que aparecem na secção <em>Parcerias</em> do site público.</p>
+
+      <form class="card mb-4" id="partnerForm">
+        <div class="card__head"><div class="card__title">Nova parceria</div></div>
+        <div class="grid-2">
+          <div class="field"><label for="partnerName">Nome *</label><input type="text" id="partnerName" required placeholder="Ex: Aveda" /></div>
+          <div class="field"><label for="partnerIcon">Emoji / Ícone</label><input type="text" id="partnerIcon" placeholder="🌿" maxlength="4" /></div>
+        </div>
+        <div class="field"><label for="partnerDesc">Descrição curta</label><input type="text" id="partnerDesc" placeholder="Ex: Coloração orgânica certificada" /></div>
+        <button class="btn btn--primary" type="submit">Adicionar parceria</button>
+      </form>
+
+      <div class="table-card">
+        <div class="table-card__head">
+          <div class="card__title">Parcerias <span class="badge badge--gray" id="partnersCount" style="margin-left:6px">0</span></div>
+        </div>
+        <div class="table-card__body" id="partnersList" style="padding: var(--s-4) var(--s-5)">
+          <div class="loading-state"><span class="spinner" aria-hidden="true"></span></div>
+        </div>
+      </div>
+    </section>
+
     <section class="panel" id="panel-loyalty">
       <h1 class="page-title">Fidelização &amp; Referidos</h1>
       <p class="page-sub mb-5">Programa de recompensas para clientes</p>
@@ -702,6 +773,8 @@ on('show-panel', (el) => {
   if (id === 'clients')    loadClients();
   if (id === 'services')   { loadServices().then(refreshOnboarding); }
   if (id === 'promotions') loadPromotions();
+  if (id === 'gallery')    loadGallery();
+  if (id === 'partners')   loadPartners();
   if (id === 'staff')      { loadStaff().then(refreshOnboarding); }
   if (id === 'dayview')    initDayview();
   if (id === 'dashboard')  refreshOnboarding();
@@ -1280,6 +1353,166 @@ on('delete-promo', async (el) => {
   if (!confirm('Remover promoção?')) return;
   await deleteDoc(doc(db,'salons',salonId,'promotions', el.dataset.id));
   loadPromotions();
+});
+
+/* ── GALLERY (site_gallery) ──────────────────────────────── */
+let allGallery = [];
+
+async function loadGallery() {
+  if (!salonId) return;
+  const el = $('#galleryList');
+  try {
+    const snap = await getDocs(query(collection(db,'salons',salonId,'site_gallery'), orderBy('order','asc')));
+    allGallery = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    $('#galleryCount').textContent = allGallery.length;
+    if (!allGallery.length) {
+      el.innerHTML = `<p class="text-muted text-sm" style="padding:var(--s-4) 0">Sem fotos ainda. Adiciona acima.</p>`;
+      return;
+    }
+    el.innerHTML = `<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--s-3)">${
+      allGallery.map((p, i) => htmlMix`
+        <div class="card" style="padding: var(--s-3); position:relative">
+          <img src="${p.url}" alt="${p.caption || ''}" style="width:100%; aspect-ratio:1; object-fit:cover; border-radius: var(--r-sm); margin-bottom: var(--s-2)" loading="lazy" />
+          ${p.caption ? raw(htmlMix`<div class="text-sm" style="line-height:1.4; min-height:36px">${p.caption}</div>`) : raw('<div class="text-sm text-muted">Sem legenda</div>')}
+          <div class="flex" style="gap:4px; margin-top: var(--s-2); flex-wrap:wrap">
+            <button class="btn btn--sm" type="button" data-action="gallery-move" data-id="${p.id}" data-dir="-1" ${raw(i === 0 ? 'disabled' : '')}>↑</button>
+            <button class="btn btn--sm" type="button" data-action="gallery-move" data-id="${p.id}" data-dir="1" ${raw(i === allGallery.length - 1 ? 'disabled' : '')}>↓</button>
+            <button class="btn btn--sm btn--danger" type="button" data-action="gallery-delete" data-id="${p.id}" style="margin-left:auto">Remover</button>
+          </div>
+        </div>`).join('')
+    }</div>`;
+  } catch (e) {
+    console.error(e);
+    el.innerHTML = `<div class="error-state"><div class="error-state__icon">⚠️</div><div class="error-state__title">Erro a carregar</div></div>`;
+  }
+}
+
+// Gallery photo upload preview
+$('#galPhotoFile').addEventListener('change', async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  try {
+    const dataUrl = await fileToResizedDataURL(file, 800, 0.82);
+    $('#galPhotoUrl').value = dataUrl;
+    $('#galPhotoImg').src = dataUrl;
+    $('#galPhotoPreview').hidden = false;
+    const sizeKB = Math.round(dataUrl.length * 0.75 / 1024);
+    $('#galPhotoMeta').textContent = `${file.name} · ${sizeKB} KB`;
+  } catch (err) { toastError(err.message); }
+});
+$('#galPhotoUrl').addEventListener('input', () => {
+  const val = $('#galPhotoUrl').value.trim();
+  if (val && /^(https?:\/\/|data:image)/.test(val)) {
+    $('#galPhotoImg').src = val;
+    $('#galPhotoMeta').textContent = 'URL externo';
+    $('#galPhotoPreview').hidden = false;
+  } else {
+    $('#galPhotoPreview').hidden = true;
+  }
+});
+
+$('#galleryForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const url = $('#galPhotoUrl').value.trim();
+  const caption = $('#galCaption').value.trim();
+  if (!url) return toast('Carrega uma foto ou cola um URL.');
+  try {
+    await addDoc(collection(db,'salons',salonId,'site_gallery'), {
+      url, caption, order: allGallery.length + 1,
+      createdAt: serverTimestamp()
+    });
+    $('#galleryForm').reset();
+    $('#galPhotoPreview').hidden = true;
+    toastSuccess('Foto adicionada à galeria.');
+    loadGallery();
+  } catch (e) { console.error(e); toastError('Erro a guardar foto.'); }
+});
+
+on('gallery-delete', async (el) => {
+  if (!confirm('Remover foto?')) return;
+  await deleteDoc(doc(db,'salons',salonId,'site_gallery', el.dataset.id));
+  loadGallery();
+});
+
+on('gallery-move', async (el) => {
+  const id = el.dataset.id;
+  const dir = parseInt(el.dataset.dir, 10);
+  const idx = allGallery.findIndex(p => p.id === id);
+  const swap = allGallery[idx + dir];
+  if (!swap) return;
+  const me = allGallery[idx];
+  await updateDoc(doc(db,'salons',salonId,'site_gallery', me.id), { order: swap.order });
+  await updateDoc(doc(db,'salons',salonId,'site_gallery', swap.id), { order: me.order });
+  loadGallery();
+});
+
+/* ── PARTNERS (site_partners) ────────────────────────────── */
+let allPartners = [];
+
+async function loadPartners() {
+  if (!salonId) return;
+  const el = $('#partnersList');
+  try {
+    const snap = await getDocs(query(collection(db,'salons',salonId,'site_partners'), orderBy('order','asc')));
+    allPartners = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    $('#partnersCount').textContent = allPartners.length;
+    if (!allPartners.length) {
+      el.innerHTML = `<p class="text-muted text-sm" style="padding:var(--s-4) 0">Sem parcerias ainda.</p>`;
+      return;
+    }
+    el.innerHTML = allPartners.map((p, i) => htmlMix`
+      <div class="row-card">
+        <div class="flex" style="gap:14px">
+          <div style="width:48px; height:48px; display:grid; place-items:center; background: var(--bg-subtle); border-radius: var(--r); font-size: 24px">${p.icon || '🤝'}</div>
+          <div>
+            <div class="row-card__title">${p.name}</div>
+            ${p.desc ? raw(htmlMix`<div class="row-card__meta">${p.desc}</div>`) : ''}
+          </div>
+        </div>
+        <div class="cluster">
+          <button class="btn btn--sm" type="button" data-action="partner-move" data-id="${p.id}" data-dir="-1" ${raw(i === 0 ? 'disabled' : '')}>↑</button>
+          <button class="btn btn--sm" type="button" data-action="partner-move" data-id="${p.id}" data-dir="1" ${raw(i === allPartners.length - 1 ? 'disabled' : '')}>↓</button>
+          <button class="btn btn--sm btn--danger" type="button" data-action="partner-delete" data-id="${p.id}">Remover</button>
+        </div>
+      </div>`).join('');
+  } catch (e) {
+    console.error(e);
+    el.innerHTML = `<div class="error-state"><div class="error-state__icon">⚠️</div><div class="error-state__title">Erro a carregar</div></div>`;
+  }
+}
+
+$('#partnerForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = $('#partnerName').value.trim();
+  if (!name) return toast('O nome é obrigatório.');
+  await addDoc(collection(db,'salons',salonId,'site_partners'), {
+    name,
+    icon: $('#partnerIcon').value.trim() || '🤝',
+    desc: $('#partnerDesc').value.trim(),
+    order: allPartners.length + 1,
+    createdAt: serverTimestamp()
+  });
+  $('#partnerForm').reset();
+  toastSuccess('Parceria adicionada.');
+  loadPartners();
+});
+
+on('partner-delete', async (el) => {
+  if (!confirm('Remover parceria?')) return;
+  await deleteDoc(doc(db,'salons',salonId,'site_partners', el.dataset.id));
+  loadPartners();
+});
+
+on('partner-move', async (el) => {
+  const id = el.dataset.id;
+  const dir = parseInt(el.dataset.dir, 10);
+  const idx = allPartners.findIndex(p => p.id === id);
+  const swap = allPartners[idx + dir];
+  if (!swap) return;
+  const me = allPartners[idx];
+  await updateDoc(doc(db,'salons',salonId,'site_partners', me.id), { order: swap.order });
+  await updateDoc(doc(db,'salons',salonId,'site_partners', swap.id), { order: me.order });
+  loadPartners();
 });
 
 /* ── LOYALTY ─────────────────────────────────────────────── */

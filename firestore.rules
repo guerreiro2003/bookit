@@ -28,9 +28,11 @@ service cloud.firestore {
         allow write: if isAdmin(salonId) || request.auth.uid == uid;
       }
 
-      match /services/{id}   { allow read: if true; allow write: if isAdmin(salonId); }
-      match /staff/{id}      { allow read: if true; allow write: if isAdmin(salonId); }
-      match /promotions/{id} { allow read: if true; allow write: if isAdmin(salonId); }
+      match /services/{id}      { allow read: if true; allow write: if isAdmin(salonId); }
+      match /staff/{id}         { allow read: if true; allow write: if isAdmin(salonId); }
+      match /promotions/{id}    { allow read: if true; allow write: if isAdmin(salonId); }
+      match /site_gallery/{id}  { allow read: if true; allow write: if isAdmin(salonId); }
+      match /site_partners/{id} { allow read: if true; allow write: if isAdmin(salonId); }
 
       match /clients/{clientId} {
         allow read, update: if isAdmin(salonId)
