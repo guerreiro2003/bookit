@@ -1,9 +1,0 @@
-# Netlify redirects
-# Pretty URLs (optional shortcuts)
-/marcar       /index.html?salon=zenorganic   302
-/conta        /account.html?salon=zenorganic 302
-/equipa       /staff.html?salon=zenorganic   302
-/admin        /admin.html                    302
-
-# Catch-all 404
-/*            /404.html                      404
