@@ -1,45 +1,109 @@
 # Book It
 
-Multi-tenant salon booking SaaS built with plain HTML / CSS / JS and
-Firebase (Auth + Firestore). No build step. Hosted as a static site.
+Plataforma web multi-tenant de marcações para salões de cabeleireiro.
+Feita em HTML / CSS / JavaScript puro (ES Modules, sem build step) com
+Firebase (Authentication + Cloud Firestore). Alojada como site estático no
+Firebase Hosting.
 
-> **🌐 Production:** [https://bookit-51575.web.app](https://bookit-51575.web.app) (Firebase Hosting)
-> **📦 Source:** [github.com/guerreiro2003/bookit](https://github.com/guerreiro2003/bookit)
->
-> Production v2 — fully redesigned (Linear / Stripe / Cal.com aesthetic),
-> dark-mode-first, real-time, with command palette and atomic transactions.
-> See [CHANGELOG.md](CHANGELOG.md) for the full diff from v1.
+**Projeto académico** — Projeto de Desenvolvimento de Software, 4.º Semestre,
+Licenciatura em Informática de Gestão (L-IG), IADE · Universidade Europeia,
+2025/2026.
 
-## Files
+Autores: **Pedro Guerreiro** (20221080) · **Tomás Ramos** (20210834) ·
+**Alberto Zumbi** (50036118)
+Coordenador: Professor António Travanca Lopes
 
-| File           | Purpose                                                                      |
-| -------------- | ---------------------------------------------------------------------------- |
-| `index.html`   | Booking wizard (5 steps, public).                                            |
-| `account.html` | Client area: próximas, histórico, descontos, referidos, dados, delete-acc.   |
-| `staff.html`   | Staff portal: today (real-time), all bookings, services, clients (admin).   |
-| `admin.html`   | Admin: dashboard (live), bookings, day view, clients, services, staff…       |
-| `login.html`   | Admin sign-in.                                                               |
-| `setup.html`   | First-time tenant setup (atomic via `writeBatch`).                           |
-| `success.html` | Post-booking confirmation.                                                   |
-| `styles.css`   | Design system: tokens, components, dark mode, responsive.                    |
-| `app.js`       | Shared utilities (templating, dates, validation, transactions, theme, CSV…). |
-| `firebase.js`  | Firebase SDK config + curated exports.                                       |
-| `CHANGELOG.md` | What changed and why.                                                        |
+---
 
-## Run locally
+## ✅ Como testar (para avaliação)
+
+Está tudo em produção, com dados reais. Não é preciso instalar nada — basta
+abrir os links e usar as credenciais abaixo.
+
+### Links de produção
+
+| O quê | Link |
+| ----- | ---- |
+| **App de marcações** (cliente) | https://bookit-51575.web.app/?salon=demo |
+| **Área pessoal / Zen Club** (cliente) | https://bookit-51575.web.app/account.html?salon=demo |
+| **Portal da equipa** | https://bookit-51575.web.app/staff.html?salon=demo |
+| **Painel de administração** | https://bookit-51575.web.app/admin.html |
+| **Setup de novo salão** | https://bookit-51575.web.app/setup.html |
+| **Site institucional Zen Organic** | https://zen-organic-pt.web.app |
+| **Admin de conteúdo Zen Organic** | https://zen-organic-pt.web.app/admin.html |
+
+### Credenciais de teste
+
+| Papel | Email / Identificador | Password |
+| ----- | --------------------- | -------- |
+| **Admin** (Book It) | `admin@bookit.demo` | `Demo2026!` |
+| **Equipa** (staff.html) | *(sem email; password partilhada)* | `equipa2026` |
+| **Cliente** (account.html) | `cliente@bookit.demo` | `Cliente2026!` |
+| **Admin de conteúdo** (Zen Organic) | *(password local)* | `zen2025` |
+
+### Sugestão de percurso de teste
+
+1. **Marcar como visitante** — abrir a app de marcações, escolher serviço →
+   colaborador → data → hora → preencher dados → confirmar.
+2. **Equipa** — entrar no portal da equipa com `equipa2026`, ver a marcação a
+   aparecer no separador "Hoje", confirmar e registar pagamento (atribui pontos
+   automaticamente).
+3. **Cliente** — entrar em account.html com `cliente@bookit.demo` para ver
+   pontos, histórico e cupões.
+4. **Admin** — entrar em admin.html para ver o dashboard em tempo real, a vista
+   de dia, clientes, serviços, equipa, e gerir o conteúdo do site (galeria,
+   parcerias) que reflete no site do Zen Organic em tempo real.
+
+> O salão de demonstração (`?salon=demo`) está populado com 6 serviços, 3
+> colaboradores, marcações de exemplo e uma promoção ativa.
+
+---
+
+## 📄 Relatórios do projeto
+
+| Entrega | Ficheiro |
+| ------- | -------- |
+| Milestone 1 (proposta) | `Milestone1_BookIt_Relatorio.docx` |
+| Milestone 2 (protótipo) | `Milestone2_BookIt_Relatorio.docx` |
+| Milestone 3 (final) | `Milestone3_BookIt_RelatorioFinal.docx` |
+
+Documentação de apoio: `GUIA_DEMO_AO_VIVO.md` (guião de apresentação),
+`GUIA_TECNICO_QA.md` (perguntas técnicas), `CHANGELOG.md`, `DEPLOY.md`.
+Apresentação: `Apresentacao_BookIt.pptx`.
+
+---
+
+## Ficheiros do código
+
+| Ficheiro | Função |
+| -------- | ------ |
+| `index.html` | Wizard de marcação (5 passos, público). |
+| `account.html` | Área do cliente: próximas, histórico, descontos, referidos, dados. |
+| `staff.html` | Portal da equipa: hoje (tempo real), todas as marcações, serviços, clientes. |
+| `admin.html` | Admin: dashboard, marcações, vista de dia, clientes, serviços, equipa, galeria, parcerias… |
+| `login.html` | Login do admin. |
+| `setup.html` | Criação inicial de salão (atómica, via `writeBatch`). |
+| `success.html` | Confirmação pós-marcação. |
+| `styles.css` | Design system: tokens, componentes, dark mode, responsivo. |
+| `app.js` | Utilitários partilhados (templating anti-XSS, datas, validação, transações, tema, CSV…). |
+| `firebase.js` | Config do SDK Firebase + exports. |
+| `firestore.rules` | Regras de segurança Firestore (deployadas em produção). |
+| `firestore.indexes.json` | Índices compostos. |
+
+## Correr localmente
 
 ```bash
 cd bookit-main
 python3 -m http.server 8000
-# open http://localhost:8000/?salon=zenorganic
+# abrir http://localhost:8000/?salon=demo
 ```
 
-## Architecture
+## Arquitetura
 
-### Tenancy
+### Multi-tenant
 
-A salon lives at `salons/{salonId}` with all sub-data nested. Selected via
-`?salon=…` (default `zenorganic`).
+Cada salão vive em `salons/{salonId}` com todos os subdados aninhados.
+Selecionado via `?salon=…` (default `demo`).
 
 ```
 salons/{salonId}
@@ -47,19 +111,21 @@ salons/{salonId}
   ├ services/{id}
   ├ staff/{id}
   ├ promotions/{id}
-  ├ clients/{id}
-  └ bookings/{id}
+  ├ clients/{uid}
+  ├ bookings/{id}
+  ├ site_gallery/{id}
+  └ site_partners/{id}
 ```
 
-### Auth
+### Autenticação
 
-- **Admin**: Firebase Auth email/password. Matched by `salons/{id}.adminUid`.
-- **Client**: Firebase Auth email/password. Profile at `salons/{id}/clients/{uid}`.
-- **Staff**: shared `teamPasswordHash` (SHA-256) on the salon doc. 8-hour
-  sessionStorage session. Admin can enter the same portal with their own
-  credentials.
+- **Admin**: Firebase Auth email/password. Identificado por `salons/{id}.adminUid`.
+- **Cliente**: Firebase Auth email/password. Perfil em `salons/{id}/clients/{uid}`.
+- **Equipa**: `teamPasswordHash` partilhada (SHA-256) no documento do salão.
+  Sessão de 8 horas em sessionStorage. O admin pode entrar no mesmo portal com
+  as suas próprias credenciais.
 
-### Booking state machine
+### Máquina de estados das marcações
 
 ```
 pending ─→ confirmed ─→ completed
@@ -67,85 +133,66 @@ pending ─→ confirmed ─→ completed
    └──→ cancelled  noshow
 ```
 
-Side effects of `completed` via `markBookingPaid()` (atomic):
+Efeitos de `completed` via `markBookingPaid()` (transação atómica):
 
-- Booking flagged `paid`, `pointsAwarded`, `paymentMethod`.
-- Client gains `pointsPerVisit` (default 10).
-- If `visits % loyaltyVisits === 0`, a loyalty discount is appended to the
-  client's `discounts` array.
+- Marcação fica `paid`, `pointsAwarded`, `paymentMethod`.
+- Cliente ganha `pointsPerVisit` (default 10).
+- Se `visits % loyaltyVisits === 0`, é adicionado um cupão de fidelização ao
+  array `discounts` do cliente.
 
-Side effects of `noshow` via `markBookingNoShow()` (atomic):
+Efeitos de `noshow` via `markBookingNoShow()` (transação atómica):
 
-- Booking flagged `noshow`.
-- Client `points` decremented by `noShowPenalty` (default 5).
+- Marcação fica `noshow`.
+- `points` do cliente decrementados por `noShowPenalty` (default 5).
 
-### Per-salon branding
+### Branding por salão
 
-The salon doc carries `primaryColor`. On boot, `applySalonBranding()` sets
-`--brand` and `--brand-rgb` as CSS custom properties — no rebuild, no theme
-switching code.
+O documento do salão tem `primaryColor`. No arranque, `applySalonBranding()`
+define `--brand` e `--brand-rgb` como CSS custom properties — sem rebuild.
 
-## Conventions
+## Convenções
 
-### XSS-safe templating
+### Templating anti-XSS
 
 ```js
 import { html, htmlMix, raw, escapeHTML } from './app.js';
 
-// Auto-escapes all interpolations:
+// Escapa automaticamente todas as interpolações:
 el.innerHTML = html`<div>${untrusted}</div>`;
-
-// Mix trusted partial HTML with untrusted values:
-el.innerHTML = htmlMix`<a href="${url}">${name}${raw('<br>')}${notes}</a>`;
 ```
 
 ### Event delegation
 
-Buttons declare an action via `data-action="some-name"`; a single delegated
-listener dispatches. No inline `onclick=`.
+Botões declaram a ação via `data-action="some-name"`; um único listener
+delegado despacha. Sem `onclick=` inline.
 
-```js
-import { on } from './app.js';
+### Escritas atómicas
 
-on('cancel-booking', async (el) => {
-  await updateDoc(doc(db, 'salons', salonId, 'bookings', el.dataset.id),
-    { status: 'cancelled' });
-});
-```
+Operações multi-documento usam `runTransaction` ou `writeBatch`. O setup cria
+o salão, horário, registo de admin e serviços de exemplo (em dois batches,
+porque as regras precisam do documento do salão existir primeiro). Pagamento +
+pontos acontecem numa só transação.
 
-### Atomic writes
+### Tema
 
-Multi-document operations use `runTransaction` or `writeBatch`. Setup
-creates the salon, schedule, admin user record, and seed services in a
-single batched commit. Payment + points happen in a single transaction.
+Light/dark via `[data-theme]` no `<html>`. Por defeito light; a escolha do
+utilizador persiste em localStorage. Botão de toggle na sidebar do admin e no
+header da equipa.
 
-### Theme
-
-Light/dark via `[data-theme]` on `<html>`. Tokens flip; per-salon brand
-colour stays. Honours `prefers-color-scheme` initially, then persists user
-choice in localStorage. Toggle button in admin sidebar + staff header.
-
-### Keyboard shortcuts
+### Atalhos de teclado
 
 - `⌘K` / `Ctrl+K` — command palette (admin)
-- `Esc` — close any modal / popup
-- `Enter` / `Space` — activate `[role="button"]` elements
+- `Esc` — fechar qualquer modal / popup
 
-## Roadmap
+## Trabalho futuro
 
-Documented in `guia_bookit_v3.docx` plus internal notes:
+- **Notificações por email / SMS** — requerem Cloud Functions (SendGrid / Twilio).
+- **Pagamento online (MB Way / Stripe)** — o modal regista o método; o
+  processamento real fica por integrar.
+- **Cloud Function para slots** — para não expor a leitura pública de bookings.
+- **Multi-admin por salão** — atualmente um único `adminUid`.
 
-- **Firestore rules** — must be written before production. Suggested:
-  read salon doc public-readable, but writes admin-only; clients
-  read/write own doc only; bookings read by salon staff (admin uid OR
-  active staff record); etc.
-- **MB Way / Stripe** — payment modal currently records the method
-  string; actual processing is offline.
-- **Multi-admin per salon** — currently single `adminUid`.
-- **Push notifications** to staff for new pending bookings.
-- **Pagination cursor** for admin booking list past 500 entries.
+---
 
-## Project
-
-Pedro Guerreiro 20221080 · Tomás Ramos 20210834
+Pedro Guerreiro 20221080 · Tomás Ramos 20210834 · Alberto Zumbi 50036118
 L-IG · 4.º Semestre · IADE · Universidade Europeia · 2025-2026
