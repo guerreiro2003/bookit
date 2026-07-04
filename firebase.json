@@ -9,13 +9,13 @@
       "firebase.json",
       "firestore.*",
       "**/.*",
+      ".git/**",
+      "**/.git/**",
       "**/node_modules/**",
       "*.zip",
       "*.pptx",
-      "GUIA_APRESENTACAO.md",
-      "CHANGELOG.md",
-      "DEPLOY.md",
-      "GUIDE.md"
+      "*.docx",
+      "*.md"
     ],
     "headers": [
       {

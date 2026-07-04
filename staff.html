@@ -181,7 +181,7 @@
 import {
   db, auth, collection, doc, getDoc, getDocs, updateDoc,
   query, where, orderBy, onSnapshot, serverTimestamp,
-  signInWithEmailAndPassword, signOut, onAuthStateChanged
+  signInWithEmailAndPassword, signInAnonymously, signOut, onAuthStateChanged
 } from './firebase.js';
 import {
   $, $$, on, toast, toastSuccess, toastError,
@@ -215,7 +215,11 @@ let cachedToday = [];
     try {
       const saved = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null');
       if (saved && saved.salonId === salonId && saved.expires > Date.now()) {
-        mode = saved.mode || 'team'; showApp();
+        mode = saved.mode || 'team';
+        // Restore a Firebase token if the anonymous session was dropped, so the
+        // team can still confirm/pay after a reload.
+        if (!user) { try { await signInAnonymously(auth); } catch (e) { console.error(e); } }
+        showApp();
       } else {
         mode = 'team'; showLogin();
       }
@@ -270,6 +274,15 @@ $('#formTeam').addEventListener('submit', withLock('team-login', async (e) => {
     salonId, mode: 'team', expires: Date.now() + 8 * 60 * 60 * 1000
   }));
   mode = 'team';
+  // Obtain a real Firebase token so the team can actually write (confirm/pay/
+  // no-show). The shared password is only the UX gate; Firestore rules scope
+  // what an anonymous team session is allowed to change.
+  try {
+    if (!auth.currentUser) await signInAnonymously(auth);
+  } catch (err) {
+    console.error('anon sign-in', err);
+    toastError('Sessão iniciada em modo leitura. Recarrega se as ações não funcionarem.');
+  }
   showApp();
 }));
 

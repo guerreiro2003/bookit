@@ -249,7 +249,7 @@ $('#setupForm').addEventListener('submit', withLock('setup', async (e) => {
     salonBatch.set(doc(db, 'salons', slug), {
       name, slug, tagline, address, phone, email,
       primaryColor: color, primaryColorDark: color, primaryColorLight: '#eef3e8',
-      loyaltyVisits: 10, loyaltyDiscount: 20,
+      loyaltyVisits: 5, loyaltyDiscount: 20,
       referralDiscount: 10, birthdayDiscount: 15,
       noShowPenalty: 5, pointsPerVisit: 10,
       teamPasswordHash: '',

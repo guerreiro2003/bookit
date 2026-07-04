@@ -9,6 +9,9 @@
   <meta property="og:title" content="Book It — Marcações online" />
   <meta property="og:description" content="Marca em segundos. Sem chamadas, sem espera." />
   <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="Book It — Marcações online" />
+  <meta name="twitter:description" content="Marca em segundos. Sem chamadas, sem espera." />
   <title>Marcar — Book It</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -196,34 +199,6 @@
     </div>
   </main>
 
-  <!-- Zen Club popup -->
-  <div id="clubPopup" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="clubTitle" aria-hidden="true">
-    <div class="modal club-modal">
-      <button class="modal__close" type="button" data-action="close-club" aria-label="Fechar">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-      <div class="club-modal__icon" aria-hidden="true">★</div>
-      <h2 class="modal__title" id="clubTitle">Junta-te ao Zen Club</h2>
-      <p class="modal__sub">Cria conta grátis e começa a ganhar recompensas.</p>
-      <div class="club-benefits">
-        <div class="club-benefit">
-          <div class="club-benefit__icon">⭐</div>
-          <div><div class="club-benefit__title">Pontos a cada visita paga</div><div class="club-benefit__desc">Troca por descontos exclusivos</div></div>
-        </div>
-        <div class="club-benefit">
-          <div class="club-benefit__icon">🎂</div>
-          <div><div class="club-benefit__title">Desconto de aniversário</div><div class="club-benefit__desc">Desconto automático no teu mês</div></div>
-        </div>
-        <div class="club-benefit">
-          <div class="club-benefit__icon">🔗</div>
-          <div><div class="club-benefit__title">Código de referido único</div><div class="club-benefit__desc">Traz amigos e ambos ganham</div></div>
-        </div>
-      </div>
-      <a class="btn btn--primary btn--full btn--lg" id="clubCreateLink" href="account.html">Criar conta gratuita →</a>
-      <button class="btn btn--ghost btn--full mt-2" type="button" data-action="close-club">Agora não</button>
-    </div>
-  </div>
-
 <script type="module">
 import {
   db, auth, collection, doc, getDoc, getDocs, addDoc, updateDoc, runTransaction,
@@ -234,10 +209,8 @@ import {
   MONTHS_FULL, WEEKDAY_KEYS, WEEKDAYS_SHORT,
   formatDate, formatDateLongPT, formatPrice, todayISO,
   getSalonId, loadSalon, applySalonBranding,
-  generateReferralCode, showFatalError, isEmail, isPhone, withLock, trapFocus
+  generateReferralCode, showFatalError, isEmail, isPhone, withLock
 } from './app.js';
-
-const POPUP_KEY = 'bookit:club_dismissed';
 
 const state = {
   salon: null,
@@ -267,21 +240,23 @@ const state = {
     const schedDoc = await getDoc(doc(db, 'salons', state.salonId, 'config', 'schedule'));
     if (schedDoc.exists()) state.schedule = schedDoc.data();
 
+    // NB: we intentionally do NOT orderBy('order') in the query — Firestore drops
+    // documents that lack the field, which would silently hide a service/staff
+    // member. We sort client-side with a safe fallback instead.
+    const byOrder = (a, b) => (a.order ?? 9999) - (b.order ?? 9999);
     const [staffSnap, promoSnap, svcSnap] = await Promise.all([
-      getDocs(query(collection(db,'salons',state.salonId,'staff'), where('active','==',true), orderBy('order','asc'))).catch(() => ({docs:[]})),
+      getDocs(query(collection(db,'salons',state.salonId,'staff'), where('active','==',true))).catch(() => ({docs:[]})),
       getDocs(query(collection(db,'salons',state.salonId,'promotions'), where('active','==',true))).catch(() => ({docs:[]})),
-      getDocs(query(collection(db,'salons',state.salonId,'services'), where('active','==',true), orderBy('order','asc'))).catch(() => ({docs:[]})),
+      getDocs(query(collection(db,'salons',state.salonId,'services'), where('active','==',true))).catch(() => ({docs:[]})),
     ]);
-    state.staff      = staffSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+    state.staff      = staffSnap.docs.map(d => ({ id:d.id, ...d.data() })).sort(byOrder);
     state.promotions = promoSnap.docs.map(d => ({ id:d.id, ...d.data() }));
-    state.services   = svcSnap.docs.map(d  => ({ id:d.id, ...d.data() }));
+    state.services   = svcSnap.docs.map(d  => ({ id:d.id, ...d.data() })).sort(byOrder);
 
     renderPromos();
     renderServices();
-
-    if (!state.authUser && !localStorage.getItem(POPUP_KEY)) {
-      setTimeout(showClubPopup, 4500);
-    }
+    // The Zen Club invite is shown AFTER a successful booking (success.html),
+    // when the visitor has already got value — not as an interrupting auto-popup.
   } catch (e) {
     console.error(e);
     showFatalError('Erro ao carregar. Verifica a tua ligação.');
@@ -302,7 +277,6 @@ function updateAuthUI() {
     acts.innerHTML = htmlMix`<a class="btn btn--ghost btn--sm" href="account.html${raw(qs)}">Entrar</a>`;
     if (invite) invite.hidden = false;
   }
-  $('#clubCreateLink').href = `account.html${qs}`;
   $('#inviteAccountLink').href = `account.html${qs}`;
 }
 
@@ -800,25 +774,6 @@ on('submit-booking', withLock('submit-booking', async () => {
     toastError('Erro ao confirmar marcação. Tenta novamente.');
   }
 }));
-
-// Zen Club popup
-let releaseFocus = null;
-function showClubPopup() {
-  const o = $('#clubPopup');
-  o.classList.add('show'); o.setAttribute('aria-hidden','false');
-  releaseFocus = trapFocus(o.querySelector('.modal'));
-}
-function hideClubPopup() {
-  const o = $('#clubPopup');
-  o.classList.remove('show'); o.setAttribute('aria-hidden','true');
-  localStorage.setItem(POPUP_KEY, '1');
-  if (releaseFocus) { releaseFocus(); releaseFocus = null; }
-}
-on('close-club', hideClubPopup);
-$('#clubPopup').addEventListener('click', (e) => { if (e.target === e.currentTarget) hideClubPopup(); });
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && $('#clubPopup').classList.contains('show')) hideClubPopup();
-});
 </script>
 </body>
 </html>

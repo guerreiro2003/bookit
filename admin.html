@@ -1119,7 +1119,7 @@ function renderClients() {
       <div class="empty-state__title">Sem clientes</div></div>`;
     return;
   }
-  const loyalty = salon?.loyaltyVisits || 10;
+  const loyalty = salon?.loyaltyVisits || 5;
   el.innerHTML = `<div class="table-scroll"><table class="data-table">
     <thead><tr><th>Nome</th><th>Email</th><th>Visitas</th><th>Pontos</th><th>Gasto</th><th>Fidelização</th><th>Código</th></tr></thead>
     <tbody>${clients.map(c => {
@@ -1518,7 +1518,7 @@ on('partner-move', async (el) => {
 /* ── LOYALTY ─────────────────────────────────────────────── */
 function loadLoyalty() {
   if (!salon) return;
-  $('#loyaltyVisits').value    = salon.loyaltyVisits   || 10;
+  $('#loyaltyVisits').value    = salon.loyaltyVisits   || 5;
   $('#loyaltyDiscount').value  = salon.loyaltyDiscount || 20;
   $('#referralDiscount').value = salon.referralDiscount || 10;
   $('#noShowPenalty').value    = salon.noShowPenalty != null ? salon.noShowPenalty : 5;

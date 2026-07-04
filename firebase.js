@@ -8,7 +8,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import {
   getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
-  signOut, onAuthStateChanged, sendPasswordResetEmail,
+  signInAnonymously, signOut, onAuthStateChanged, sendPasswordResetEmail,
   updatePassword, updateProfile, deleteUser
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
@@ -32,6 +32,6 @@ export {
   onSnapshot, serverTimestamp, writeBatch, runTransaction,
   arrayUnion, arrayRemove, increment,
   signInWithEmailAndPassword, createUserWithEmailAndPassword,
-  signOut, onAuthStateChanged, sendPasswordResetEmail,
+  signInAnonymously, signOut, onAuthStateChanged, sendPasswordResetEmail,
   updatePassword, updateProfile, deleteUser
 };

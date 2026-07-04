@@ -319,8 +319,9 @@ export async function hashPassword(pw) {
 }
 export async function verifyPassword(pw, hash) {
   if (!hash) return false;
-  // Legacy plain-text fallback (will be re-hashed on next save)
-  if (!/^[a-f0-9]{64}$/.test(String(hash))) return pw === hash;
+  // Only SHA-256 hashes are accepted. A non-hash value (e.g. a legacy plain-text
+  // password) is rejected outright so credentials are never compared in the clear.
+  if (!/^[a-f0-9]{64}$/.test(String(hash))) return false;
   const h = await hashPassword(pw);
   // constant-time-ish compare
   if (h.length !== hash.length) return false;
@@ -374,7 +375,7 @@ export async function markBookingPaid({ salonId, bookingId, method, pointsPerVis
       const visits = (c.visits || 0) + 1;
       const points = (c.points || 0) + pts;
       const spent  = (c.totalSpent || 0) + (Number(b.finalPrice) || Number(b.servicePrice) || 0);
-      const target = loyaltyVisits || 10;
+      const target = loyaltyVisits || 5;
       const discount = loyaltyDiscount || 20;
       const updates = { visits, points, totalSpent: spent };
       if (visits > 0 && visits % target === 0) {

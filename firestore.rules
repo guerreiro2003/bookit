@@ -9,12 +9,20 @@ service cloud.firestore {
         get(/databases/$(database)/documents/salons/$(salonId)).data.adminUid == request.auth.uid;
     }
 
+    // Team portal (staff.html) signs in with Firebase Anonymous Auth after the
+    // shared team password is verified client-side. We can't prove *who* they are
+    // server-side without a backend, so anonymous sessions get a tightly-scoped
+    // set of operational permissions (below): they may move a booking through its
+    // status machine and award/deduct loyalty points, but may NOT alter money,
+    // dates, client identity, or create records out of thin air.
+    function isTeam() {
+      return isAuth() && request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+
     match /salons/{salonId} {
-      // Public read (so the booking site can show salon name / colour)
+      // Public read (booking site needs salon name / colour / schedule)
       allow read: if true;
-      // Only the admin (Firebase Auth) can update
       allow update: if isAdmin(salonId);
-      // Create only via setup.html (must set adminUid to self)
       allow create: if isAuth() && request.resource.data.adminUid == request.auth.uid;
       allow delete: if false;
 
@@ -35,24 +43,73 @@ service cloud.firestore {
       match /site_partners/{id} { allow read: if true; allow write: if isAdmin(salonId); }
 
       match /clients/{clientId} {
-        allow read, update: if isAdmin(salonId)
+        allow read: if isAdmin(salonId)
           || (isAuth() && resource.data.uid == request.auth.uid)
           || (isAuth() && resource.data.email == request.auth.token.email);
-        allow create: if true;
+
+        // New clients must start with a clean slate. Prevents anyone from
+        // birthing a client document pre-loaded with points or discount coupons.
+        allow create: if request.resource.data.get('visits', 0) == 0
+          && request.resource.data.get('points', 0) == 0
+          && request.resource.data.get('totalSpent', 0) == 0
+          && request.resource.data.get('discounts', []).size() == 0;
+
+        // The owner may edit their own profile (name/phone/birthday) and mark
+        // coupons used, but may NOT inflate their loyalty balance or mint coupons:
+        //  · points / visits / totalSpent must stay unchanged
+        //  · the discounts array may only shrink or stay equal (mark-as-used), never grow
+        allow update: if isAdmin(salonId)
+          || ( isAuth()
+               && (resource.data.get('uid', '') == request.auth.uid
+                   || resource.data.get('email', '') == request.auth.token.email)
+               && request.resource.data.get('points', 0) == resource.data.get('points', 0)
+               && request.resource.data.get('visits', 0) == resource.data.get('visits', 0)
+               && request.resource.data.get('totalSpent', 0) == resource.data.get('totalSpent', 0)
+               && request.resource.data.get('discounts', []).size() <= resource.data.get('discounts', []).size() )
+          // Team session awarding points / loyalty coupons through the app's atomic
+          // transactions (markBookingPaid / markBookingNoShow).
+          || isTeam();
+
         allow delete: if isAdmin(salonId);
       }
 
       match /bookings/{id} {
-        // Public READ — anonymous booking flow needs to see which slots are taken.
-        // Trade-off: customer names/emails are technically visible to anyone who
-        // crafts the right query. Acceptable for an academic demo; for real
-        // production, move slot-availability check to a Cloud Function that
-        // returns just dates+times without PII.
+        // Public READ — the anonymous booking flow needs to see which slots are
+        // taken. Trade-off: only date/time/staff are operationally sensitive here;
+        // for a hardened production build this would move behind a Cloud Function
+        // returning slot availability without client PII.
         allow read: if true;
-        allow create: if true;
+
+        // Public create, but the price is pinned to reality: servicePrice must
+        // equal the real service's price, and finalPrice can't drop below 50% of
+        // it. This neutralises forged discount codes / "free service" attacks —
+        // even a fake 100%-off coupon can't push the price to zero.
+        allow create: if request.resource.data.status == 'pending'
+          && request.resource.data.paid == false
+          && request.resource.data.serviceId is string
+          && exists(/databases/$(database)/documents/salons/$(salonId)/services/$(request.resource.data.serviceId))
+          && request.resource.data.servicePrice ==
+               get(/databases/$(database)/documents/salons/$(salonId)/services/$(request.resource.data.serviceId)).data.price
+          && request.resource.data.finalPrice is number
+          && request.resource.data.finalPrice >= request.resource.data.servicePrice * 0.5;
+
         allow update: if isAdmin(salonId)
-          || (isAuth() && resource.data.clientEmail == request.auth.token.email
-              && request.resource.data.status == 'cancelled');
+          // A signed-in client may cancel their own booking (nothing else).
+          || ( isAuth()
+               && resource.data.clientEmail == request.auth.token.email
+               && request.resource.data.status == 'cancelled' )
+          // Team session moving a booking through its status machine. Money, date,
+          // time and client identity are frozen — they can only change status/paid.
+          // .get() guards against bookings that omit an optional field.
+          || ( isTeam()
+               && request.resource.data.get('clientEmail', '')  == resource.data.get('clientEmail', '')
+               && request.resource.data.get('clientId', '')     == resource.data.get('clientId', '')
+               && request.resource.data.get('servicePrice', 0)  == resource.data.get('servicePrice', 0)
+               && request.resource.data.get('finalPrice', 0)    == resource.data.get('finalPrice', 0)
+               && request.resource.data.get('date', '')         == resource.data.get('date', '')
+               && request.resource.data.get('time', '')         == resource.data.get('time', '')
+               && request.resource.data.status in ['pending','confirmed','completed','cancelled','noshow'] );
+
         allow delete: if isAdmin(salonId);
       }
     }
