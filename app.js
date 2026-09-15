@@ -426,9 +426,11 @@ function linkProjection(salonId, bookingId, b) {
     status: b.status, updatedAt: serverTimestamp(),
   };
 }
-function syncLink(tx, salonId, b, patch) {
+function syncLink(tx, salonId, bookingId, b, patch) {
   if (!b?.manageToken) return; // legacy booking without a link
-  tx.set(linkRef(salonId, b.manageToken), { ...patch, updatedAt: serverTimestamp() }, { merge: true });
+  // merge-set: also (re)creates the projection if it went missing, with the
+  // identifying fields the create rule requires and never any PII.
+  tx.set(linkRef(salonId, b.manageToken), { salonId, bookingId, ...patch, updatedAt: serverTimestamp() }, { merge: true });
 }
 
 /** Load what the booking engine needs for a salon (schedule + active staff). */
@@ -647,7 +649,7 @@ export async function cancelBooking({ salonId, bookingId, by = 'salon', enforceP
     // writes
     tx.update(bRef, { status: 'cancelled', previousStatus: b.status, cancelledAt: serverTimestamp(), cancelledBy: by });
     if (aRef) releaseInterval(tx, aSnap, aRef, bookingId);
-    syncLink(tx, salonId, b, { status: 'cancelled' });
+    syncLink(tx, salonId, bookingId, b, { status: 'cancelled' });
     return { ok: true, previousStatus: b.status };
   });
 }
@@ -670,7 +672,7 @@ export async function restoreBooking({ salonId, bookingId, toStatus = null }) {
     if (aSnap.exists()) tx.update(aRef, { intervals: [...(aSnap.data().intervals || []).filter(i => i.bookingId !== bookingId), interval], updatedAt: serverTimestamp() });
     else tx.set(aRef, { staffId: b.staffId, date: b.date, intervals: [interval], updatedAt: serverTimestamp() });
     tx.update(bRef, { status: target, cancelledAt: null, cancelledBy: null, previousStatus: null, restoredAt: serverTimestamp() });
-    syncLink(tx, salonId, b, { status: target });
+    syncLink(tx, salonId, bookingId, b, { status: target });
     return { ok: true, status: target };
   });
 }
@@ -714,7 +716,7 @@ export async function rescheduleBooking({ salonId, salon, ctx, bookingId, newDat
       // a moved appointment must be re-confirmed by the client
       ...(b.status === 'confirmed' && b.confirmedVia === 'link' ? {} : {}),
     });
-    syncLink(tx, salonId, b, { date: newDate, time: minToTime(newStartMin), startMin: newStartMin, endMin: newStartMin + duration, staffId: staff.id, staffName: staff.name });
+    syncLink(tx, salonId, bookingId, b, { date: newDate, time: minToTime(newStartMin), startMin: newStartMin, endMin: newStartMin + duration, staffId: staff.id, staffName: staff.name });
     return { ok: true };
   });
 }
@@ -727,7 +729,7 @@ export async function confirmBooking({ salonId, bookingId }) {
     if (!bSnap.exists()) throw err('booking-not-found');
     if (!canTransition(bSnap.data().status, 'confirmed')) throw err('invalid-transition');
     tx.update(bRef, { status: 'confirmed', confirmedAt: serverTimestamp(), confirmedVia: 'staff' });
-    syncLink(tx, salonId, bSnap.data(), { status: 'confirmed' });
+    syncLink(tx, salonId, bookingId, bSnap.data(), { status: 'confirmed' });
     return { ok: true };
   });
 }
@@ -776,7 +778,7 @@ export async function markBookingPaid({ salonId, salon, bookingId, method }) {
       paid: true, status: 'completed', paidAt: serverTimestamp(), paymentMethod: method || 'balcao', pointsAwarded: pts,
       ...(clientPlan && !b.clientId ? { clientId: clientPlan.ref.id } : {}),
     });
-    syncLink(tx, salonId, b, { status: 'completed' });
+    syncLink(tx, salonId, bookingId, b, { status: 'completed' });
 
     const spentDelta = Number(b.finalPrice) || Number(b.servicePrice) || 0;
     if (clientPlan?.create) {
@@ -815,7 +817,7 @@ export async function markBookingNoShow({ salonId, salon, bookingId }) {
     if (!canTransition(b.status, 'noshow')) throw err(b.status === 'completed' ? 'booking-completed' : 'booking-cancelled');
     tx.update(bRef, { status: 'noshow', noShowAt: serverTimestamp() });
     if (b.clientId && penalty > 0) tx.update(doc(db, 'salons', salonId, 'clients', b.clientId), { points: increment(-penalty) });
-    syncLink(tx, salonId, b, { status: 'noshow' });
+    syncLink(tx, salonId, bookingId, b, { status: 'noshow' });
     return { ok: true };
   });
 }

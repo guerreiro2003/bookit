@@ -46,6 +46,10 @@
 
     <div class="sidebar__section">
       <span class="sidebar__label">Operação</span>
+      <button class="sidebar__link" type="button" data-action="show-panel" data-panel="business">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        <span>Negócio</span>
+      </button>
       <button class="sidebar__link" type="button" data-action="show-panel" data-panel="bookings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         <span>Marcações</span>
@@ -206,6 +210,70 @@
         </div>
         <div class="table-card__body table-scroll" id="todayBookings">
           <div class="loading-state"><span class="spinner" aria-hidden="true"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-business">
+      <div class="panel-header">
+        <div class="panel-header__title-row">
+          <h1 class="page-title">Negócio</h1>
+          <p class="page-sub">O que aconteceu, medido a partir das marcações. Sem estimativas.</p>
+        </div>
+        <div class="cluster">
+          <select id="bizPeriod" class="input" style="max-width:170px" data-action="biz-period">
+            <option value="7">Últimos 7 dias</option>
+            <option value="30" selected>Últimos 30 dias</option>
+            <option value="90">Últimos 90 dias</option>
+            <option value="month">Este mês</option>
+            <option value="custom">Intervalo…</option>
+          </select>
+          <input type="date" id="bizFrom" class="input" style="max-width:150px" hidden data-action="biz-period" />
+          <input type="date" id="bizTo" class="input" style="max-width:150px" hidden data-action="biz-period" />
+          <button class="btn btn--sm" type="button" data-action="biz-refresh">Atualizar</button>
+        </div>
+      </div>
+
+      <div id="bizLoading" class="loading-state"><span class="spinner" aria-hidden="true"></span></div>
+      <div id="bizBody" hidden>
+        <div class="stats" id="bizStats"></div>
+
+        <div id="bizQuality" class="promo mb-4" hidden style="border-color:var(--danger-border)">
+          <div><div class="promo__title">Marcações passadas por fechar</div><div class="promo__desc" id="bizQualityText"></div></div>
+          <a class="badge badge--amber" href="#" data-action="biz-open-unresolved">ver</a>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card__head"><div class="card__title">Faltas e confirmações</div></div>
+            <div id="bizNoShow"></div>
+          </div>
+          <div class="card">
+            <div class="card__head"><div class="card__title">Por semana</div></div>
+            <div id="bizWeeks"></div>
+          </div>
+          <div class="card">
+            <div class="card__head"><div class="card__title">Por origem</div></div>
+            <div id="bizChannels"></div>
+          </div>
+          <div class="card">
+            <div class="card__head"><div class="card__title">Por colaborador</div></div>
+            <div id="bizStaff"></div>
+          </div>
+          <div class="card">
+            <div class="card__head"><div class="card__title">Por serviço</div></div>
+            <div id="bizServices"></div>
+          </div>
+          <div class="card">
+            <div class="card__head"><div class="card__title">Como lemos estes números</div></div>
+            <ul class="text-sm text-muted" style="line-height:1.55;margin:0;padding-left:18px">
+              <li><strong>Faltas</strong> = "não compareceu" ÷ marcações passadas fechadas (concluídas + não compareceu). Marcações passadas ainda "pendentes/confirmadas" não contam e aparecem no aviso acima.</li>
+              <li><strong>Ocupação</strong> = minutos marcados ÷ minutos vendáveis (horário − pausas − folgas − férias − datas encerradas), só em dias já passados.</li>
+              <li><strong>Confirmadas</strong> = com pedido enviado ou confirmação registada (link, equipa ou admin). É a taxa que a equipa controla.</li>
+              <li><strong>Voltaram em 60 dias</strong> = clientes com visita concluída há mais de 60 dias que voltaram a marcar nesse prazo.</li>
+              <li>Tudo é <em>atribuído</em> (contado nos registos). Não há estimativas aqui.</li>
+            </ul>
+          </div>
         </div>
       </div>
     </section>
@@ -758,6 +826,8 @@ import {
   isEmail, isPhone, isHexColor
 } from './app.js';
 
+import { computeBaseline, pct, eur } from './metrics-core.js';
+
 /** Bookings currently known to this page, by id (dashboard, list, day filter). */
 const bookingIndex = new Map();
 
@@ -920,6 +990,7 @@ on('show-panel', (el) => {
   if (id === 'partners')   loadPartners();
   if (id === 'staff')      { loadStaff().then(refreshOnboarding); }
   if (id === 'dayview')    initDayview();
+  if (id === 'business')   loadBusiness();
   if (id === 'dashboard')  refreshOnboarding();
   if (id === 'settings')   refreshOnboarding();
   if (id === 'schedule')   refreshOnboarding();
@@ -1356,6 +1427,87 @@ on('confirm-reschedule', withLock('reschedule', async () => {
     document.querySelector('[data-action="close-reschedule"]').click();
   } catch (e) { console.error(e); err.textContent = friendlyError(e, 'Não foi possível reagendar.'); err.classList.add('show'); renderRsSlots(); }
 }));
+
+/* ── NEGÓCIO (baseline) ──────────────────────────────────── */
+function bizRange() {
+  const today = todayForSalon(salon);
+  const sel = $('#bizPeriod').value;
+  if (sel === 'custom') {
+    const f = $('#bizFrom').value, t = $('#bizTo').value;
+    return (isValidDateStr(f) && isValidDateStr(t) && f <= t) ? { from: f, to: t } : null;
+  }
+  if (sel === 'month') return { from: today.slice(0, 8) + '01', to: today };
+  return { from: addDaysStr(today, -(Number(sel) - 1)), to: today };
+}
+function onBizPeriodChange() {
+  const custom = $('#bizPeriod').value === 'custom';
+  $('#bizFrom').hidden = !custom; $('#bizTo').hidden = !custom;
+  if (!custom || (isValidDateStr($('#bizFrom').value) && isValidDateStr($('#bizTo').value))) loadBusiness();
+}
+on('biz-period', onBizPeriodChange);
+$('#bizPeriod').addEventListener('change', onBizPeriodChange);   // <select> fires change, not always click
+$('#bizFrom').addEventListener('change', onBizPeriodChange); $('#bizTo').addEventListener('change', onBizPeriodChange);
+on('biz-refresh', loadBusiness);
+on('biz-open-unresolved', () => {
+  $('#filterStatus').value = 'confirmed'; $('#filterDate').value = ''; $('#bookingsSearch').value = '';
+  document.querySelector('.sidebar__link[data-panel="bookings"]').click();
+});
+
+const statCard = (label, value, sub = '') => `<div class="stat"><div class="stat__label">${escapeHTML(label)}</div><div class="stat__value">${escapeHTML(value)}</div>${sub ? `<div class="text-xs text-muted mt-1">${escapeHTML(sub)}</div>` : ''}</div>`;
+const barRows = (rows, valueKey, fmt = (v) => v) => {
+  if (!rows.length) return '<p class="text-sm text-muted">Sem dados neste período.</p>';
+  const max = Math.max(...rows.map(r => r[valueKey] || 0), 1);
+  return `<table class="data-table data-table--compact"><tbody>${rows.map(r => htmlMix`<tr>
+    <td style="width:38%">${r.label}</td>
+    <td><div class="bar"><div class="bar__fill" style="width:${raw(Math.round((r[valueKey] || 0) / max * 100))}%"></div></div></td>
+    <td class="tabular text-right" style="white-space:nowrap">${raw(fmt(r[valueKey] || 0))}${r.extra ? raw(` <span class="text-xs text-muted">${escapeHTML(r.extra)}</span>`) : ''}</td>
+  </tr>`).join('')}</tbody></table>`;
+};
+
+let bizBusy = false;
+async function loadBusiness() {
+  if (!salonId || bizBusy) return;
+  const range = bizRange(); if (!range) return;
+  bizBusy = true; $('#bizLoading').hidden = false; $('#bizBody').hidden = true;
+  try {
+    const snap = await getDocs(query(collection(db,'salons',salonId,'bookings'), where('date','>=', range.from), where('date','<=', range.to)));
+    const bookings = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const m = computeBaseline({ bookings, from: range.from, to: range.to, today: todayForSalon(salon), schedule: bookingCtx.schedule, staff: allStaff, closedDates: salon.closedDates || [] });
+
+    $('#bizStats').innerHTML = [
+      statCard('Marcações', String(m.counts.total), `${m.counts.completed} concluídas · ${m.counts.byStatus.cancelled || 0} canceladas`),
+      statCard('Receita registada', eur(m.revenue.total), `${m.counts.paid} pagamentos · ticket ${eur(m.revenue.avgTicket)}`),
+      statCard('Faltas', pct(m.noShow.rate), `${m.noShow.count} em ${m.noShow.resolved} fechadas`),
+      statCard('Cancelamentos', pct(m.cancellations.rate), `${m.cancellations.count} · ${m.cancellations.late} em cima da hora`),
+      statCard('Ocupação', pct(m.occupancy.rate), `${Math.round(m.occupancy.bookedMinutes / 60)}h de ${Math.round(m.occupancy.availableMinutes / 60)}h vendáveis`),
+      statCard('Confirmadas', pct(m.confirmation.confirmedRate), `${m.confirmation.byLink} pelo link · ${pct(m.confirmation.requestRate)} com pedido`),
+      statCard('Voltaram em 60 dias', pct(m.rebooking.rate), `${m.rebooking.rebooked} de ${m.rebooking.eligible} visitas`),
+    ].join('');
+
+    $('#bizQuality').hidden = m.noShow.unresolvedPast === 0;
+    $('#bizQualityText').textContent = `${m.noShow.unresolvedPast} marcação(ões) já passaram e continuam "pendentes/confirmadas". Marca-as como concluídas ou não compareceu — senão a taxa de faltas fica errada.`;
+
+    $('#bizNoShow').innerHTML = `
+      <table class="data-table data-table--compact"><tbody>
+        <tr><td>Faltas em marcações <strong>confirmadas</strong></td><td class="tabular text-right">${pct(m.noShow.rateConfirmed)}</td></tr>
+        <tr><td>Faltas em marcações <strong>não confirmadas</strong></td><td class="tabular text-right">${pct(m.noShow.rateUnconfirmed)}</td></tr>
+        <tr><td>Pedidos de confirmação enviados</td><td class="tabular text-right">${m.confirmation.requested} (${pct(m.confirmation.requestRate)})</td></tr>
+        <tr><td>Confirmadas pelo link, sem trabalho da equipa</td><td class="tabular text-right">${m.confirmation.byLink}</td></tr>
+        <tr><td>Cancelamentos feitos pelo cliente (link/conta)</td><td class="tabular text-right">${m.cancellations.byClient}</td></tr>
+      </tbody></table>
+      <p class="text-xs text-muted mt-2">A diferença entre as duas primeiras linhas é o efeito de confirmar. Quando houver ≥ 100 marcações fechadas passa a ser um número em que se pode confiar.</p>`;
+
+    $('#bizWeeks').innerHTML = barRows(m.byWeek.map(w => ({ label: `sem. ${formatDatePT(w.key, { short: true })}`, v: w.bookings, extra: `${eur(w.revenue)} · ${w.noshow} faltas` })), 'v');
+    $('#bizChannels').innerHTML = barRows(m.byChannel.map(c => ({ label: ({ online: 'online (link direto)', admin: 'admin (balcão/telefone)', staff: 'equipa', guest: 'visitante' })[c.key] || c.key.replace('online:', 'online · '), v: c.bookings, extra: eur(c.revenue) })), 'v');
+    $('#bizStaff').innerHTML = barRows(m.byStaff.map(s => ({ label: s.key, v: s.bookings, extra: `${eur(s.revenue)} · ${s.noshow} faltas` })), 'v');
+    $('#bizServices').innerHTML = barRows(m.byService.map(s => ({ label: s.key, v: s.revenue, extra: `${s.bookings}×` })), 'v', eur);
+
+    $('#bizLoading').hidden = true; $('#bizBody').hidden = false;
+  } catch (e) {
+    console.error(e); $('#bizLoading').hidden = true;
+    toastError(friendlyError(e, 'Não foi possível calcular as métricas.'));
+  } finally { bizBusy = false; }
+}
 
 /* ── CLIENTS ─────────────────────────────────────────────── */
 const CLIENTS_PAGE = 200;

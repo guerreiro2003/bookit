@@ -22,7 +22,8 @@ const salon = await loadSalon(SALON);
 const ctx = await loadBookingContext(SALON);
 const service = { id: 'PHsXXzGABGEoeXSwkrJh', name: 'Corte + Brushing', duration: 45, price: 35 };
 const S = ctx.staff[0];   // full-time staff member (others may have day-offs)
-const D1 = (() => { let d = nextOpen(60); while (new Date(d + 'T00:00:00Z').getUTCDay() === 6) d = nextOpen(61); return d; })();
+// first Mon–Fri at least 60 days out (some staff have Saturday off)
+const D1 = (() => { let d = new Date(Date.now() + 60 * 86400000); while ([0, 6].includes(d.getUTCDay())) d = new Date(d.getTime() + 86400000); return d.toISOString().slice(0, 10); })();
 console.log(`\nLinks E2E — ${salon.name} · ${S.name} · ${D1}\n`);
 await signOut(auth);
 
@@ -46,6 +47,7 @@ ok('confirm by token → link status confirmed', (await loadBookingLink({ salonI
 await expectErr('token holder cannot mark completed', () => updateDoc(doc(db, 'salons', SALON, 'bookings', b1.id), { status: 'completed', viaToken: b1.manageToken }), 'permission-denied');
 await expectErr('token holder cannot change price', () => updateDoc(doc(db, 'salons', SALON, 'bookings', b1.id), { finalPrice: 0, viaToken: b1.manageToken }), 'permission-denied');
 await expectErr('public cannot add PII to the link projection', () => updateDoc(doc(db, 'salons', SALON, 'bookingLinks', b1.manageToken), { clientName: 'x', status: 'confirmed' }), 'permission-denied');
+await expectErr('projection cannot lie about status (must match the booking)', () => updateDoc(doc(db, 'salons', SALON, 'bookingLinks', b1.manageToken), { status: 'cancelled', updatedAt: new Date() }), 'permission-denied');
 
 /* cancel far ahead → agenda released */
 ok('agenda holds interval before cancel', (await agendaOf(S.id, D1)).some(iv => iv.bookingId === b1.id));

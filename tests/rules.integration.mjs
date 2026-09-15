@@ -52,13 +52,15 @@ console.log(`\nRules integration — salon=${SALON} service=${service.name} staf
 
 /* ── 1. PUBLIC (unauthenticated) ── */
 console.log('PUBLIC');
-await expectStatus('agenda readable without auth', () => api('GET', `${FS}/salons/${SALON}/agenda?pageSize=1`, null), 200);
+await expectStatus('agenda NOT listable without auth', () => api('GET', `${FS}/salons/${SALON}/agenda?pageSize=1`, null), 403);
 await expectStatus('bookings NOT listable without auth (PII closed)', () => api('GET', `${FS}/salons/${SALON}/bookings?pageSize=1`, null), 403);
 await expectStatus('clients NOT readable without auth', () => runQuery(null, `salons/${SALON}`, 'clients', { fieldFilter: { field: { fieldPath: 'email' }, op: 'EQUAL', value: { stringValue: 'x@x.pt' } } }), 403);
-await expectStatus('referrals readable without auth', () => api('GET', `${FS}/salons/${SALON}/referrals?pageSize=1`, null), 200);
+await expectStatus('referrals NOT listable without auth (codes not enumerable)', () => api('GET', `${FS}/salons/${SALON}/referrals?pageSize=1`, null), 403);
+await expectStatus('bookingLinks NOT listable without auth (tokens not enumerable)', () => api('GET', `${FS}/salons/${SALON}/bookingLinks?pageSize=1`, null), 403);
 
 const agendaId = `${S1.id}__${D1}`;
 await expectStatus('public creates agenda doc with exactly 1 interval', async () => { await createDocument(null, `salons/${SALON}/agenda`, agendaId, agendaDoc(S1.id, D1, [{ start: 600, end: 645, bookingId: 'rt1' }])); created.push(`salons/${SALON}/agenda/${agendaId}`); }, 200);
+await expectStatus('agenda doc GET-able without auth (availability)', () => api('GET', `${FS}/salons/${SALON}/agenda/${agendaId}`, null), 200);
 await expectStatus('public agenda id must match staffId__date', () => createDocument(null, `salons/${SALON}/agenda`, `${S1.id}__${D2}`, agendaDoc(S1.id, D1, [{ start: 600, end: 645, bookingId: 'x' }])), 403);
 await expectStatus('public may add ONE interval', () => patchDocument(null, `salons/${SALON}/agenda/${agendaId}`, agendaDoc(S1.id, D1, [{ start: 600, end: 645, bookingId: 'rt1' }, { start: 660, end: 705, bookingId: 'rt2' }]), { merge: false }), 200);
 await expectStatus('public may NOT add two intervals at once', () => patchDocument(null, `salons/${SALON}/agenda/${agendaId}`, agendaDoc(S1.id, D1, [{ start: 600, end: 645, bookingId: 'rt1' }, { start: 660, end: 705, bookingId: 'rt2' }, { start: 720, end: 765, bookingId: 'a' }, { start: 780, end: 825, bookingId: 'b' }]), { merge: false }), 403);
@@ -136,6 +138,7 @@ await expectStatus('client cannot inflate own points', () => patchDocument(clien
 await expectStatus('client edits own phone', () => patchDocument(client.token, `salons/${SALON}/clients/${client.uid}`, { phone: '912000000' }), 200);
 await expectStatus('client cannot change own email', () => patchDocument(client.token, `salons/${SALON}/clients/${client.uid}`, { email: 'other@x.pt' }), 403);
 await expectStatus('client publishes own referral code', async () => { await createDocument(client.token, `salons/${SALON}/referrals`, 'RULESTEST1', { clientId: client.uid }); created.push(`salons/${SALON}/referrals/RULESTEST1`); }, 200);
+await expectStatus('a typed referral code is GET-able without auth', () => api('GET', `${FS}/salons/${SALON}/referrals/RULESTEST1`, null), 200);
 await expectStatus('client cannot publish a referral for another uid', () => createDocument(client.token, `salons/${SALON}/referrals`, 'RULESTEST2', { clientId: 'someone-else' }), 403);
 
 /* ── 6. TENANT ISOLATION ── */

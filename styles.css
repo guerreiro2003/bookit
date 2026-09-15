@@ -1783,3 +1783,9 @@ kbd {
 @media (max-width: 640px) {
   .appbar__sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 56vw; display: block; }
 }
+
+/* ── BARS (Negócio) ────────────────────────────────────────── */
+.bar { height: 8px; background: var(--bg-2, #eee); border-radius: 999px; overflow: hidden; min-width: 60px; }
+.bar__fill { height: 100%; background: var(--brand); border-radius: 999px; }
+.data-table--compact td { padding: 6px 8px; font-size: var(--text-sm); }
+.text-right { text-align: right; }

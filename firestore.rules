@@ -140,7 +140,8 @@ service cloud.firestore {
 
       /* ───────────── referral codes (public lookup, no PII) ───────────── */
       match /referrals/{code} {
-        allow read: if true;
+        allow get: if true;               // lookup of a code someone typed
+        allow list: if isStaff(salonId);  // never enumerate codes
         allow create: if str(request.resource.data.clientId, 128) && (
           isStaff(salonId) || (isAuth() && request.resource.data.clientId == request.auth.uid)
         );
@@ -150,13 +151,18 @@ service cloud.firestore {
       /* ───────────── booking links: PII-free projection behind an unguessable token ───────────── */
       match /bookingLinks/{token} {
         function noPII() { return !request.resource.data.keys().hasAny(['clientName', 'clientEmail', 'clientPhone', 'clientPhoneE164', 'notes', 'forSomeone']); }
-        allow read: if true;   // the 32-hex token in the URL is the credential
+        // The 32-hex token in the URL is the credential: single-document GET only.
+        // Listing would enumerate every token, so it is staff-only.
+        allow get: if true;
+        allow list: if isStaff(salonId);
         allow create: if noPII() && str(request.resource.data.bookingId, 128)
           && (isStaff(salonId) || planActive(salonId));
+        // A link holder may only mirror the booking's real (post-transaction) status.
         allow update: if noPII() && (
              isStaff(salonId)
           || ( request.resource.data.status in ['pending', 'confirmed', 'cancelled']
-               && changedOnly(['status', 'updatedAt']) )
+               && changedOnly(['status', 'updatedAt'])
+               && getAfter(/databases/$(database)/documents/salons/$(salonId)/bookings/$(resource.data.bookingId)).data.status == request.resource.data.status )
         );
         allow delete: if isAdmin(salonId);
       }
@@ -184,7 +190,8 @@ service cloud.firestore {
               && resource.data.intervals.hasAny([iv])
               && !request.resource.data.intervals.hasAny([iv]);
         }
-        allow read: if true;
+        allow get: if true;               // availability is computed from direct gets (staffId__date)
+        allow list: if isStaff(salonId);
         allow create: if validAgenda() && (isStaff(salonId) || (planActive(salonId) && request.resource.data.intervals.size() == 1));
         allow update: if validAgenda() && (
              isStaff(salonId)
