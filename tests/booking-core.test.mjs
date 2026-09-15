@@ -6,7 +6,38 @@ import {
   canTransition, clientCanCancel, daysBetween,
   isEmail, isPhone, isSlug, validateBookingInput, applyDiscount,
   buildICS, googleCalendarUrl, agendaId, occupiedFromAgenda,
+  normalizePhone, formatPhonePT, randomToken, manageUrl, whatsAppUrl, dateLabelPT, messageText, firstName,
 } from '../booking-core.js';
+
+test('normalizePhone (Portugal-first)', () => {
+  assert.equal(normalizePhone('912 345 678'), '351912345678');
+  assert.equal(normalizePhone('+351 912-345-678'), '351912345678');
+  assert.equal(normalizePhone('00351912345678'), '351912345678');
+  assert.equal(normalizePhone('0034 600 111 222'), '34600111222');
+  assert.equal(normalizePhone('21 000 0000'), '351210000000');
+  assert.equal(normalizePhone('12345'), null);
+  assert.equal(normalizePhone(''), null);
+  assert.equal(formatPhonePT('351912345678'), '912 345 678');
+});
+
+test('tokens, manage url, wa.me url', () => {
+  const t = randomToken(16);
+  assert.match(t, /^[a-f0-9]{32}$/);
+  assert.notEqual(t, randomToken(16));
+  assert.equal(manageUrl('https://x.app/', 'demo', 'abc'), 'https://x.app/m.html?s=demo&t=abc');
+  const u = whatsAppUrl('912 345 678', 'Olá, ok?');
+  assert.equal(u, 'https://wa.me/351912345678?text=Ol%C3%A1%2C%20ok%3F');
+  assert.equal(whatsAppUrl('1', 'x'), null);
+});
+
+test('pt-PT message templates', () => {
+  assert.equal(dateLabelPT('2026-09-17'), 'qui, 17 set');
+  assert.equal(firstName('Ana Maria Silva'), 'Ana');
+  const txt = messageText('confirmRequest', { clientName: 'Ana Silva', salonName: 'Zen', serviceName: 'Corte', dateStr: '2026-09-17', time: '10:00', link: 'https://x/m.html?t=1' });
+  assert.ok(txt.startsWith('Olá Ana!'));
+  assert.ok(txt.includes('*Corte*') && txt.includes('qui, 17 set às 10:00') && txt.includes('Responde *1*') && txt.includes('https://x/m.html?t=1'));
+  assert.ok(messageText('reminder', { clientName: '', salonName: 'Zen', serviceName: 'Corte', dateStr: '2026-09-17', time: '10:00' }).startsWith('Olá! Lembrete'));
+});
 
 const SCHED = {
   monday:    { open: '10:00', close: '19:00', closed: false },
@@ -134,6 +165,7 @@ test('validators', () => {
   const v = validateBookingInput({ name: 'A', email: 'x', phone: '1', date: '2026-02-30', time: '25:00' });
   assert.deepEqual(Object.keys(v.errors).sort(), ['date','email','name','phone','time']);
   assert.equal(validateBookingInput({ name: 'Ana Silva', email: 'ana@x.pt', phone: '912345678', date: MON, time: '10:00' }).ok, true);
+  assert.equal(validateBookingInput({ name: 'Ana Silva', email: '', phone: '+351 912 345 678', date: MON, time: '10:00' }).ok, true, 'email is optional');
 });
 
 test('pricing', () => {

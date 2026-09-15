@@ -188,6 +188,17 @@
         </div>
       </div>
 
+      <div class="card card--accent mb-4" id="confirmCard" hidden>
+        <div class="card__head">
+          <div>
+            <div class="card__title">Por confirmar (hoje e amanhã) <span class="badge badge--amber" id="confirmCount" style="margin-left:6px">0</span></div>
+            <div class="card__sub" id="confirmSub"></div>
+          </div>
+        </div>
+        <p class="text-sm text-muted" style="margin:-4px 0 10px"><strong>💬</strong> abre o WhatsApp com a mensagem pronta e um link para o cliente confirmar ou cancelar sozinho. Registamos quem recebeu pedido e quem confirmou pelo link — é isto que mede a taxa de faltas.</p>
+        <div id="confirmList"></div>
+      </div>
+
       <div class="table-card">
         <div class="table-card__head">
           <div class="card__title">Marcações de hoje</div>
@@ -742,9 +753,13 @@ import {
   debounce, toggleTheme, getTheme, setTheme,
   markBookingPaid, markBookingNoShow, confirmBooking, cancelBooking, restoreBooking, rescheduleBooking,
   createBooking, computeAvailability, minToTime, timeToMin, isValidDateStr, BLOCKING_STATUSES,
+  whatsAppFor, markMessageSent, addDaysStr, formatRelativeTime,
   downloadCSV, subscribe, trapFocus,
   isEmail, isPhone, isHexColor
 } from './app.js';
+
+/** Bookings currently known to this page, by id (dashboard, list, day filter). */
+const bookingIndex = new Map();
 
 /** Booking-engine context (schedule + active staff) kept in sync with the panels. */
 const bookingCtx = { schedule: null, staff: [] };
@@ -1009,6 +1024,8 @@ function subscribeBookings() {
   const q = query(collection(db,'salons',salonId,'bookings'), orderBy('date','desc'), limit(500));
   unsubBookings = onSnapshot(q, snap => {
     cachedBookings = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    cachedBookings.forEach(b => bookingIndex.set(b.id, b));
+    renderConfirmations();
     if ($('#panel-bookings').classList.contains('active')) loadBookings();
   });
 }
@@ -1067,13 +1084,26 @@ async function loadBookings() {
         <td>${b.serviceName}</td>
         <td class="text-muted">${b.staffName || '—'}</td>
         <td class="tabular">${formatPrice(b.finalPrice ?? b.servicePrice)}${b.referralDiscount ? raw(htmlMix`<br><span class="text-xs" style="color:var(--brand)">-${b.referralDiscount}%</span>`) : ''}</td>
-        <td>${raw(statusBadge(b.status))}${b.paid ? raw(' <span class="badge badge--green">Pago</span>') : ''}</td>
+        <td>${raw(statusBadge(b.status))}${b.paid ? raw(' <span class="badge badge--green">Pago</span>') : ''} ${raw(commsBadges(b))}</td>
         <td class="actions">${raw(bookingActions(b))}</td>
       </tr>`).join('')}</tbody></table></div>`;
 }
 
+function commsBadges(b) {
+  const bits = [];
+  if (b.confirmedVia === 'link') bits.push('<span class="badge badge--green">✓ link</span>');
+  else if (b.status === 'pending' && b.confirmRequestedAt) bits.push(`<span class="badge badge--amber" title="Pedido de confirmação enviado">pedido ${escapeHTML(formatRelativeTime(b.confirmRequestedAt))}</span>`);
+  if (b.reminderSentAt) bits.push(`<span class="badge badge--gray" title="Lembrete enviado">lembrete</span>`);
+  if (b.channel) bits.push(`<span class="badge badge--gray">${escapeHTML(b.channel)}</span>`);
+  return bits.join(' ');
+}
+
 function bookingActions(b) {
+  bookingIndex.set(b.id, b);
   const btns = [];
+  const upcoming = ['pending','confirmed'].includes(b.status) && b.date >= todayForSalon(salon);
+  if (upcoming && (b.clientPhoneE164 || b.clientPhone))
+    btns.push(htmlMix`<button class="btn btn--sm" type="button" data-action="wa-message" data-id="${b.id}" title="Abrir WhatsApp com a mensagem pronta">💬</button>`);
   if (b.status === 'pending')
     btns.push(htmlMix`<button class="btn btn--sm btn--success" type="button" data-action="confirm-booking" data-id="${b.id}">Confirmar</button>`);
   if (!b.paid && !['cancelled','noshow'].includes(b.status))
@@ -1091,6 +1121,35 @@ on('confirm-booking', withLock('confirm', async (el) => {
   try { await confirmBooking({ salonId, bookingId: el.dataset.id }); toastSuccess('Marcação confirmada.'); }
   catch (e) { console.error(e); toastError(friendlyError(e)); }
 }));
+
+on('wa-message', async (el) => {
+  const b = bookingIndex.get(el.dataset.id);
+  if (!b) return;
+  const today = todayForSalon(salon), tomorrow = addDaysStr(today, 1);
+  const kind = b.status === 'pending' ? 'confirmRequest' : b.date === today ? 'reminderToday' : b.date === tomorrow ? 'reminder' : 'info';
+  const msg = whatsAppFor({ salon: { ...salon, id: salonId }, booking: { ...b, salonId }, kind });
+  if (!msg) return toastError('Sem número de telemóvel válido nesta marcação.');
+  window.open(msg.url, '_blank', 'noopener');
+  try { await markMessageSent({ salonId, bookingId: b.id, kind }); } catch (e) { console.error(e); }
+});
+
+/* Dashboard: who still needs a confirmation request for today/tomorrow. */
+function renderConfirmations() {
+  const el = $('#confirmList'); if (!el) return;
+  const today = todayForSalon(salon), tomorrow = addDaysStr(today, 1);
+  const rows = cachedBookings.filter(b => b.status === 'pending' && (b.date === today || b.date === tomorrow)).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+  $('#confirmCard').hidden = rows.length === 0;
+  $('#confirmCount').textContent = rows.length;
+  $('#confirmSub').textContent = rows.length ? `${rows.filter(b => b.confirmRequestedAt).length} de ${rows.length} já com pedido enviado` : '';
+  el.innerHTML = rows.map(b => htmlMix`
+    <div class="row-card">
+      <div class="row-card__main">
+        <div class="row-card__title"><span class="row-card__date">${raw(relativeDay(b.date))}</span> <strong>${b.time}</strong> <span class="row-card__dot" aria-hidden="true">·</span> ${b.serviceName}</div>
+        <div class="row-card__meta">${b.clientName}${b.clientPhone ? ' · ' + b.clientPhone : ''}${b.staffName ? ' · ' + b.staffName : ''} ${raw(commsBadges(b))}</div>
+      </div>
+      <div class="row-card__side"><div class="row-card__actions">${raw(bookingActions(b))}</div></div>
+    </div>`).join('');
+}
 
 on('cancel-booking', withLock('cancel', async (el) => {
   const id = el.dataset.id;

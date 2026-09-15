@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.0 — 2026-09-15 · Movimento 1 (custo zero): rail de confirmação + origem
+
+- **Links de capacidade** por marcação (`manageToken`, projeção sem PII em `bookingLinks/{token}`): o cliente confirma ou cancela em `m.html` sem conta; as regras validam o token e libertam o horário atomicamente (`getAfter`), respeitando a janela de cancelamento.
+- **WhatsApp manual com mensagem pronta** (wa.me) no portal da equipa e no admin, com o link embebido; cartão "Por confirmar (hoje e amanhã)"; registo de `confirmRequestedAt` / `reminderSentAt` / `confirmedVia` para medir cobertura de confirmações.
+- **Telefone como identidade**: `clientPhoneE164` normalizado, email opcional na marcação online (regras + formulário); clientes resolvidos por telefone antes de email ao registar pagamento.
+- **Origem** de cada marcação (`channel` via `?src=`; o site do Zen envia `src=site`).
+- Página de sucesso mostra o link de gestão. Testes: `tests/links.e2e.mjs` (17), unit 17, rules 61, engine 33.
+
 ## 2.0.0 — 2026-09-15 · Production hardening (commercial release)
 
 ### Motor de marcações

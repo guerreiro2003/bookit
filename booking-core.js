@@ -184,8 +184,9 @@ export const clampStr = (v, max) => String(v ?? '').trim().slice(0, max);
 export function validateBookingInput({ name, email, phone, date, time, notes, forSomeone }) {
   const errors = {};
   if (!clampStr(name, 80) || clampStr(name, 80).length < 2) errors.name = 'Indica o teu nome.';
-  if (!isEmail(email)) errors.email = 'Email inválido.';
-  if (!isPhone(phone)) errors.phone = 'Telemóvel inválido (9 a 15 dígitos).';
+  // Portugal-first: the phone is the identity (WhatsApp); email is optional but must be valid if given.
+  if (String(email ?? '').trim() && !isEmail(email)) errors.email = 'Email inválido.';
+  if (!normalizePhone(phone)) errors.phone = 'Telemóvel inválido (ex.: 912 345 678).';
   if (!isValidDateStr(date)) errors.date = 'Data inválida.';
   if (timeToMin(time) == null) errors.time = 'Hora inválida.';
   if (notes && String(notes).length > 500) errors.notes = 'Notas demasiado longas (máx. 500).';
@@ -232,4 +233,66 @@ export function occupiedFromAgenda(agendaData, excludeBookingId = null) {
   return (agendaData?.intervals || [])
     .filter(iv => iv && iv.bookingId !== excludeBookingId)
     .map(iv => ({ start: iv.start, end: iv.end }));
+}
+
+/* ── Phone (Portugal-first, E.164 digits without '+') ─────── */
+/**
+ * "912 345 678" → "351912345678"; "+351 21 000 0000" → "351210000000";
+ * "0034 600..." → "34600...". Returns null when it can't be a real number.
+ */
+export function normalizePhone(raw, defaultCountry = '351') {
+  let d = String(raw ?? '').trim().replace(/[^\d+]/g, '');
+  if (!d) return null;
+  if (d.startsWith('00')) d = d.slice(2);
+  else if (d.startsWith('+')) d = d.slice(1);
+  else if (d.length === 9) d = defaultCountry + d;          // national PT number
+  else if (d.startsWith('0') && d.length === 10) d = defaultCountry + d.slice(1);
+  if (!/^\d{10,15}$/.test(d)) return null;
+  return d;
+}
+export function formatPhonePT(e164) {
+  const d = String(e164 || '');
+  if (d.startsWith('351') && d.length === 12) return `${d.slice(3, 6)} ${d.slice(6, 9)} ${d.slice(9)}`;
+  return d ? '+' + d : '';
+}
+
+/* ── Capability links & WhatsApp ─────────────────────────── */
+export function randomToken(bytes = 16) {
+  const a = new Uint8Array(bytes);
+  globalThis.crypto.getRandomValues(a);
+  return Array.from(a, b => b.toString(16).padStart(2, '0')).join('');
+}
+export const manageUrl = (baseUrl, salonId, token) => `${baseUrl.replace(/\/$/, '')}/m.html?s=${encodeURIComponent(salonId)}&t=${encodeURIComponent(token)}`;
+export function whatsAppUrl(phone, text) {
+  const p = normalizePhone(phone);
+  if (!p) return null;
+  return `https://wa.me/${p}?text=${encodeURIComponent(text)}`;
+}
+export const firstName = (n) => String(n || '').trim().split(/\s+/)[0] || '';
+const WD_PT = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+const MO_PT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+/** "qui, 17 set" — short, human, no year. */
+export function dateLabelPT(dateStr) {
+  if (!isValidDateStr(dateStr)) return dateStr || '';
+  const [, m, d] = dateStr.split('-').map(Number);
+  return `${WD_PT[weekdayOf(dateStr)]}, ${d} ${MO_PT[m - 1]}`;
+}
+/** Message templates (pt-PT). `kind`: confirmRequest | reminder | reminderToday. Keep them short: they are read on a phone. */
+export function messageText(kind, { clientName, salonName, serviceName, dateStr, time, link }) {
+  const n = firstName(clientName);
+  const hi = n ? `Olá ${n}! ` : 'Olá! ';
+  const when = `${dateLabelPT(dateStr)} às ${time}`;
+  const tail = link ? `\nConfirmar ou alterar: ${link}` : '';
+  switch (kind) {
+    case 'confirmRequest':
+      return `${hi}Aqui é do ${salonName} 👋 Confirmas a tua marcação de *${serviceName}* para *${when}*? Responde *1* para confirmar.${tail}`;
+    case 'reminder':
+      return `${hi}Lembrete do ${salonName}: *${serviceName}* amanhã, *${when}*. Se precisares de alterar, diz-nos com antecedência.${tail}\nAté já! ✂️`;
+    case 'reminderToday':
+      return `${hi}É hoje! *${serviceName}* às *${time}* no ${salonName}.${tail}\nAté já! ✂️`;
+    case 'freeSlot':
+      return `${hi}Surgiu uma vaga no ${salonName}: *${serviceName}*, *${when}*. Queres? Responde *1* e é tua.${tail}`;
+    default:
+      return `${hi}${salonName}: ${serviceName}, ${when}.${tail}`;
+  }
 }

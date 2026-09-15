@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="theme-color" content="#ffffff" />
+  <title>A tua marcação — Book It</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <noscript><div class="noscript-banner"><div class="noscript-banner__inner"><h1>JavaScript necessário</h1><p>Ativa o JavaScript para gerir a tua marcação.</p></div></div></noscript>
+
+  <header class="appbar">
+    <div class="appbar__inner">
+      <a class="appbar__brand" href="index.html" aria-label="Página inicial" id="brandLink">
+        <div class="appbar__mark" id="headerMark" aria-hidden="true">B</div>
+        <div><div class="appbar__name" id="headerName">Book It</div><div class="appbar__sub" id="headerSub">Marcações</div></div>
+      </a>
+    </div>
+  </header>
+
+  <main>
+    <div class="container" style="padding: var(--s-8) 0 var(--s-10); max-width: 560px">
+      <div id="loading" class="loading-state"><span class="spinner spinner--lg" aria-hidden="true"></span><div class="mt-3">A carregar a tua marcação…</div></div>
+
+      <section id="view" hidden>
+        <p class="eyebrow" style="margin-bottom: var(--s-2)">A tua marcação</p>
+        <h1 class="section-title" id="title">—</h1>
+        <p class="section-sub" id="statusLine">—</p>
+
+        <div class="card mb-3">
+          <table class="kv-table" aria-label="Detalhes">
+            <tbody>
+              <tr><td class="label">Serviço</td><td class="value" id="rService">—</td></tr>
+              <tr><td class="label">Colaborador</td><td class="value" id="rStaff">—</td></tr>
+              <tr><td class="label">Data</td><td class="value" id="rDate">—</td></tr>
+              <tr><td class="label">Hora</td><td class="value tabular" id="rTime">—</td></tr>
+              <tr><td class="label">Estado</td><td class="value" id="rStatus">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div id="actions" class="btn-group--full mb-3" style="flex-direction:column; gap: 8px">
+          <button class="btn btn--primary btn--lg btn--full" type="button" id="btnConfirm" data-action="confirm" hidden>✓ Confirmar presença</button>
+          <button class="btn btn--full" type="button" data-action="ics">📅 Adicionar ao calendário</button>
+          <a class="btn btn--full" id="gcal" href="#" target="_blank" rel="noopener">Google Calendar</a>
+          <button class="btn btn--danger btn--full" type="button" id="btnCancel" data-action="cancel" hidden>Cancelar marcação</button>
+        </div>
+        <p class="text-sm text-muted" id="policy"></p>
+        <p class="text-sm text-muted mt-2" id="salonContact"></p>
+        <a class="btn btn--ghost btn--full mt-4" id="newLink" href="index.html">Fazer nova marcação</a>
+      </section>
+
+      <section id="missing" hidden class="error-state">
+        <div class="error-state__icon">🔗</div>
+        <div class="error-state__title">Link inválido ou expirado</div>
+        <div class="error-state__desc">Não encontrámos esta marcação. Contacta o salão ou faz uma nova marcação.</div>
+        <a class="btn btn--primary mt-3" id="missingNew" href="index.html">Nova marcação</a>
+      </section>
+    </div>
+  </main>
+
+<script type="module">
+import {
+  $, on, toastSuccess, toastError, friendlyError, escapeHTML,
+  getSalonId, loadSalon, applySalonBranding, loadBookingLink, confirmBookingByToken, cancelBookingByToken,
+  clientCanCancel, salonSetting, nowInTimezone, buildICS, googleCalendarUrl, MONTHS_FULL, STATUS_LABELS, withLock,
+} from './app.js';
+
+const p = new URLSearchParams(location.search);
+const salonId = p.get('s') || getSalonId();
+const token = (p.get('t') || '').trim();
+let salon = null, link = null;
+
+const fmtDate = (d) => { const [y, m, dd] = d.split('-').map(Number); return `${dd} de ${MONTHS_FULL[m - 1]} de ${y}`; };
+const qs = `?salon=${encodeURIComponent(salonId)}`;
+$('#newLink').href = `index.html${qs}`; $('#missingNew').href = `index.html${qs}`; $('#brandLink').href = `index.html${qs}`;
+
+async function load() {
+  try {
+    salon = await loadSalon(salonId);
+    if (salon) applySalonBranding(salon, { titlePrefix: 'A tua marcação' });
+    link = /^[a-f0-9]{16,64}$/.test(token) ? await loadBookingLink({ salonId, token }) : null;
+    $('#loading').hidden = true;
+    if (!salon || !link) { $('#missing').hidden = false; return; }
+    render();
+  } catch (e) { console.error(e); $('#loading').hidden = true; $('#missing').hidden = false; }
+}
+
+function render() {
+  $('#view').hidden = false;
+  $('#rService').textContent = link.serviceName || '—';
+  $('#rStaff').textContent = link.staffName || '—';
+  $('#rDate').textContent = fmtDate(link.date);
+  $('#rTime').textContent = link.time;
+  $('#rStatus').textContent = STATUS_LABELS[link.status] || link.status;
+  const upcoming = ['pending', 'confirmed'].includes(link.status);
+  const policy = clientCanCancel({ booking: { status: link.status, date: link.date, time: link.time }, cancellationHours: salonSetting(salon, 'cancellationHours'), now: nowInTimezone(salonSetting(salon, 'timezone')) });
+  $('#title').textContent = link.status === 'pending' ? 'Confirmas a tua presença?' : link.status === 'confirmed' ? 'Está confirmada. Até já!' : link.status === 'cancelled' ? 'Marcação cancelada' : 'Marcação concluída';
+  $('#statusLine').textContent = link.status === 'pending'
+    ? `${salon.name} pede-te para confirmares esta marcação.`
+    : link.status === 'confirmed' ? `Obrigado por confirmares. Se não puderes vir, avisa com antecedência.` : '';
+  $('#btnConfirm').hidden = link.status !== 'pending';
+  $('#btnCancel').hidden = !(upcoming && policy.ok);
+  $('#policy').textContent = upcoming
+    ? (policy.ok ? `Podes cancelar online até ${salonSetting(salon, 'cancellationHours')}h antes da hora marcada.` : `Já não é possível cancelar online (menos de ${salonSetting(salon, 'cancellationHours')}h). Contacta o salão.`)
+    : '';
+  $('#salonContact').textContent = [salon.name, salon.phone, salon.address].filter(Boolean).join(' · ');
+  const title = `${link.serviceName} · ${salon.name}`;
+  $('#gcal').href = googleCalendarUrl({ title, details: link.staffName ? `Com ${link.staffName}` : '', location: salon.address || '', dateStr: link.date, time: link.time, durationMin: link.serviceDuration || 30, tz: salonSetting(salon, 'timezone') });
+  $('#gcal').hidden = !upcoming;
+  document.querySelector('[data-action="ics"]').hidden = !upcoming;
+}
+
+on('confirm', withLock('confirm', async () => {
+  $('#btnConfirm').disabled = true;
+  try { await confirmBookingByToken({ salonId, token }); link.status = 'confirmed'; render(); toastSuccess('Presença confirmada. Obrigado!'); }
+  catch (e) { console.error(e); toastError(friendlyError(e, 'Não foi possível confirmar. Contacta o salão.')); $('#btnConfirm').disabled = false; }
+}));
+
+on('cancel', withLock('cancel', async () => {
+  if (!confirm('Cancelar esta marcação? O horário fica livre para outra pessoa.')) return;
+  $('#btnCancel').disabled = true;
+  try { await cancelBookingByToken({ salonId, salon, token }); link.status = 'cancelled'; render(); toastSuccess('Marcação cancelada.'); }
+  catch (e) { console.error(e); toastError(friendlyError(e, 'Não foi possível cancelar. Contacta o salão.')); $('#btnCancel').disabled = false; }
+}));
+
+on('ics', () => {
+  const ics = buildICS({ uid: `${link.bookingId}@bookit`, title: `${link.serviceName} · ${salon.name}`, description: link.staffName ? `Com ${link.staffName}` : '', location: salon.address || '', dateStr: link.date, time: link.time, durationMin: link.serviceDuration || 30, tz: salonSetting(salon, 'timezone'), url: location.href });
+  const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
+  const a = document.createElement('a'); a.href = url; a.download = 'marcacao.ics'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+});
+
+load();
+</script>
+</body>
+</html>

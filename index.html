@@ -115,12 +115,13 @@
             <input type="text" id="clientName" required autocomplete="name" maxlength="80" placeholder="O teu nome" />
           </div>
           <div class="field">
-            <label for="clientEmail">Email *</label>
-            <input type="email" id="clientEmail" required autocomplete="email" maxlength="120" placeholder="email@exemplo.com" />
+            <label for="clientPhone">Telemóvel *</label>
+            <input type="tel" id="clientPhone" required autocomplete="tel" inputmode="tel" maxlength="20" placeholder="912 345 678" />
+            <div class="field__hint">Usamos o WhatsApp para confirmar a marcação.</div>
           </div>
           <div class="field">
-            <label for="clientPhone">Telemóvel *</label>
-            <input type="tel" id="clientPhone" required autocomplete="tel" maxlength="20" placeholder="912 345 678" />
+            <label for="clientEmail">Email <span class="text-muted text-sm" style="font-weight:400">(opcional)</span></label>
+            <input type="email" id="clientEmail" autocomplete="email" maxlength="120" placeholder="email@exemplo.com" />
           </div>
           <div class="field">
             <label for="forSomeone">Esta marcação é para outra pessoa? <span class="text-muted text-sm" style="font-weight:400">(opcional)</span></label>
@@ -173,8 +174,8 @@
               <tr><td class="label">Preço</td><td class="value tabular" id="confirmPrice">—</td></tr>
               <tr><td class="label">Nome</td><td class="value" id="confirmName">—</td></tr>
               <tr id="confirmForRow" hidden><td class="label">Para</td><td class="value" id="confirmFor">—</td></tr>
-              <tr><td class="label">Email</td><td class="value" id="confirmEmail">—</td></tr>
               <tr><td class="label">Telemóvel</td><td class="value tabular" id="confirmPhone">—</td></tr>
+              <tr id="confirmEmailRow"><td class="label">Email</td><td class="value" id="confirmEmail">—</td></tr>
             </tbody>
           </table>
         </div>
@@ -225,6 +226,8 @@ const state = {
   discount: null,                                // { type, code, percent, title }
   authUser: null, clientData: null,
   slotsToken: 0,
+  // Acquisition channel: ?src=ig|google|qr|wa|site … recorded on the booking (measure where clients come from)
+  channel: (new URLSearchParams(window.location.search).get('src') || '').replace(/[^a-z0-9_-]/gi, '').slice(0, 40) || null,
 };
 
 (async function init() {
@@ -461,7 +464,9 @@ function fillConfirmation() {
   $('#confirmTime').textContent = minToTime(state.selectedStart);
   $('#confirmDuration').textContent = `${s.duration} min`;
   $('#confirmName').textContent = $('#clientName').value.trim();
-  $('#confirmEmail').textContent = $('#clientEmail').value.trim();
+  const emailVal = $('#clientEmail').value.trim();
+  $('#confirmEmailRow').hidden = !emailVal;
+  $('#confirmEmail').textContent = emailVal;
   $('#confirmPhone').textContent = $('#clientPhone').value.trim();
   $('#confirmStaff').textContent = state.selectedStaff ? state.selectedStaff.name : 'Sem preferência (atribuído automaticamente)';
   const forName = $('#forSomeone').value.trim();
@@ -511,7 +516,7 @@ on('submit-booking', withLock('submit-booking', async () => {
     const res = await createBooking({
       salonId: state.salonId, salon: state.salon, ctx: state.ctx, service: state.selectedService,
       staff: state.selectedStaff, dateStr: state.selectedDate, startMin: state.selectedStart,
-      client, discount: state.discount, source: 'online',
+      client, discount: state.discount, source: 'online', channel: state.channel,
     });
     // Personal coupon → mark used (owner may shrink/flag their own coupons)
     if (state.discount && state.discount.type !== 'referral' && state.clientData) {
@@ -521,6 +526,7 @@ on('submit-booking', withLock('submit-booking', async () => {
     const params = new URLSearchParams({
       salon: state.salonId, id: res.id, service: state.selectedService.name, date: state.selectedDate, time: res.time,
       duration: String(state.selectedService.duration), price: String(res.finalPrice), name: clampStr(client.name, 80), staff: res.staff.name,
+      t: res.manageToken,
     });
     window.location.href = `success.html?${params.toString()}`;
   } catch (e) {

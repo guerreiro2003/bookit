@@ -4,13 +4,14 @@
 
 import {
   db, auth, doc, getDoc, getDocs, collection, query, where, limit, increment, serverTimestamp,
-  runTransaction, onSnapshot
+  runTransaction, onSnapshot, updateDoc, writeBatch
 } from './firebase.js';
 import {
   timeToMin, minToTime, isValidDateStr, nowInTimezone, resolveDayWindow, generateSlots, checkSlot,
   canTransition, clientCanCancel, BLOCKING_STATUSES, occupiedFromAgenda, agendaId,
   isEmail, isPhone, isHexColor, isSlug, clampStr, validateBookingInput, applyDiscount,
   buildICS, googleCalendarUrl, addDaysStr, weekdayOf, WEEKDAY_KEYS as CORE_WEEKDAY_KEYS,
+  normalizePhone, formatPhonePT, randomToken, manageUrl, whatsAppUrl, firstName, dateLabelPT, messageText,
 } from './booking-core.js';
 
 // Re-export the pure core so pages import everything from one place.
@@ -19,7 +20,12 @@ export {
   canTransition, clientCanCancel, BLOCKING_STATUSES, occupiedFromAgenda, agendaId,
   isEmail, isPhone, isHexColor, isSlug, clampStr, validateBookingInput, applyDiscount,
   buildICS, googleCalendarUrl, addDaysStr, weekdayOf,
+  normalizePhone, formatPhonePT, randomToken, manageUrl, whatsAppUrl, firstName, dateLabelPT, messageText,
 };
+
+/** Public origin of the app (for links sent to clients). */
+export const APP_BASE_URL = (typeof window !== 'undefined' && window.location?.origin && !window.location.origin.startsWith('file:'))
+  ? window.location.origin : 'https://bookit-51575.web.app';
 
 /* ── Salon defaults (single source of truth for tunables) ── */
 export const SALON_DEFAULTS = {
@@ -401,8 +407,29 @@ export function throttle(fn, wait = 200) {
    ============================================================ */
 
 const agendaRef = (salonId, staffId, dateStr) => doc(db, 'salons', salonId, 'agenda', agendaId(staffId, dateStr));
+const linkRef = (salonId, token) => doc(db, 'salons', salonId, 'bookingLinks', token);
 
 function err(code, extra) { const e = new Error(code); e.code = code; Object.assign(e, extra || {}); return e; }
+
+/**
+ * bookingLinks/{token} is a PII-free projection of a booking, readable only by
+ * whoever holds the unguessable token (capability URL). It powers m.html: the
+ * client confirms / cancels / adds to calendar without an account. Kept in sync
+ * by every helper that changes status, date, time or staff.
+ */
+function linkProjection(salonId, bookingId, b) {
+  return {
+    salonId, bookingId,
+    serviceName: b.serviceName, serviceDuration: b.serviceDuration,
+    staffId: b.staffId, staffName: b.staffName,
+    date: b.date, time: b.time, startMin: b.startMin, endMin: b.endMin,
+    status: b.status, updatedAt: serverTimestamp(),
+  };
+}
+function syncLink(tx, salonId, b, patch) {
+  if (!b?.manageToken) return; // legacy booking without a link
+  tx.set(linkRef(salonId, b.manageToken), { ...patch, updatedAt: serverTimestamp() }, { merge: true });
+}
 
 /** Load what the booking engine needs for a salon (schedule + active staff). */
 export async function loadBookingContext(salonId) {
@@ -455,7 +482,7 @@ export async function computeAvailability({ salonId, salon, ctx, service, staff,
  * candidate free at that time is assigned — so every booking ends up with a real
  * staff member and the agenda stays consistent.
  */
-export async function createBooking({ salonId, salon, ctx, service, staff, dateStr, startMin, client, discount, source = 'online', status = 'pending' }) {
+export async function createBooking({ salonId, salon, ctx, service, staff, dateStr, startMin, client, discount, source = 'online', status = 'pending', channel = null }) {
   if (!isValidDateStr(dateStr)) throw err('invalid-date');
   if (!(service && service.id && service.duration > 0)) throw err('invalid-service');
   const duration = Number(service.duration);
@@ -471,6 +498,8 @@ export async function createBooking({ salonId, salon, ctx, service, staff, dateS
 
   const bookingRef = doc(collection(db, 'salons', salonId, 'bookings'));
   const finalPrice = discount?.percent ? applyDiscount(service.price, discount.percent) : Number(service.price);
+  const manageToken = randomToken(16);
+  const phoneE164 = normalizePhone(client.phone);
 
   try {
     return await runCreateTx();
@@ -516,10 +545,11 @@ export async function createBooking({ salonId, salon, ctx, service, staff, dateS
     if (chosenSnap.exists()) tx.update(aRef, { intervals: [...(chosenSnap.data().intervals || []), interval], updatedAt: serverTimestamp() });
     else tx.set(aRef, { staffId: chosen.id, date: dateStr, intervals: [interval], updatedAt: serverTimestamp() });
 
-    tx.set(bookingRef, {
+    const bookingDoc = {
       salonId,
       clientId: client.id || null,
-      clientName: clampStr(client.name, 80), clientEmail: clampStr(client.email, 120).toLowerCase(), clientPhone: clampStr(client.phone, 20),
+      clientName: clampStr(client.name, 80), clientEmail: clampStr(client.email, 120).toLowerCase(),
+      clientPhone: clampStr(client.phone, 20), clientPhoneE164: phoneE164,
       forSomeone: client.forSomeone ? clampStr(client.forSomeone, 80) : null,
       notes: clampStr(client.notes, 500),
       serviceId: service.id, serviceName: service.name, serviceDuration: duration, servicePrice: Number(service.price),
@@ -529,11 +559,68 @@ export async function createBooking({ salonId, salon, ctx, service, staff, dateS
       referralDiscount: discount?.percent || 0,
       staffId: chosen.id, staffName: chosen.name, staffPreference: staff ? 'chosen' : 'any',
       date: dateStr, time: minToTime(startMin), startMin, endMin: startMin + duration,
-      status, paid: false, source,
+      status, paid: false, source, channel: channel ? clampStr(channel, 40) : null,
+      manageToken,
+      confirmedAt: status === 'confirmed' ? serverTimestamp() : null, confirmedVia: status === 'confirmed' ? source : null,
+      confirmRequestedAt: null, reminderSentAt: null,
       createdAt: serverTimestamp(),
-    });
-    return { id: bookingRef.id, staff: chosen, time: minToTime(startMin), finalPrice };
+    };
+    tx.set(bookingRef, bookingDoc);
+    tx.set(linkRef(salonId, manageToken), linkProjection(salonId, bookingRef.id, bookingDoc));
+    return { id: bookingRef.id, staff: chosen, time: minToTime(startMin), finalPrice, manageToken };
   }); }
+}
+
+/* ── Capability-link flows (no login; the token IS the credential) ── */
+export async function loadBookingLink({ salonId, token }) {
+  const s = await getDoc(linkRef(salonId, token));
+  return s.exists() ? { token, ...s.data() } : null;
+}
+/** Client confirms from m.html. Rules: token must match, pending → confirmed only. */
+export async function confirmBookingByToken({ salonId, token }) {
+  const l = await loadBookingLink({ salonId, token });
+  if (!l) throw err('booking-not-found');
+  if (l.status === 'confirmed') return { alreadyConfirmed: true };
+  if (l.status !== 'pending') throw err('invalid-transition');
+  const batch = writeBatch(db);
+  batch.update(doc(db, 'salons', salonId, 'bookings', l.bookingId), { status: 'confirmed', confirmedAt: serverTimestamp(), confirmedVia: 'link', viaToken: token });
+  batch.update(linkRef(salonId, token), { status: 'confirmed', updatedAt: serverTimestamp() });
+  await batch.commit();
+  return { ok: true };
+}
+/** Client cancels from m.html within the salon's policy. Frees the agenda atomically. */
+export async function cancelBookingByToken({ salonId, salon, token }) {
+  const l = await loadBookingLink({ salonId, token });
+  if (!l) throw err('booking-not-found');
+  if (!BLOCKING_STATUSES.includes(l.status)) throw err('invalid-transition');
+  const policy = clientCanCancel({ booking: { status: l.status, date: l.date, time: l.time }, cancellationHours: salonSetting(salon, 'cancellationHours'), now: nowInTimezone(salonSetting(salon, 'timezone')) });
+  if (!policy.ok) throw err(policy.reason === 'too-late' ? 'cancel-too-late' : 'invalid-transition');
+  const aRef = agendaRef(salonId, l.staffId, l.date);
+  return await runTransaction(db, async (tx) => {
+    const aSnap = await tx.get(aRef);                 // agenda is public-read; the booking itself is not
+    const intervals = (aSnap.exists() ? aSnap.data().intervals || [] : []).filter(iv => iv.bookingId !== l.bookingId);
+    tx.update(doc(db, 'salons', salonId, 'bookings', l.bookingId), { status: 'cancelled', cancelledAt: serverTimestamp(), cancelledBy: 'client-link', viaToken: token });
+    if (aSnap.exists()) tx.update(aRef, { intervals, viaToken: token, viaBookingId: l.bookingId, updatedAt: serverTimestamp() });
+    tx.update(linkRef(salonId, token), { status: 'cancelled', updatedAt: serverTimestamp() });
+    return { ok: true };
+  });
+}
+
+/* ── WhatsApp (manual, zero cost): message + wa.me link, and tracking ── */
+/**
+ * Builds the text and wa.me URL for a booking. `kind`: confirmRequest | reminder | reminderToday | freeSlot.
+ * Returns null when the booking has no usable phone.
+ */
+export function whatsAppFor({ salon, booking, kind, baseUrl = APP_BASE_URL }) {
+  const link = booking.manageToken ? manageUrl(baseUrl, booking.salonId || salon.id, booking.manageToken) : `${baseUrl}/account.html?salon=${encodeURIComponent(booking.salonId || salon.id)}`;
+  const text = messageText(kind, { clientName: booking.clientName, salonName: salon.name, serviceName: booking.serviceName, dateStr: booking.date, time: booking.time, link });
+  const url = whatsAppUrl(booking.clientPhoneE164 || booking.clientPhone, text);
+  return url ? { text, url } : null;
+}
+/** Staff/admin pressed "WhatsApp": record it so we can measure confirmation and reminder coverage. */
+export async function markMessageSent({ salonId, bookingId, kind }) {
+  const field = kind === 'confirmRequest' ? 'confirmRequestedAt' : kind === 'freeSlot' ? 'offerSentAt' : 'reminderSentAt';
+  await updateDoc(doc(db, 'salons', salonId, 'bookings', bookingId), { [field]: serverTimestamp(), lastMessageKind: kind });
 }
 
 /** Remove a booking's interval from its agenda doc (inside a transaction). */
@@ -560,6 +647,7 @@ export async function cancelBooking({ salonId, bookingId, by = 'salon', enforceP
     // writes
     tx.update(bRef, { status: 'cancelled', previousStatus: b.status, cancelledAt: serverTimestamp(), cancelledBy: by });
     if (aRef) releaseInterval(tx, aSnap, aRef, bookingId);
+    syncLink(tx, salonId, b, { status: 'cancelled' });
     return { ok: true, previousStatus: b.status };
   });
 }
@@ -582,6 +670,7 @@ export async function restoreBooking({ salonId, bookingId, toStatus = null }) {
     if (aSnap.exists()) tx.update(aRef, { intervals: [...(aSnap.data().intervals || []).filter(i => i.bookingId !== bookingId), interval], updatedAt: serverTimestamp() });
     else tx.set(aRef, { staffId: b.staffId, date: b.date, intervals: [interval], updatedAt: serverTimestamp() });
     tx.update(bRef, { status: target, cancelledAt: null, cancelledBy: null, previousStatus: null, restoredAt: serverTimestamp() });
+    syncLink(tx, salonId, b, { status: target });
     return { ok: true, status: target };
   });
 }
@@ -622,7 +711,10 @@ export async function rescheduleBooking({ salonId, salon, ctx, bookingId, newDat
       date: newDate, time: minToTime(newStartMin), startMin: newStartMin, endMin: newStartMin + duration,
       staffId: staff.id, staffName: staff.name,
       rescheduledFrom: { date: b.date, time: b.time, staffId: b.staffId }, rescheduledAt: serverTimestamp(),
+      // a moved appointment must be re-confirmed by the client
+      ...(b.status === 'confirmed' && b.confirmedVia === 'link' ? {} : {}),
     });
+    syncLink(tx, salonId, b, { date: newDate, time: minToTime(newStartMin), startMin: newStartMin, endMin: newStartMin + duration, staffId: staff.id, staffName: staff.name });
     return { ok: true };
   });
 }
@@ -634,7 +726,8 @@ export async function confirmBooking({ salonId, bookingId }) {
     const bSnap = await tx.get(bRef);
     if (!bSnap.exists()) throw err('booking-not-found');
     if (!canTransition(bSnap.data().status, 'confirmed')) throw err('invalid-transition');
-    tx.update(bRef, { status: 'confirmed', confirmedAt: serverTimestamp() });
+    tx.update(bRef, { status: 'confirmed', confirmedAt: serverTimestamp(), confirmedVia: 'staff' });
+    syncLink(tx, salonId, bSnap.data(), { status: 'confirmed' });
     return { ok: true };
   });
 }
@@ -646,10 +739,18 @@ export async function confirmBooking({ salonId, bookingId }) {
  */
 async function resolveClientForBooking(salonId, b) {
   if (b.clientId) return { ref: doc(db, 'salons', salonId, 'clients', b.clientId), create: false };
+  // Phone first (Portugal: the phone is the identity), then email.
+  const phone = b.clientPhoneE164 || normalizePhone(b.clientPhone);
+  if (phone) {
+    const qp = await getDocs(query(collection(db, 'salons', salonId, 'clients'), where('phoneE164', '==', phone), limit(1)));
+    if (!qp.empty) return { ref: qp.docs[0].ref, create: false };
+  }
   const email = (b.clientEmail || '').toLowerCase();
-  if (!email) return null;
-  const q = await getDocs(query(collection(db, 'salons', salonId, 'clients'), where('email', '==', email), limit(1)));
-  if (!q.empty) return { ref: q.docs[0].ref, create: false };
+  if (email) {
+    const q = await getDocs(query(collection(db, 'salons', salonId, 'clients'), where('email', '==', email), limit(1)));
+    if (!q.empty) return { ref: q.docs[0].ref, create: false };
+  }
+  if (!phone && !email) return null;
   return { ref: doc(collection(db, 'salons', salonId, 'clients')), create: true, seed: { name: b.clientName, email, phone: b.clientPhone || '' } };
 }
 
@@ -675,11 +776,12 @@ export async function markBookingPaid({ salonId, salon, bookingId, method }) {
       paid: true, status: 'completed', paidAt: serverTimestamp(), paymentMethod: method || 'balcao', pointsAwarded: pts,
       ...(clientPlan && !b.clientId ? { clientId: clientPlan.ref.id } : {}),
     });
+    syncLink(tx, salonId, b, { status: 'completed' });
 
     const spentDelta = Number(b.finalPrice) || Number(b.servicePrice) || 0;
     if (clientPlan?.create) {
       tx.set(clientPlan.ref, {
-        ...clientPlan.seed, uid: null, birthday: null, referralCode: null,
+        ...clientPlan.seed, phoneE164: normalizePhone(clientPlan.seed.phone) || null, uid: null, birthday: null, referralCode: null,
         visits: 1, points: pts, totalSpent: spentDelta, referredBy: null, referrals: [], discounts: [],
         source: 'guest', createdAt: serverTimestamp(),
       });
@@ -713,6 +815,7 @@ export async function markBookingNoShow({ salonId, salon, bookingId }) {
     if (!canTransition(b.status, 'noshow')) throw err(b.status === 'completed' ? 'booking-completed' : 'booking-cancelled');
     tx.update(bRef, { status: 'noshow', noShowAt: serverTimestamp() });
     if (b.clientId && penalty > 0) tx.update(doc(db, 'salons', salonId, 'clients', b.clientId), { points: increment(-penalty) });
+    syncLink(tx, salonId, b, { status: 'noshow' });
     return { ok: true };
   });
 }

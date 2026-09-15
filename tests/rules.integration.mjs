@@ -40,7 +40,7 @@ const staff = (await listAll(null, `salons/${SALON}/staff`)).filter(s => s.activ
 const S1 = staff[0];
 const D1 = nextOpenDate(20), D2 = nextOpenDate(27);
 const booking = (over) => ({
-  salonId: SALON, clientId: null, clientName: 'RULES-TEST visitante', clientEmail: 'rules-test@example.com', clientPhone: '912345678',
+  salonId: SALON, clientId: null, clientName: 'RULES-TEST visitante', clientEmail: 'rules-test@example.com', clientPhone: '912345678', clientPhoneE164: '351912345678',
   forSomeone: null, notes: '', serviceId: SERVICE_ID, serviceName: service.name, serviceDuration: service.duration, servicePrice: service.price,
   finalPrice: service.price, discountType: null, discountCode: null, referralCode: null, referralDiscount: 0,
   staffId: S1.id, staffName: S1.name, staffPreference: 'chosen', date: D1, time: '10:00', startMin: 600, endMin: 600 + service.duration,
@@ -72,6 +72,8 @@ await expectStatus('reject lying about servicePrice', () => createDocument(null,
 await expectStatus('reject status=confirmed from public', () => createDocument(null, `salons/${SALON}/bookings`, null, booking({ status: 'confirmed' })), 403);
 await expectStatus('reject paid=true from public', () => createDocument(null, `salons/${SALON}/bookings`, null, booking({ paid: true })), 403);
 await expectStatus('reject bad email', () => createDocument(null, `salons/${SALON}/bookings`, null, booking({ clientEmail: 'nope' })), 403);
+await expectStatus('accept empty email (phone is the identity)', async () => { const r = await createDocument(null, `salons/${SALON}/bookings`, null, booking({ clientEmail: '', date: D2, time: '16:00', startMin: 960, endMin: 960 + service.duration })); created.push(`salons/${SALON}/bookings/${r.name.split('/').pop()}`); }, 200);
+await expectStatus('reject online booking without normalised phone', () => createDocument(null, `salons/${SALON}/bookings`, null, booking({ clientPhoneE164: '' })), 403);
 await expectStatus('reject bad date', () => createDocument(null, `salons/${SALON}/bookings`, null, booking({ date: '2027-02-30' })), 403);
 await expectStatus('reject bad time', () => createDocument(null, `salons/${SALON}/bookings`, null, booking({ time: '25:00' })), 403);
 await expectStatus('reject endMin inconsistent with duration', () => createDocument(null, `salons/${SALON}/bookings`, null, booking({ endMin: 700 })), 403);

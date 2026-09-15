@@ -147,6 +147,20 @@ service cloud.firestore {
         allow update, delete: if isAdmin(salonId);
       }
 
+      /* ───────────── booking links: PII-free projection behind an unguessable token ───────────── */
+      match /bookingLinks/{token} {
+        function noPII() { return !request.resource.data.keys().hasAny(['clientName', 'clientEmail', 'clientPhone', 'clientPhoneE164', 'notes', 'forSomeone']); }
+        allow read: if true;   // the 32-hex token in the URL is the credential
+        allow create: if noPII() && str(request.resource.data.bookingId, 128)
+          && (isStaff(salonId) || planActive(salonId));
+        allow update: if noPII() && (
+             isStaff(salonId)
+          || ( request.resource.data.status in ['pending', 'confirmed', 'cancelled']
+               && changedOnly(['status', 'updatedAt']) )
+        );
+        allow delete: if isAdmin(salonId);
+      }
+
       /* ───────────── agenda: per staff / per day occupancy (no PII) ───────────── */
       match /agenda/{agendaDoc} {
         function validAgenda() {
@@ -155,12 +169,28 @@ service cloud.firestore {
               && request.resource.data.intervals is list
               && agendaDoc == request.resource.data.staffId + '__' + request.resource.data.date;
         }
+        // A client cancelling through their capability link may remove exactly
+        // their own interval, and only if that booking ends up cancelled in the
+        // same transaction (getAfter). Nothing else on the agenda may change.
+        function tokenRelease() {
+          let bid = request.resource.data.get('viaBookingId', '');
+          let bk = get(/databases/$(database)/documents/salons/$(salonId)/bookings/$(bid)).data;
+          let iv = { 'start': bk.startMin, 'end': bk.endMin, 'bookingId': bid };
+          return bid != ''
+              && bk.get('manageToken', '') != ''
+              && request.resource.data.get('viaToken', '') == bk.manageToken
+              && getAfter(/databases/$(database)/documents/salons/$(salonId)/bookings/$(bid)).data.status == 'cancelled'
+              && request.resource.data.intervals.size() == resource.data.intervals.size() - 1
+              && resource.data.intervals.hasAny([iv])
+              && !request.resource.data.intervals.hasAny([iv]);
+        }
         allow read: if true;
         allow create: if validAgenda() && (isStaff(salonId) || (planActive(salonId) && request.resource.data.intervals.size() == 1));
         allow update: if validAgenda() && (
              isStaff(salonId)
           || (planActive(salonId) && request.resource.data.intervals.size() == resource.data.intervals.size() + 1)  // public booking adds one
-          || (isAuth() && request.resource.data.intervals.size() == resource.data.intervals.size() - 1)             // client cancel frees one
+          || (isAuth() && request.resource.data.intervals.size() == resource.data.intervals.size() - 1)             // signed-in client cancel frees one
+          || tokenRelease()                                                                                          // link-holder cancel frees their own
         );
         allow delete: if isAdmin(salonId);
       }
@@ -237,14 +267,23 @@ service cloud.firestore {
               && d().servicePrice == resource.data.servicePrice
               && d().get('clientEmail', '') == resource.data.get('clientEmail', '')
               && (resource.data.get('clientId', null) == null || d().get('clientId', null) == resource.data.get('clientId', null))
+              && d().get('manageToken', '') == resource.data.get('manageToken', '')
               && (isAdmin(salonId) || d().finalPrice == resource.data.finalPrice);
+        }
+        // Capability link: the request carries the booking's own token.
+        function tokenOk() {
+          return resource.data.get('manageToken', '') != ''
+              && d().get('viaToken', '') == resource.data.manageToken;
         }
 
         // Read: salon staff, or the client who owns it. No public reads — availability comes from /agenda.
         allow read: if isStaff(salonId) || ownsBooking(resource.data);
 
+        // Online bookings identify the client by phone (E.164, ≥ 10 digits); email is optional.
         allow create: if validShape() && honestPrice() && (
-             ( d().get('source', 'online') == 'online' && planActive(salonId) && d().status == 'pending' && validEmail(d().clientEmail) )
+             ( d().get('source', 'online') == 'online' && planActive(salonId) && d().status == 'pending'
+               && str(d().get('clientPhoneE164', ''), 16) && d().get('clientPhoneE164', '').matches('^[0-9]{10,15}$')
+               && (d().get('clientEmail', '') == '' || validEmail(d().clientEmail)) )
           || ( isStaff(salonId) && d().status in ['pending', 'confirmed'] )
         );
 
@@ -262,8 +301,17 @@ service cloud.firestore {
                && request.time + duration.value(salon(salonId).get('cancellationHours', 24), 'h') <= apptTs(resource.data.date, resource.data.time) )
           // Client erases their personal data from their own bookings (GDPR).
           || ( ownsBooking(resource.data)
-               && changedOnly(['clientName', 'clientEmail', 'clientPhone', 'notes', 'forSomeone', 'clientId', 'anonymised', 'anonymisedAt'])
+               && changedOnly(['clientName', 'clientEmail', 'clientPhone', 'clientPhoneE164', 'notes', 'forSomeone', 'clientId', 'anonymised', 'anonymisedAt'])
                && d().get('anonymised', false) == true )
+          // Link holder (no login) confirms: pending → confirmed, nothing else.
+          || ( tokenOk()
+               && resource.data.status == 'pending' && d().status == 'confirmed'
+               && changedOnly(['status', 'confirmedAt', 'confirmedVia', 'viaToken']) )
+          // Link holder cancels within the salon's policy window.
+          || ( tokenOk()
+               && resource.data.status in ['pending', 'confirmed'] && d().status == 'cancelled'
+               && changedOnly(['status', 'cancelledAt', 'cancelledBy', 'viaToken'])
+               && request.time + duration.value(salon(salonId).get('cancellationHours', 24), 'h') <= apptTs(resource.data.date, resource.data.time) )
         );
 
         allow delete: if isAdmin(salonId);

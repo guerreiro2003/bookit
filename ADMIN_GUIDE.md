@@ -32,10 +32,13 @@ O cartão de onboarding guia os 4 passos:
 - **Fidelização**: visitas para desconto, %, desconto de referido, penalização de não-comparência.
 
 ## D. Portal da equipa (`staff.html?salon=<slug>`)
-Entra com a **password da equipa**. Vê o dia, confirma, regista pagamentos, marca não-comparência, cancela. O admin pode entrar no mesmo portal com as suas credenciais (aba "Admin") e vê também o separador Clientes.
+Entra com a **password da equipa**. Vê o dia, confirma, regista pagamentos, marca não-comparência, cancela.
+
+**Rotina de fim de dia (2 minutos):** no cartão **Por confirmar (hoje e amanhã)** carrega em **💬 WhatsApp** em cada marcação — abre a conversa com a mensagem pronta e um link onde o cliente confirma ou cancela sozinho. Se o cliente confirmar pelo link, a marcação passa a *Confirmada* automaticamente; se responder "1", carrega em **Confirmar**. As marcações não confirmadas até à hora são as que mais faltam: dá-lhes prioridade. O admin pode entrar no mesmo portal com as suas credenciais (aba "Admin") e vê também o separador Clientes.
 
 ## E. O cliente final
-- Marca em `/?salon=<slug>` sem conta: serviço → colaborador → data/hora (só horários livres) → dados → confirmar. Recebe uma página com **.ics / Google Calendar** (não há email automático — ver `functions/README.md`).
+- Marca em `/?salon=<slug>` sem conta: serviço → colaborador → data/hora (só horários livres) → telemóvel (email opcional) → confirmar. Recebe uma página com **.ics / Google Calendar** e o **link de gestão** (`m.html?s=…&t=…`) para confirmar presença ou cancelar dentro da janela do salão. Não há email automático (ver `functions/README.md`); a confirmação faz-se pelo WhatsApp da equipa.
+- Para medir de onde vêm os clientes, partilha o link com origem: `/?salon=<slug>&src=ig` (Instagram), `&src=google` (perfil Google), `&src=qr` (balcão), `&src=site`.
 - Com conta (`account.html`): vê estado das marcações, cancela dentro da janela permitida, pontos e cupões, código de amigo, exporta ou apaga os seus dados.
 
 ## F. Perguntas frequentes

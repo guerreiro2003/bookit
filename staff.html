@@ -99,6 +99,16 @@
             <div class="stat"><div class="stat__label">Confirmadas</div><div class="stat__value" id="statConfirmed">—</div></div>
             <div class="stat"><div class="stat__label">Faturação</div><div class="stat__value" id="statRevenue" style="color:var(--brand)">—</div></div>
           </div>
+          <div class="card card--accent mb-4" id="confirmCard" hidden>
+            <div class="card__head">
+              <div>
+                <div class="card__title">Por confirmar (hoje e amanhã) <span class="badge badge--amber" id="confirmCount" style="margin-left:6px">0</span></div>
+                <div class="card__sub" id="confirmSub"></div>
+              </div>
+            </div>
+            <p class="text-sm text-muted" style="margin:-4px 0 10px">Carrega em <strong>💬 WhatsApp</strong>: abre a conversa com a mensagem pronta e um link para o cliente confirmar sozinho. Quando responder, carrega em <strong>Confirmar</strong>.</p>
+            <div id="confirmList"></div>
+          </div>
           <div class="card">
             <div class="card__head">
               <div class="card__title" id="todayTitle">Marcações de hoje</div>
@@ -187,11 +197,16 @@ import {
   $, $$, on, toast, toastSuccess, toastError,
   escapeHTML, htmlMix, raw,
   MONTHS_FULL, formatDate, formatDatePT, formatPrice, todayISO, relativeDay,
-  getSalonId, loadSalon, applySalonBranding, todayForSalon,
+  getSalonId, loadSalon, applySalonBranding, todayForSalon, addDaysStr, dateLabelPT,
   authErrorMessage, friendlyError, showFatalError, statusBadge,
   markBookingPaid, markBookingNoShow, confirmBooking, cancelBooking, restoreBooking, withLock,
+  whatsAppFor, markMessageSent, formatRelativeTime,
   debounce, toggleTheme, getTheme, trapFocus
 } from './app.js';
+
+/** Every booking rendered on this page, by id — used by the WhatsApp action. */
+const bookingIndex = new Map();
+let unsubConfirm = null;
 
 const salonId = getSalonId();
 let salon = null, mode = 'team';
@@ -281,6 +296,7 @@ $('#formAdmin').addEventListener('submit', withLock('admin-login', async (e) => 
 
 on('logout', async () => {
   if (unsubToday) { unsubToday(); unsubToday = null; }
+  if (unsubConfirm) { unsubConfirm(); unsubConfirm = null; }
   try { await signOut(auth); } catch {}
   mode = 'team';
   showLogin();
@@ -301,6 +317,7 @@ function showApp() {
   $('#modeBadge').classList.toggle('badge--green', mode === 'admin');
   $$('.adminOnly').forEach(t => t.hidden = mode !== 'admin');
   subscribeToday();
+  subscribeConfirmations();
   loadServices();
 }
 
@@ -375,6 +392,7 @@ function renderBookings(sel, bookings, { showDate = false } = {}) {
       <div class="empty-state__title">Sem marcações</div></div>`;
     return;
   }
+  bookings.forEach(b => bookingIndex.set(b.id, b));
   el.innerHTML = bookings.map(b => htmlMix`
     <div class="row-card">
       <div class="row-card__main">
@@ -389,6 +407,7 @@ function renderBookings(sel, bookings, { showDate = false } = {}) {
           ${b.clientName}${b.clientPhone ? raw(htmlMix` · <span class="row-card__phone">${b.clientPhone}</span>`) : ''}${b.staffName && b.staffName !== 'Sem preferência' ? raw(htmlMix` · ${b.staffName}`) : ''}
         </div>
         ${b.notes ? raw(htmlMix`<div class="row-card__notes"><span aria-hidden="true">💬</span> ${b.notes}</div>`) : ''}
+        ${raw(commsBadges(b))}
       </div>
       <div class="row-card__side">
         <div class="row-card__price">${formatPrice(b.finalPrice ?? b.servicePrice)}</div>
@@ -398,8 +417,21 @@ function renderBookings(sel, bookings, { showDate = false } = {}) {
     </div>`).join('');
 }
 
+/** Small trace of what was sent / how it was confirmed (this is what we measure). */
+function commsBadges(b) {
+  const bits = [];
+  if (b.confirmedVia === 'link') bits.push('<span class="badge badge--green">✓ confirmou pelo link</span>');
+  else if (b.status === 'pending' && b.confirmRequestedAt) bits.push(`<span class="badge badge--amber">pedido enviado ${escapeHTML(formatRelativeTime(b.confirmRequestedAt))}</span>`);
+  if (b.reminderSentAt) bits.push(`<span class="badge badge--gray">lembrete ${escapeHTML(formatRelativeTime(b.reminderSentAt))}</span>`);
+  if (b.channel) bits.push(`<span class="badge badge--gray">via ${escapeHTML(b.channel)}</span>`);
+  return bits.length ? `<div class="row-card__notes" style="gap:6px;display:flex;flex-wrap:wrap">${bits.join(' ')}</div>` : '';
+}
+
 function bookingActions(b) {
   const btns = [];
+  const upcoming = ['pending', 'confirmed'].includes(b.status) && b.date >= todayForSalon(salon);
+  if (upcoming && (b.clientPhoneE164 || b.clientPhone))
+    btns.push(htmlMix`<button class="btn btn--sm" type="button" data-action="wa-message" data-id="${b.id}" title="Abrir WhatsApp com a mensagem pronta">💬 WhatsApp</button>`);
   if (b.status === 'pending')
     btns.push(htmlMix`<button class="btn btn--sm btn--success" type="button" data-action="confirm-booking" data-id="${b.id}">Confirmar</button>`);
   if (!b.paid && !['cancelled','noshow'].includes(b.status))
@@ -415,6 +447,35 @@ on('confirm-booking', withLock('confirm', async (el) => {
   try { await confirmBooking({ salonId, bookingId: el.dataset.id }); toastSuccess('Marcação confirmada.'); }
   catch (e) { console.error(e); toastError(friendlyError(e)); }
 }));
+
+/* WhatsApp (manual, zero cost): opens wa.me with the right message for the
+ * booking's state and records that it was sent, so coverage can be measured. */
+on('wa-message', async (el) => {
+  const b = bookingIndex.get(el.dataset.id);
+  if (!b) return;
+  const today = todayForSalon(salon), tomorrow = addDaysStr(today, 1);
+  const kind = b.status === 'pending' ? 'confirmRequest' : b.date === today ? 'reminderToday' : b.date === tomorrow ? 'reminder' : 'info';
+  const msg = whatsAppFor({ salon: { ...salon, id: salonId }, booking: { ...b, salonId }, kind });
+  if (!msg) return toastError('Sem número de telemóvel válido nesta marcação.');
+  window.open(msg.url, '_blank', 'noopener');
+  try { await markMessageSent({ salonId, bookingId: b.id, kind }); } catch (e) { console.error(e); }
+});
+
+/* "Por confirmar": today + tomorrow, still pending — the end-of-day routine. */
+function subscribeConfirmations() {
+  if (unsubConfirm) unsubConfirm();
+  const today = todayForSalon(salon), tomorrow = addDaysStr(today, 1);
+  const q = query(collection(db,'salons',salonId,'bookings'), where('date','in', [today, tomorrow]));
+  unsubConfirm = onSnapshot(q, snap => {
+    const rows = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(b => b.status === 'pending').sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+    const card = $('#confirmCard'); if (!card) return;
+    card.hidden = rows.length === 0;
+    $('#confirmCount').textContent = rows.length;
+    const sent = rows.filter(b => b.confirmRequestedAt).length;
+    $('#confirmSub').textContent = rows.length ? `${sent} de ${rows.length} já com pedido enviado` : '';
+    renderBookings('#confirmList', rows, { showDate: true });
+  }, e => console.error('confirmations', e));
+}
 
 on('cancel-booking', withLock('cancel', async (el) => {
   const id = el.dataset.id;

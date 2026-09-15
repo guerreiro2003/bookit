@@ -50,6 +50,14 @@
         <button class="btn" type="button" data-action="download-ics">📅 Adicionar ao calendário</button>
         <a class="btn" id="gcalLink" href="#" target="_blank" rel="noopener">Google Calendar</a>
       </div>
+      <div id="manageCard" class="card mb-3" hidden style="text-align:left">
+        <div class="card__head"><div class="card__title">🔗 O teu link de gestão</div></div>
+        <p class="text-sm text-muted">Guarda este link: serve para confirmar a presença ou cancelar sem precisares de conta.</p>
+        <div class="flex" style="gap:8px; margin-top:8px; flex-wrap:wrap">
+          <a class="btn btn--sm btn--primary" id="manageLink" href="#">Abrir a minha marcação</a>
+          <button class="btn btn--sm" type="button" data-action="copy-manage">Copiar link</button>
+        </div>
+      </div>
 
       <div id="inviteCard" class="card card--accent mb-3" hidden style="text-align:left">
         <div class="flex" style="align-items:flex-start;gap:var(--s-3)">
@@ -71,7 +79,7 @@
   </main>
 
 <script type="module">
-import { loadSalon, applySalonBranding, getSalonId, on, toastError, MONTHS_FULL, buildICS, googleCalendarUrl, salonSetting, formatPrice } from './app.js';
+import { loadSalon, applySalonBranding, getSalonId, on, toastError, toastSuccess, MONTHS_FULL, buildICS, googleCalendarUrl, salonSetting, formatPrice } from './app.js';
 import { auth, onAuthStateChanged } from './firebase.js';
 
 const salonId = getSalonId();
@@ -88,6 +96,16 @@ if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) { const [y, m, d] = dateStr.split('-').
 else set('rDate', dateStr);
 
 const qs = `?salon=${encodeURIComponent(salonId)}`;
+const manageToken = (p.get('t') || '').trim();
+let manageHref = '';
+if (/^[a-f0-9]{16,64}$/.test(manageToken)) {
+  manageHref = `${location.origin}/m.html?s=${encodeURIComponent(salonId)}&t=${manageToken}`;
+  document.getElementById('manageLink').href = manageHref;
+  document.getElementById('manageCard').hidden = false;
+}
+on('copy-manage', async () => {
+  try { await navigator.clipboard.writeText(manageHref); toastSuccess('Link copiado.'); } catch { toastError('Não foi possível copiar.'); }
+});
 document.getElementById('btnBack').href = `index.html${qs}`;
 document.getElementById('btnBackLoggedIn').href = `index.html${qs}`;
 document.getElementById('btnPortal').href = `account.html${qs}`;
