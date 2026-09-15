@@ -1,0 +1,446 @@
+<title>Book It — Auditoria Estratégica</title>
+<style>
+  :root { --bg:#faf8f4; --fg:#1a1814; --fg2:#4a4640; --fg3:#7a746a; --line:#e6e0d4; --card:#ffffff; --accent:#4f5938; --accent2:#8b5e3c; --ok:#2f6b3a; --warn:#9a6b0a; --bad:#a63a2e; --chip:#efeae0; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#141311; --fg:#ece7dc; --fg2:#c9c2b4; --fg3:#948d80; --line:#2a2722; --card:#1c1a17; --accent:#9fb07e; --accent2:#c99a74; --ok:#7fc48e; --warn:#e0b45a; --bad:#e28a7c; --chip:#26231e; } }
+  :root[data-theme="dark"] { --bg:#141311; --fg:#ece7dc; --fg2:#c9c2b4; --fg3:#948d80; --line:#2a2722; --card:#1c1a17; --accent:#9fb07e; --accent2:#c99a74; --ok:#7fc48e; --warn:#e0b45a; --bad:#e28a7c; --chip:#26231e; }
+  body { background:var(--bg); color:var(--fg); font-family: Inter, -apple-system, Segoe UI, Roboto, sans-serif; line-height:1.55; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 40px 22px 96px; }
+  h1 { font-family: Georgia, 'Times New Roman', serif; font-weight: 500; font-size: 40px; line-height:1.1; margin: 0 0 8px; }
+  h2 { font-family: Georgia, serif; font-weight: 500; font-size: 27px; margin: 56px 0 12px; padding-top: 18px; border-top: 1px solid var(--line); }
+  h3 { font-size: 16px; margin: 26px 0 8px; letter-spacing:.01em; }
+  p { margin: 8px 0; color: var(--fg2); }
+  .lead { font-size: 17px; color: var(--fg2); max-width: 70ch; }
+  .meta { color: var(--fg3); font-size: 13px; margin-bottom: 28px; }
+  .toc { display:grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: 4px 18px; font-size: 13.5px; margin: 18px 0 8px; }
+  .toc a { color: var(--fg2); text-decoration:none; } .toc a:hover { text-decoration:underline; }
+  table { width:100%; border-collapse: collapse; font-size: 13.5px; margin: 12px 0 18px; }
+  .tbl { overflow-x:auto; }
+  th, td { text-align:left; vertical-align:top; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  th { color: var(--fg3); font-weight:600; font-size: 12px; text-transform: uppercase; letter-spacing:.06em; }
+  td strong { color: var(--fg); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin: 14px 0; }
+  .grid2 { display:grid; grid-template-columns: repeat(auto-fit, minmax(300px,1fr)); gap: 12px; }
+  .tag { display:inline-block; font-size: 11px; font-weight:700; letter-spacing:.06em; padding: 2px 8px; border-radius: 999px; background: var(--chip); color: var(--fg2); text-transform: uppercase; }
+  .tag.ok { color: var(--ok); } .tag.warn { color: var(--warn); } .tag.bad { color: var(--bad); }
+  .kpi { font-family: Georgia, serif; font-size: 30px; color: var(--fg); }
+  .note { border-left: 3px solid var(--accent2); padding: 8px 14px; background: var(--card); margin: 12px 0; font-size: 14px; }
+  .note.legal { border-color: var(--bad); }
+  ul, ol { color: var(--fg2); margin: 6px 0 10px 22px; padding:0; } li { margin: 4px 0; }
+  code { background: var(--chip); padding: 1px 5px; border-radius: 4px; font-size: 12.5px; }
+  .src { font-size: 12.5px; color: var(--fg3); }
+  .src a { color: var(--fg3); }
+  .num { font-variant-numeric: tabular-nums; text-align:right; }
+  .big { font-size: 20px; font-family: Georgia, serif; color: var(--fg); margin: 6px 0; }
+  hr { border: 0; border-top: 1px solid var(--line); margin: 28px 0; }
+</style>
+
+<div class="wrap">
+  <p class="tag">Confidencial · versão 1 · 15 set 2026</p>
+  <h1>Book It — de "agenda online" a produto que um salão não consegue deixar de pagar</h1>
+  <p class="lead">Auditoria estratégica e técnica do produto que temos, pesquisa de mercado em Portugal, concorrência, escolha da <em>wedge</em>, posicionamento, pricing, unit economics, go-to-market, roadmap e riscos. Escrito como cofundador com dinheiro em jogo: sem entusiasmo artificial, com as incertezas assinaladas.</p>
+  <p class="meta">Base: código e produção auditados nas últimas sessões (motor transacional, regras, testes) + 30 fontes consultadas em setembro de 2026. Onde um número não foi confirmado está escrito <span class="tag warn">não confirmado</span>; onde é uma hipótese nossa está escrito <span class="tag">hipótese</span>.</p>
+
+  <div class="toc">
+    <a href="#s1">1. Auditoria do produto</a><a href="#s2">2. Auditoria técnica</a><a href="#s3">3. Auditoria comercial</a><a href="#s4">4. Mercado</a>
+    <a href="#s5">5. Concorrência</a><a href="#s6">6. Principais dores</a><a href="#s7">7. Wedge</a><a href="#s8">8. Posicionamento</a>
+    <a href="#s9">9. Top funcionalidades</a><a href="#s10">10. Pricing</a><a href="#s11">11. Moat</a><a href="#s12">12. Roadmap</a>
+    <a href="#s13">13. Validação</a><a href="#s14">14. Plano €10k/mês</a><a href="#s15">15. Plano €50k/mês</a><a href="#s16">16. Riscos</a>
+    <a href="#s17">17. Integrações (WhatsApp, IG, Google, MB WAY)</a><a href="#s18">18. IA, automações, saúde do cliente</a><a href="#s19">19. Não construir</a><a href="#s20">20. Os 3 movimentos</a>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0">Resumo em 8 linhas</h3>
+    <ol>
+      <li><strong>Hoje ninguém escolheria o Book It em vez da Zappy, BUK ou Fresha.</strong> A base técnica é forte (motor de marcações transacional, segurança, testes), mas não temos o mínimo que todos têm: lembretes automáticos. Isso é corrigível em semanas.</li>
+      <li>O mercado português é grande e fragmentado (INE cita mais de 38 000 salões e institutos de beleza; a maioria micro) e é <strong>WhatsApp-first</strong>: 89,9% de penetração (Marktest 2025).</li>
+      <li>A concorrência vende <em>agenda</em> (Zappy €20–119/mês, BUK €0–26/mês) ou vende <em>clientes novos</em> com comissão (Treatwell 25%, Fresha 20%, Booksy 30%). Ninguém em Portugal vende <strong>"receita recuperada e medida"</strong>.</li>
+      <li><strong>Wedge escolhida:</strong> o salão em piloto automático no WhatsApp — confirmação a duas vias + lembretes (menos faltas) e reativação de clientes por cadência (menos churn), com um painel honesto de € recuperados.</li>
+      <li>O WhatsApp Business API em Portugal custa €0,0142 por mensagem "utility" e as respostas em 24h são grátis: um salão médio gasta-nos <strong>menos de €15/mês</strong> em mensagens. Cabe com margem num plano de €29–59.</li>
+      <li>Pricing proposto: <strong>€29 / €59 / €99</strong> por salão (não por profissional), com mensagens incluídas. €10k MRR ≈ 200 salões; €50k MRR ≈ 900–1000 salões — só com canal de parceiros.</li>
+      <li>Não temos moat. Construímos um com <em>dados de cadência por cliente</em>, <em>base de consentimentos WhatsApp</em>, <em>histórico de ROI</em> e distribuição via distribuidores de produtos.</li>
+      <li>Decisão pedida: aprovar os <a href="#s20">3 movimentos</a> antes de implementar seja o que for.</li>
+    </ol>
+  </div>
+
+  <!-- ─────────────────────────── 1 ─────────────────────────── -->
+  <h2 id="s1">1. Auditoria do produto atual</h2>
+  <p>Classificação de cada área tendo em conta o que existe no repositório (não o que está no relatório académico).</p>
+  <div class="tbl"><table>
+    <tr><th style="width:24%">Área</th><th style="width:16%">Estado</th><th>Porquê</th></tr>
+    <tr><td><strong>Motor de marcações</strong></td><td><span class="tag ok">FORTE</span></td><td>Transacional por colaborador/dia, sem sobreposições mesmo em concorrência (stress-testado), duração real, pausas, férias, datas encerradas, fuso. É melhor do que o que a maioria dos pequenos fornecedores PT tem — mas o cliente não vê isto, só sente se falhar.</td></tr>
+    <tr><td><strong>Segurança / multi-tenant</strong></td><td><span class="tag ok">FORTE</span></td><td>Regras como backend, isolamento testado, preços não forjáveis, RGPD (exportar/apagar). Reduz risco de incidente com clientes pagantes.</td></tr>
+    <tr><td><strong>Custo de infraestrutura</strong></td><td><span class="tag ok">FORTE</span></td><td>Estático + Firestore: custo marginal por salão perto de zero. Permite margem bruta alta e trial generoso.</td></tr>
+    <tr><td><strong>Fluxo de marcação do cliente final</strong></td><td><span class="tag ok">FORTE</span></td><td>5 passos, sem conta, mobile, .ics. Uma reserva de teste em produção demorou <span class="tag">~60 s</span>.</td></tr>
+    <tr><td><strong>UI / aspeto</strong></td><td><span class="tag ok">FORTE</span></td><td>Editorial, consistente, acima da média PT. Transmite confiança na demo.</td></tr>
+    <tr><td><strong>Testes e documentação</strong></td><td><span class="tag ok">FORTE</span></td><td>4 suites, checklist de produção, DR. Raro neste segmento; permite iterar depressa sem partir.</td></tr>
+    <tr><td><strong>Painel do dono</strong></td><td><span class="tag">ACEITÁVEL</span></td><td>Largo (serviços, equipa, horários, promoções, galeria, parcerias, fidelização) mas raso: mostra o dia de hoje, não mostra o negócio. Não responde a "como está o meu mês?".</td></tr>
+    <tr><td><strong>Portal da equipa</strong></td><td><span class="tag">ACEITÁVEL</span></td><td>Uma conta partilhada por salão. Chega para 1–3 pessoas; impede comissões, métricas por profissional e responsabilização — coisas que o segmento pagante (3–8 profissionais) pede.</td></tr>
+    <tr><td><strong>Modelo de dados de clientes</strong></td><td><span class="tag warn">PRECISA DE MELHORIA</span></td><td>Temos visitas, pontos, gasto e histórico de marcações — matéria-prima de CRM — mas sem <em>cadência</em>, <em>última visita</em>, <em>próximo retorno esperado</em>, <em>consentimento WhatsApp</em>, nem identidade por telefone (em PT o telefone é a chave natural; o email obrigatório na marcação online é fricção que introduzimos).</td></tr>
+    <tr><td><strong>Notificações</strong></td><td><span class="tag bad">PROBLEMÁTICA</span></td><td>Zero. Nem email, nem SMS, nem WhatsApp. É o requisito mínimo de qualquer concorrente e a base de todas as funcionalidades de valor (no-show, reativação). O código existe em <code>functions/</code> mas não está deployado (plano Blaze).</td></tr>
+    <tr><td><strong>Analytics / relatórios</strong></td><td><span class="tag bad">PROBLEMÁTICA</span></td><td>Sem faturação por período, ocupação, no-show %, retenção, clientes em risco. Sem isto não há ROI demonstrável, logo não há venda por valor.</td></tr>
+    <tr><td><strong>Ausência de backend</strong></td><td><span class="tag bad">PROBLEMÁTICA</span></td><td>Sem funções agendadas (lembretes), sem webhooks (WhatsApp, pagamentos), sem chaves secretas (IA). Corrige-se com Cloud Functions — <em>aditivo</em>, não é reescrita — mas é a decisão arquitetural que desbloqueia os níveis 3–5.</td></tr>
+    <tr><td><strong>Onboarding / importação</strong></td><td><span class="tag warn">PRECISA DE MELHORIA</span></td><td>Setup em 3 passos existe; falta importar clientes/marcações de Excel/Fresha/Zappy. Sem importação, o custo de mudar é alto e a reativação de clientes começa a zero.</td></tr>
+    <tr><td><strong>Gestão de conteúdo do site (galeria, parcerias)</strong></td><td><span class="tag bad">DESNECESSÁRIA</span></td><td>Feito à medida para o Zen Organic. Manter para o piloto; não investir mais — não é o produto.</td></tr>
+    <tr><td><strong>⌘K, dark mode, referidos, pontos</strong></td><td><span class="tag bad">DESNECESSÁRIA</span> (para vender)</td><td>Zero peso na decisão de compra. Manter, congelar.</td></tr>
+  </table></div>
+  <div class="note"><strong>Direção atual a corrigir:</strong> as últimas semanas investiram em polimento de superfície (site do Zen, galeria, ⌘K, pontos) e em rigor de engenharia. O rigor fica. O polimento de superfície pára. O que falta é o que faz dinheiro: comunicação automática com o cliente e medição.</div>
+
+  <!-- ─────────────────────────── 2 ─────────────────────────── -->
+  <h2 id="s2">2. Auditoria técnica — riscos que importam para o negócio</h2>
+  <ul>
+    <li><strong>Sem servidor = sem automações.</strong> Decisão a tomar já: ativar Blaze e Cloud Functions (custo previsível: cêntimos por salão/mês). Tudo o que recomendo abaixo assume isto.</li>
+    <li><strong>Email obrigatório na marcação online</strong> (regra que eu próprio endureci). Para Portugal, telefone deve ser obrigatório e email opcional; a identidade do cliente passa a ser o telefone normalizado (E.164). Reversível em horas.</li>
+    <li><strong>Conta de equipa partilhada.</strong> Bom para entrar; limita o plano Pro (métricas por profissional, comissões). Evoluir para contas por profissional quando o primeiro salão com 4+ pessoas pagar — não antes.</li>
+    <li><strong>Lock-in Firebase.</strong> Aceitável nesta fase; custo de saída baixo porque os dados são exportáveis (temos scripts). Não é prioridade.</li>
+    <li><strong>Bus factor = 1.</strong> A documentação e testes mitigam; o risco real é comercial (tempo do fundador dividido entre construir e vender).</li>
+    <li><strong>WhatsApp API exige aprovação da Meta</strong> (verificação do negócio; e para ligar números de vários salões, o programa de <em>Tech Provider</em>/Embedded Signup). Ver §17 — há um caminho manual para validar antes de depender disto.</li>
+  </ul>
+
+  <!-- ─────────────────────────── 3 ─────────────────────────── -->
+  <h2 id="s3">3. Auditoria comercial — onde está e onde não está o valor</h2>
+  <div class="grid2">
+    <div class="card"><h3 style="margin-top:0">Quem pagaria e porquê</h3>
+      <p><strong>Não</strong> o profissional a solo (sensível ao preço, servido por BUK grátis e Fresha ~€15). <strong>Sim</strong> o dono de um salão/barbearia com 2–8 profissionais, agenda cheia o suficiente para que faltas e horas vazias doam, e sem tempo para andar a confirmar marcações no WhatsApp à noite. Paga se vir, todos os meses, um número em euros que atribui ao produto.</p></div>
+    <div class="card"><h3 style="margin-top:0">O que custa hoje ao salão (hipótese calculada)</h3>
+      <p><span class="tag">hipótese</span> Salão-tipo: 3 profissionais, 550 marcações/mês, ticket €35 → ~€19k/mês.</p>
+      <ul>
+        <li>No-shows: 5% (com confirmação manual) → 27/mês × €35 ≈ <strong>€950</strong>. Sem confirmação manual a literatura fala em 15–25%.</li>
+        <li>Cancelamentos: 8% (Zenoti 2025) → 44 horários/mês ≈ <strong>€1 540</strong> em risco; parte é reocupada.</li>
+        <li>Churn silencioso: retenção de clientes existentes ~75%, de novos ~35% (Boulevard/Meevo 2025) → num salão com 800 clientes ativos, ~200 desaparecem por ano ≈ <strong>€40k/ano</strong> de valor anual (6 visitas × €35).</li>
+        <li>Tempo do dono a confirmar/marcar por WhatsApp: ~1h/dia ≈ 20h/mês.</li>
+      </ul></div>
+  </div>
+  <p>Valor plausível a recuperar por software num salão destes: reduzir no-shows 50–70% (≈€500–650), reocupar 20–30% dos cancelamentos (≈€300–450), reativar 10% dos clientes perdidos (≈€330/mês), poupar 10–15h/mês. <strong>Ordem de grandeza: €1 000–1 500/mês.</strong> Se conseguirmos mostrar metade disto de forma credível, €59/mês é uma decisão fácil. Se não conseguirmos medir, somos "mais uma agenda" e o preço cai para €20.</p>
+  <p class="src">Fontes: Zenoti 2025 Benchmark (3% no-show / 8% cancelamento com lembretes), Boulevard 2025 (retenção novos 35%), Meevo (existentes 75%), estatísticas de no-show sem lembretes 15–25% (várias; ver §fontes). Os valores em € são hipóteses nossas para um salão-tipo, não dados portugueses.</p>
+
+  <!-- ─────────────────────────── 4 ─────────────────────────── -->
+  <h2 id="s4">4. Mercado (Portugal primeiro)</h2>
+  <div class="grid2">
+    <div class="card"><div class="kpi">&gt; 38 000</div><p>salões de cabeleireiro e institutos de beleza em Portugal, segundo o INE citado pela L'Oréal Portugal. <span class="tag warn">ano não confirmado</span>. Estrutura: maioria micro (1–2 pessoas); <span class="tag">hipótese</span> 15–20% com 3+ profissionais → ~6–8 mil contas-alvo.</p></div>
+    <div class="card"><div class="kpi">89,9%</div><p>penetração do WhatsApp em Portugal (Marktest, "Os Portugueses e as Redes Sociais 2025", 801 entrevistas, jul 2025). Instagram é a rede "mais usada" (32% de menções). Facebook em queda (23%).</p></div>
+    <div class="card"><div class="kpi">89% · 6,0 M</div><p>penetração de internet e utilizadores de Instagram em Portugal (DataReportal, Digital 2025 Portugal).</p></div>
+    <div class="card"><div class="kpi">&gt; 45%</div><p>quota do MB WAY nos pagamentos online em Portugal (afirmação da Stripe na página do método). Taxas: Ifthenpay/Eupago €0,07 + 0,7%; Stripe 1,5% + €0,25.</p></div>
+  </div>
+  <p><strong>Hábitos que importam:</strong> o salão português médio gere a agenda em papel/Google Calendar/WhatsApp, recebe pedidos por DM de Instagram e WhatsApp, confirma manualmente, cobra ao balcão (MB WAY/dinheiro/cartão) e, se emite fatura, usa software certificado pela AT (Vendus, Moloni, InvoiceXpress, ou o módulo da Zappy). <span class="tag warn">Validar com 10 entrevistas</span> — é a hipótese central deste documento.</p>
+  <p><strong>Tendências:</strong> concorrentes a cobrar por mensagem (Fresha) e por cliente novo (Treatwell 25%, Fresha 20%, Booksy 30%) — o custo de aquisição via marketplace está a subir para o salão; WhatsApp Business API a ficar barato para mensagens transacionais; Reserve with Google limitado na UE pelo DMA desde 2024.</p>
+
+  <!-- ─────────────────────────── 5 ─────────────────────────── -->
+  <h2 id="s5">5. Concorrência</h2>
+  <div class="tbl"><table>
+    <tr><th>Concorrente</th><th>Preço</th><th>Alvo</th><th>Forte</th><th>Fraco</th><th>Oportunidade para nós</th></tr>
+    <tr><td><strong>Zappy</strong> (PT, líder local)</td><td>€20 (1 pro) · €31 (2) · €42 (3–5) · €75 (6–12) · €119 (12+); add-ons: faturação €6,5–12, app cliente €29, RGPD €4</td><td>Salões e clínicas PT, todos os tamanhos</td><td>Faturação certificada, suporte PT, fichas de tratamento, marca conhecida</td><td>Interface datada, tudo é módulo pago, sem automação de retenção, SMS como lembrete</td><td>Ser o "cérebro de receita" que a Zappy não é; eventualmente integrar com a faturação deles em vez de a copiar</td></tr>
+    <tr><td><strong>BUK</strong> (PT)</td><td>Grátis (1 pessoa) · Pro €15,99 · Pro+ €25,99 (+€4/staff, anual)</td><td>Solo e pequenos salões PT</td><td>Grátis para entrar, lembretes SMS/email ilimitados no Pro, Google Reserve no Pro+</td><td>Raso em CRM/retenção; monetização baixa</td><td>Não competir no solo; ganhar no salão de 3–8 com € medidos</td></tr>
+    <tr><td><strong>Treatwell</strong></td><td>Sem mensalidade no Starter · 25% de comissão no 1.º agendamento de cliente novo · 2% pagamentos online (+IVA)</td><td>Salões urbanos que querem clientes novos</td><td>Marketplace com procura real, SMS grátis, integração Google</td><td>Comissão pesada, clientes "do marketplace", pouca fidelização própria</td><td>Somos complementares: "mantém os clientes que a Treatwell te trouxe"</td></tr>
+    <tr><td><strong>Fresha</strong></td><td>Deixou de ser grátis em 2025: ~$19,95 solo / ~$14,95 por membro; 20% em clientes novos do marketplace (mín. $6); mensagens (SMS/WhatsApp) pagas além de uma franquia <span class="tag warn">preços EUR/PT não confirmados</span></td><td>Global, salões de todos os tamanhos</td><td>Produto muito completo, marketplace, pagamentos, marketing</td><td>Tudo é upsell; WhatsApp cobrado à mensagem; suporte impessoal</td><td>Preço fixo com mensagens incluídas; presença local</td></tr>
+    <tr><td><strong>Booksy</strong></td><td>EUA: $29,99 + $20/membro; Boost 30% no 1.º serviço de cliente novo. Opera em PT (booksy.com/pt-pt) <span class="tag warn">preço PT não confirmado</span></td><td>Barbearias e salões com marketing forte</td><td>App de consumidor, marketing, forte em barbearias</td><td>Caro por membro, Boost caro</td><td>Barbearias: reativação por cadência é onde mais rende</td></tr>
+    <tr><td><strong>Koibox</strong> (ES, com site PT)</td><td>Não publicado</td><td>Centros de beleza ibéricos</td><td>Lembretes por WhatsApp, SMS grátis, campanhas, chatbot</td><td>Ibérico genérico; pouca prova de resultados</td><td>É o concorrente mais parecido com a nossa wedge — observar</td></tr>
+    <tr><td><strong>Phorest</strong></td><td>Sob orçamento; ~$150+/mês/licença</td><td>Salões premium/multi-loja</td><td>Retenção e marketing maduros ("client reconnect"), relatórios</td><td>Caro; fora do alcance do salão de 3 pessoas</td><td>Trazer o que a Phorest faz a €150 para €59 num mercado que ela ignora</td></tr>
+  </table></div>
+  <div class="note"><strong>Resposta honesta a "porque nos escolheriam hoje?":</strong> não escolheriam. Sem lembretes, sem WhatsApp, sem relatórios, sem faturação, sem marketplace, temos uma agenda bonita e correta. A boa notícia: o que nos falta para <em>igualar</em> é 3–4 semanas (lembretes/confirmações); o que nos permite <em>ganhar</em> (reativação medida em €) ninguém em Portugal faz de forma visível a este preço.</div>
+
+  <!-- ─────────────────────────── 6 ─────────────────────────── -->
+  <h2 id="s6">6. Os problemas mais valiosos (15) — pontuação 1–10</h2>
+  <p>Freq = frequência; Dor; € = impacto financeiro; Urg = urgência; WTP; Soft = facilidade de resolver com software; Dif = diferenciação; Ret = retenção; Tec = simplicidade técnica (10 = fácil). Total = média simples.</p>
+  <div class="tbl"><table>
+    <tr><th>#</th><th>Problema</th><th class="num">Freq</th><th class="num">Dor</th><th class="num">€</th><th class="num">Urg</th><th class="num">WTP</th><th class="num">Soft</th><th class="num">Dif</th><th class="num">Ret</th><th class="num">Tec</th><th class="num">Total</th></tr>
+    <tr><td>1</td><td><strong>Clientes que deixam de vir sem o dono reparar</strong> (churn silencioso)</td><td class="num">8</td><td class="num">6</td><td class="num">9</td><td class="num">6</td><td class="num">8</td><td class="num">8</td><td class="num">8</td><td class="num">9</td><td class="num">7</td><td class="num"><strong>7,7</strong></td></tr>
+    <tr><td>2</td><td><strong>Faltas e cancelamentos em cima da hora</strong></td><td class="num">9</td><td class="num">8</td><td class="num">7</td><td class="num">8</td><td class="num">7</td><td class="num">9</td><td class="num">5</td><td class="num">8</td><td class="num">7</td><td class="num"><strong>7,6</strong></td></tr>
+    <tr><td>3</td><td><strong>Tempo perdido a confirmar/marcar por WhatsApp e Instagram</strong></td><td class="num">10</td><td class="num">8</td><td class="num">5</td><td class="num">7</td><td class="num">7</td><td class="num">7</td><td class="num">7</td><td class="num">9</td><td class="num">5</td><td class="num"><strong>7,2</strong></td></tr>
+    <tr><td>4</td><td>Horários vazios após cancelamento</td><td class="num">6</td><td class="num">6</td><td class="num">7</td><td class="num">6</td><td class="num">6</td><td class="num">7</td><td class="num">8</td><td class="num">7</td><td class="num">6</td><td class="num">6,6</td></tr>
+    <tr><td>5</td><td>Clientes novos que não voltam (65% nunca regressa)</td><td class="num">8</td><td class="num">5</td><td class="num">8</td><td class="num">5</td><td class="num">6</td><td class="num">7</td><td class="num">7</td><td class="num">8</td><td class="num">7</td><td class="num">6,8</td></tr>
+    <tr><td>6</td><td>Não saber quanto fatura, o que rende, quem vale mais</td><td class="num">7</td><td class="num">5</td><td class="num">6</td><td class="num">4</td><td class="num">5</td><td class="num">9</td><td class="num">5</td><td class="num">7</td><td class="num">8</td><td class="num">6,2</td></tr>
+    <tr><td>7</td><td>Depender de marketplaces com comissão para clientes novos</td><td class="num">5</td><td class="num">6</td><td class="num">7</td><td class="num">4</td><td class="num">6</td><td class="num">5</td><td class="num">6</td><td class="num">6</td><td class="num">6</td><td class="num">5,7</td></tr>
+    <tr><td>8</td><td>Rebooking não feito à saída ("marco depois")</td><td class="num">9</td><td class="num">5</td><td class="num">7</td><td class="num">5</td><td class="num">5</td><td class="num">8</td><td class="num">6</td><td class="num">8</td><td class="num">8</td><td class="num">6,8</td></tr>
+    <tr><td>9</td><td>Horas fracas da semana (terça de manhã) vazias</td><td class="num">8</td><td class="num">4</td><td class="num">6</td><td class="num">3</td><td class="num">5</td><td class="num">6</td><td class="num">7</td><td class="num">6</td><td class="num">6</td><td class="num">5,7</td></tr>
+    <tr><td>10</td><td>Cobrar/gerir sinais para serviços longos (coloração, extensões)</td><td class="num">4</td><td class="num">6</td><td class="num">7</td><td class="num">5</td><td class="num">6</td><td class="num">7</td><td class="num">5</td><td class="num">6</td><td class="num">6</td><td class="num">5,8</td></tr>
+    <tr><td>11</td><td>Gerir folgas, férias, horários da equipa</td><td class="num">7</td><td class="num">4</td><td class="num">3</td><td class="num">4</td><td class="num">4</td><td class="num">9</td><td class="num">2</td><td class="num">6</td><td class="num">9</td><td class="num">5,3</td></tr>
+    <tr><td>12</td><td>Comissões e produtividade por profissional</td><td class="num">6</td><td class="num">5</td><td class="num">5</td><td class="num">4</td><td class="num">6</td><td class="num">8</td><td class="num">3</td><td class="num">7</td><td class="num">6</td><td class="num">5,6</td></tr>
+    <tr><td>13</td><td>Ser encontrado no Google/Instagram e converter a visita em marcação</td><td class="num">7</td><td class="num">6</td><td class="num">7</td><td class="num">5</td><td class="num">6</td><td class="num">5</td><td class="num">4</td><td class="num">5</td><td class="num">7</td><td class="num">5,8</td></tr>
+    <tr><td>14</td><td>Faturação certificada / contabilidade</td><td class="num">8</td><td class="num">6</td><td class="num">4</td><td class="num">7</td><td class="num">5</td><td class="num">4</td><td class="num">1</td><td class="num">7</td><td class="num">2</td><td class="num">4,9</td></tr>
+    <tr><td>15</td><td>Vender produtos/pacotes/vouchers</td><td class="num">4</td><td class="num">3</td><td class="num">5</td><td class="num">3</td><td class="num">4</td><td class="num">6</td><td class="num">3</td><td class="num">5</td><td class="num">6</td><td class="num">4,3</td></tr>
+  </table></div>
+  <p><strong>Leitura:</strong> os três primeiros problemas partilham a mesma infraestrutura (comunicação automática com o cliente pelo WhatsApp + modelo de cadência por cliente). Resolvê-los em conjunto é uma só aposta técnica com três argumentos de venda. Os problemas 11, 14 e 15 são commodities: fazemos o mínimo (já temos 11) ou integramos (14).</p>
+
+  <!-- ─────────────────────────── 7 ─────────────────────────── -->
+  <h2 id="s7">7. A nossa wedge</h2>
+  <div class="card">
+    <p class="tag ok">A NOSSA MELHOR WEDGE</p>
+    <p class="big">"Pomos o teu salão em piloto automático no WhatsApp: confirmamos as marcações, lembramos quem se ia esquecer, chamamos de volta quem desapareceu — e mostramos-te quanto isso te rendeu."</p>
+    <p>Concretamente, três mecanismos numa só rail (WhatsApp Business API + Cloud Functions + modelo de cadência por cliente):</p>
+    <ol>
+      <li><strong>Confirmação a duas vias e lembretes</strong> (utility, €0,0142/msg): pedido de confirmação 48h antes ("responde 1 para confirmar"), lembrete 24h/3h, link para cancelar/reagendar. Marcação não confirmada até T−12h → o dono decide libertar (ou liberta automaticamente) e o horário vai para a lista de espera.</li>
+      <li><strong>Reativação por cadência</strong>: para cada cliente calculamos o intervalo típico entre visitas (por serviço). Passado 1,5× o intervalo sem marcação, o produto propõe (ou envia, com consentimento de marketing) uma mensagem pessoal com link de marcação pré-preenchido. Quem regressa fica marcado como "recuperado".</li>
+      <li><strong>Painel "Receita recuperada"</strong>: € de marcações criadas a partir de links de reativação, € de horários cancelados que foram reocupados, taxa de no-show antes/depois. Atribuído vs estimado, separados, sem inflacionar.</li>
+    </ol>
+  </div>
+  <div class="grid2">
+    <div class="card"><p class="tag">ALTERNATIVA 1</p><p><strong>Assistente de WhatsApp/Instagram que transforma mensagens em marcações</strong> (IA a responder "tens vaga sexta à tarde?" e a marcar). Dor enorme e muito portuguesa; mas exige API de inbound, revisão de app na Meta, e IA a tomar decisões com dinheiro — risco de erro alto para começar. É o passo seguinte na mesma rail, não o primeiro.</p></div>
+    <div class="card"><p class="tag">ALTERNATIVA 2</p><p><strong>Motor de cancelamentos → lista de espera</strong>. Valor por evento alto e muito diferenciador, mas menos frequente (8% de cancelamentos) e com arranque a frio (precisa de clientes em lista de espera). Entra dentro do mecanismo 1 como segunda fase, não como wedge.</p></div>
+  </div>
+  <p><strong>Porque a primeira:</strong> (a) explica-se em cinco segundos a qualquer dono ("nunca mais um cliente falta sem avisar"); (b) é o único canal que 9 em 10 portugueses usam; (c) o custo de mensagens é marginal e previsível; (d) as confirmações são o cavalo de Troia — comodidade que todos entendem — e a reativação é o que justifica €59 e cria o hábito de olhar para o painel; (e) a mesma infraestrutura serve a lista de espera, campanhas e o assistente inbound depois; (f) é mensurável, e a medição é a nossa proposta comercial.</p>
+
+  <!-- ─────────────────────────── 8 ─────────────────────────── -->
+  <h2 id="s8">8. Posicionamento — 5 opções e a escolha</h2>
+  <div class="tbl"><table>
+    <tr><th>Posicionamento</th><th>ICP</th><th>Promessa</th><th>WTP</th><th>Dificuldade comercial</th><th>Concorrência</th><th>Veredito</th></tr>
+    <tr><td>A. "Software de marcações"</td><td>Todos</td><td>Agenda online fácil</td><td>€10–25</td><td>Baixa, mas guerra de preço</td><td>BUK, Zappy, Fresha</td><td><span class="tag bad">Não</span> — commodity</td></tr>
+    <tr><td><strong>B. "Receita recuperada pelo WhatsApp"</strong></td><td>Salão/barbearia 2–8 pros</td><td>Menos faltas, clientes de volta, € medidos</td><td>€29–99</td><td>Média: exige demo com números</td><td>Koibox (parcial), Phorest (caro)</td><td><span class="tag ok">Escolhido</span></td></tr>
+    <tr><td>C. "Assistente de WhatsApp do salão"</td><td>Salões com muitas DMs</td><td>Deixa de responder a mensagens</td><td>€49–99</td><td>Média-alta (confiança na IA)</td><td>Startups de IA genéricas</td><td>Fase 3, mesma rail</td></tr>
+    <tr><td>D. "Sistema operativo do salão" (agenda+faturação+stock+comissões)</td><td>Salões médios</td><td>Tudo num só</td><td>€40–120</td><td>Alta: substituir tudo, faturação certificada</td><td>Zappy, Phorest</td><td><span class="tag bad">Não</span> — é o terreno da Zappy</td></tr>
+    <tr><td>E. "Marketplace de clientes novos"</td><td>Salões urbanos</td><td>Trazemos-te clientes</td><td>Comissão</td><td>Muito alta (lado da procura)</td><td>Treatwell, Fresha, Booksy</td><td><span class="tag bad">Não</span></td></tr>
+  </table></div>
+  <div class="card">
+    <p><strong>Headline:</strong> Recupera clientes e horários perdidos — pelo WhatsApp, em piloto automático.</p>
+    <p><strong>Subheadline:</strong> Confirmações, lembretes e reativação de clientes para salões e barbearias em Portugal. Vês todos os meses quanto o Book It te rendeu.</p>
+    <p><strong>Diferencial defensável:</strong> não vendemos agenda, vendemos um número em euros — e somos os únicos a mostrá-lo de forma honesta em Portugal.</p>
+  </div>
+
+  <!-- ─────────────────────────── 9 ─────────────────────────── -->
+  <h2 id="s9">9. Top funcionalidades por impacto comercial</h2>
+  <p>Impacto financeiro (IF), valor para o cliente (VC), diferenciação (D), retenção (R), facilidade de vender (FV), complexidade técnica (CT, 10 = simples). Prioridade = (IF+VC+D+R+FV+CT)/6.</p>
+  <div class="tbl"><table>
+    <tr><th>Funcionalidade</th><th class="num">IF</th><th class="num">VC</th><th class="num">D</th><th class="num">R</th><th class="num">FV</th><th class="num">CT</th><th class="num">Prio</th><th>Nota</th></tr>
+    <tr><td><strong>1. Confirmação 2-vias + lembretes WhatsApp</strong></td><td class="num">7</td><td class="num">9</td><td class="num">5</td><td class="num">9</td><td class="num">10</td><td class="num">6</td><td class="num"><strong>7,7</strong></td><td>Entrada. Bloqueada só pela aprovação Meta; validar com wa.me manual antes.</td></tr>
+    <tr><td><strong>2. Clientes em risco + reativação por cadência</strong></td><td class="num">9</td><td class="num">8</td><td class="num">8</td><td class="num">9</td><td class="num">7</td><td class="num">7</td><td class="num"><strong>8,0</strong></td><td>O que justifica o Pro. Dá para validar manualmente já (os dados existem).</td></tr>
+    <tr><td><strong>3. Painel Receita recuperada + baseline (no-show, ocupação, retenção)</strong></td><td class="num">6</td><td class="num">8</td><td class="num">8</td><td class="num">9</td><td class="num">9</td><td class="num">8</td><td class="num"><strong>8,0</strong></td><td>Sem isto não há venda por valor nem case study.</td></tr>
+    <tr><td>4. Cancelamento → lista de espera automática</td><td class="num">7</td><td class="num">7</td><td class="num">8</td><td class="num">7</td><td class="num">8</td><td class="num">5</td><td class="num">7,0</td><td>Fase 2, depois da rail.</td></tr>
+    <tr><td>5. Identidade por telefone + importação de clientes (Excel/Fresha/Zappy)</td><td class="num">5</td><td class="num">7</td><td class="num">3</td><td class="num">8</td><td class="num">6</td><td class="num">8</td><td class="num">6,2</td><td>Pré-requisito da reativação (precisa de histórico).</td></tr>
+    <tr><td>6. Sinal/depósito MB WAY em serviços de risco</td><td class="num">7</td><td class="num">6</td><td class="num">6</td><td class="num">6</td><td class="num">6</td><td class="num">6</td><td class="num">6,2</td><td>Só para serviços longos/valiosos; nunca para tudo.</td></tr>
+    <tr><td>7. Follow-up de 1.ª visita ("gostaste? marca a próxima")</td><td class="num">7</td><td class="num">6</td><td class="num">5</td><td class="num">8</td><td class="num">6</td><td class="num">8</td><td class="num">6,7</td><td>Marketing → exige opt-in explícito.</td></tr>
+    <tr><td>8. Kit de aquisição gratuito (link Google Business, QR, bio Instagram)</td><td class="num">5</td><td class="num">6</td><td class="num">2</td><td class="num">4</td><td class="num">8</td><td class="num">10</td><td class="num">5,8</td><td>Custa um dia. Faz-se.</td></tr>
+    <tr><td>9. Campanhas segmentadas (horas fracas, serviço, aniversário)</td><td class="num">6</td><td class="num">6</td><td class="num">5</td><td class="num">6</td><td class="num">6</td><td class="num">6</td><td class="num">5,8</td><td>Depois da base de consentimentos existir.</td></tr>
+    <tr><td>10. Contas por profissional + comissões</td><td class="num">4</td><td class="num">6</td><td class="num">2</td><td class="num">7</td><td class="num">5</td><td class="num">6</td><td class="num">5,0</td><td>Quando o 1.º salão de 4+ pagar.</td></tr>
+    <tr><td>11. Assistente IA (perguntas sobre o próprio negócio)</td><td class="num">4</td><td class="num">6</td><td class="num">7</td><td class="num">6</td><td class="num">7</td><td class="num">5</td><td class="num">5,8</td><td>Útil só quando houver dados e painel; ver §18.</td></tr>
+    <tr><td>12. Inbound WhatsApp/Instagram → marcação (IA)</td><td class="num">6</td><td class="num">9</td><td class="num">8</td><td class="num">9</td><td class="num">8</td><td class="num">3</td><td class="num">7,2</td><td>Alto valor, alto risco; fase 3.</td></tr>
+  </table></div>
+
+  <!-- ─────────────────────────── 10 ─────────────────────────── -->
+  <h2 id="s10">10. Pricing</h2>
+  <p>Princípios: por <strong>salão</strong>, não por profissional (a Zappy/Fresha/Booksy escalam por pessoa — o dono odeia); <strong>mensagens incluídas</strong> (a Fresha cobra à mensagem — o dono odeia mais); preço ancorado no <strong>€ recuperado</strong>, não na agenda; trial de 30 dias (já existe) com onboarding assistido.</p>
+  <div class="tbl"><table>
+    <tr><th>Plano</th><th>Preço</th><th>Para quem</th><th>Inclui</th><th>Limites (o que faz subir)</th></tr>
+    <tr><td><strong>Essencial</strong></td><td>€29/mês (€24/mês anual)</td><td>1–2 profissionais</td><td>Agenda + marcações online + confirmações e lembretes WhatsApp + painel básico + kit de aquisição</td><td>2 profissionais · 300 mensagens/mês · sem reativação</td></tr>
+    <tr><td><strong>Pro</strong> <span class="tag ok">principal</span></td><td>€59/mês (€49 anual)</td><td>3–6 profissionais</td><td>Tudo do Essencial + clientes em risco e reativação + lista de espera/cancelamentos + painel Receita recuperada + importação</td><td>6 profissionais · 1 000 mensagens/mês</td></tr>
+    <tr><td><strong>Crescimento</strong></td><td>€99/mês (€83 anual)</td><td>7+ profissionais ou 2 lojas</td><td>Tudo do Pro + campanhas segmentadas + sinais MB WAY + contas por profissional/comissões + várias localizações + (futuro) assistente IA</td><td>Profissionais ilimitados · 3 000 mensagens/mês</td></tr>
+  </table></div>
+  <ul>
+    <li>Mensagens extra: €0,03 (utility) e €0,08 (marketing) — custo Meta €0,0142/€0,049 → margem ~50%. Pagamentos: taxa do gateway + 0,5% nosso (só nos sinais).</li>
+    <li><strong>Razão de upgrade</strong> Essencial → Pro: o painel do Essencial mostra "X clientes em risco (€Y)" mas bloqueia a ação. É a alavanca de conversão mais forte que temos.</li>
+    <li>Testar €24,90 vs €29 no Essencial com os primeiros 20 salões; não baixar o Pro.</li>
+    <li>Comparação que o dono faz: Zappy DUO €31 sem WhatsApp vs. nós €29 com WhatsApp; um único cliente recuperado (~€35) paga o Pro.</li>
+  </ul>
+
+  <!-- ─────────────────────────── 11 ─────────────────────────── -->
+  <h2 id="s11">11. Moat — porque a Fresha não nos copia (ou copia e não interessa)</h2>
+  <p><strong>Hoje: não temos moat.</strong> Tudo o que está descrito pode ser copiado em meses por um concorrente com equipa. O que se pode construir:</p>
+  <ul>
+    <li><strong>Dados que melhoram com o uso:</strong> cadência por cliente e por serviço, resposta a mensagens, horários de maior conversão, risco de falta. Cada mês de utilização torna as previsões e o timing melhores para <em>aquele</em> salão — um concorrente que copie a funcionalidade começa a zero.</li>
+    <li><strong>Base de consentimentos e conversas no WhatsApp</strong> ligada à nossa plataforma: mudar de software significa perder o histórico de opt-ins e templates aprovados.</li>
+    <li><strong>Histórico de ROI:</strong> um dono que vê 12 meses de "€ recuperados" tem uma razão concreta para não cancelar. Ninguém no mercado PT mostra isto.</li>
+    <li><strong>Especialização Portugal:</strong> MB WAY, RGPD em pt-PT, integração com faturação certificada, linguagem e práticas locais. Os globais tratam PT como mercado secundário.</li>
+    <li><strong>Distribuição:</strong> parcerias com distribuidores/representantes de marcas que visitam salões todos os meses. É o único canal com acesso recorrente e barato ao dono. Quem o fechar primeiro fica com ele.</li>
+    <li><strong>Efeito de rede (mais tarde, incerto):</strong> lista de espera cruzada e clientes com conta em vários salões. Não contar com isto.</li>
+  </ul>
+
+  <!-- ─────────────────────────── 12 ─────────────────────────── -->
+  <h2 id="s12">12. Roadmap</h2>
+  <h3>AGORA (4 semanas) — validar a wedge sem depender da Meta</h3>
+  <div class="tbl"><table>
+    <tr><th>Item</th><th>Impacto</th><th>Esforço</th><th>Dependências</th><th>Risco</th><th>Justificação</th></tr>
+    <tr><td>Cloud Functions ativas + emails de confirmação/lembrete (código pronto)</td><td>Médio</td><td>2 dias</td><td>Blaze, SMTP</td><td>Baixo</td><td>Base de tudo; iguala o mínimo do mercado.</td></tr>
+    <tr><td>Telefone como identidade; email opcional</td><td>Médio</td><td>1–2 dias</td><td>—</td><td>Baixo</td><td>Fricção PT; pré-requisito do WhatsApp.</td></tr>
+    <tr><td><strong>"Clientes em risco" por cadência + botão WhatsApp manual</strong> (wa.me com texto pronto e link de marcação pré-preenchido)</td><td>Alto</td><td>4–5 dias</td><td>Histórico de marcações</td><td>Médio</td><td>Valida a reativação com custo zero de API. Manual primeiro.</td></tr>
+    <tr><td>Baseline e painel: no-show %, cancelamentos, ocupação, rebooking, € por origem</td><td>Alto</td><td>4–5 dias</td><td>Campo <code>source</code> em cada marcação</td><td>Baixo</td><td>Sem baseline não há case study.</td></tr>
+    <tr><td>Kit de aquisição: link de marcação no Google Business, QR para o balcão, bio Instagram</td><td>Médio</td><td>1 dia</td><td>—</td><td>Baixo</td><td>Custa nada; mostra profissionalismo.</td></tr>
+    <tr><td>Pedido de Business Verification na Meta + candidatura WhatsApp Cloud API (em paralelo, porque demora)</td><td>Alto</td><td>1 dia + espera</td><td>Documentos da empresa</td><td>Médio</td><td>O relógio da Meta começa já.</td></tr>
+  </table></div>
+  <h3>PRÓXIMA FASE (semanas 5–10) — automatizar o que validou</h3>
+  <ul>
+    <li>WhatsApp Cloud API: templates utility (confirmação, lembrete, cancelar/reagendar), resposta "1" para confirmar, libertação de não-confirmadas + oferta a lista de espera.</li>
+    <li>Painel "Receita recuperada" com atribuição por token de link.</li>
+    <li>Importação de clientes (CSV; Fresha/Zappy export).</li>
+    <li>Sinal MB WAY (Ifthenpay ou Stripe) só em serviços marcados "com sinal".</li>
+  </ul>
+  <h3>DEPOIS DE VALIDAR (meses 3–6)</h3>
+  <ul><li>Motor de automações com aprovação (regras da §18), campanhas com opt-in de marketing, follow-up de 1.ª visita, contas por profissional e comissões, assistente IA sobre os dados do salão (perguntas → consultas determinísticas).</li></ul>
+  <h3>ESCALA (mês 6+)</h3>
+  <ul><li>Inbound WhatsApp/Instagram → marcação com IA e supervisão; várias localizações; API para parceiros (faturação, distribuidores); barbearias e estética como verticais explícitas; Espanha só depois de 300 salões em PT.</li></ul>
+
+  <!-- ─────────────────────────── 13 ─────────────────────────── -->
+  <h2 id="s13">13. Plano de validação — provar que pagam antes de construir</h2>
+  <div class="tbl"><table>
+    <tr><th>Hipótese</th><th>Experimento</th><th>Métrica</th><th>Amostra</th><th>Sucesso</th><th>Falha</th></tr>
+    <tr><td>Donos de salões 2–8 pros sentem no-shows e churn como problema pago</td><td>10 entrevistas de 20 min em Lisboa (Telheiras/Lumiar/Benfica) com guião de descoberta; no fim, pedir pré-compromisso de trial pago</td><td>% que descreve o problema sem ser induzido; % que aceita trial</td><td>10 salões</td><td>≥6/10 nomeiam faltas ou clientes perdidos; ≥3 aceitam trial</td><td>≤3/10 e ninguém aceita → rever ICP</td></tr>
+    <tr><td>Reativação por cadência traz clientes de volta</td><td>No Zen + 2 salões: lista de clientes em risco gerada pelo produto; dono envia mensagem manual (wa.me) com link; medir 14 dias</td><td>% que remarca em 14 dias; € gerado</td><td>≥100 clientes em risco</td><td>≥8% remarcam</td><td>&lt;3%</td></tr>
+    <tr><td>Confirmação 2-vias reduz faltas</td><td>Baseline 4 semanas (manual) → 8 semanas com confirmação por WhatsApp manual/assistida</td><td>No-show %</td><td>≥400 marcações</td><td>Queda ≥40% relativa</td><td>&lt;15%</td></tr>
+    <tr><td>Salões pagam €59 pelo Pro</td><td>Após 30 dias de trial com painel de € recuperados, propor Pro; sem desconto</td><td>Conversão trial→pago; MRR</td><td>15 trials</td><td>≥40% convertem</td><td>&lt;20%</td></tr>
+    <tr><td>Lista de espera reocupa cancelamentos</td><td>Opt-in na marcação ("avisa-me se surgir vaga"); ao cancelar, o dono envia oferta manual à lista</td><td>% cancelamentos reocupados; tempo até reocupar</td><td>≥60 cancelamentos</td><td>≥20% reocupados</td><td>&lt;8%</td></tr>
+    <tr><td>Distribuidores/representantes aceitam ser canal</td><td>Contactar 5 representantes de marcas (ex.: quem fornece o Zen); oferecer comissão 20% no 1.º ano</td><td>Nº de introduções qualificadas/mês</td><td>5 representantes</td><td>≥1 fecha e traz ≥3 salões/mês</td><td>Nenhum aceita</td></tr>
+  </table></div>
+
+  <!-- ─────────────────────────── 14 ─────────────────────────── -->
+  <h2 id="s14">14. Plano para €10k/mês</h2>
+  <p><span class="tag">hipótese</span> ARPU misto €50 (60% Pro, 30% Essencial, 10% Crescimento) → <strong>≈200 salões pagantes</strong>. Com churn 3%/mês precisamos de ~15–20 novos salões/mês líquidos durante 12–15 meses.</p>
+  <div class="tbl"><table>
+    <tr><th>Fase</th><th>Salões</th><th>Canal principal</th><th>O que tem de ser verdade</th></tr>
+    <tr><td>1 → 3</td><td>0–3</td><td>Zen Organic (piloto) + rede pessoal</td><td>Baseline medido; 1 história com números</td></tr>
+    <tr><td>3 → 10</td><td>mês 2–3</td><td>Porta a porta em Lisboa com uma página A4 "Receita recuperada no Zen: €X em 60 dias"; DMs no Instagram a salões</td><td>Demo de 15 min no salão; trial 30 dias com onboarding feito por nós</td></tr>
+    <tr><td>10 → 25</td><td>mês 4–6</td><td>Referrals (1 mês grátis por salão trazido) + primeiros representantes de marcas</td><td>Conversão trial→pago ≥40%</td></tr>
+    <tr><td>25 → 100</td><td>mês 6–12</td><td>Parceiros (distribuidores, contabilistas, escolas de cabeleireiro), conteúdo curto com donos reais, Google Ads pequeno em "software cabeleireiro"</td><td>CAC &lt; €300; churn &lt; 3%</td></tr>
+    <tr><td>100 → 200</td><td>mês 12–18</td><td>Escalar o canal que funcionou; 1 pessoa de vendas/suporte</td><td>Payback &lt; 6 meses</td></tr>
+  </table></div>
+  <p><strong>Unit economics (base, por salão/mês):</strong> receita €50 · Firebase €0,3 · mensagens €8 · pagamentos pass-through · suporte €6 (1 pessoa/300 salões) → margem bruta ≈ €35 (70%). CAC fundador-led €150–300 → payback 4–9 meses; LTV a 3% churn ≈ €1 150. Pessimista: ARPU €35, churn 5%, CAC €400 → LTV €490, payback 17 meses — não fecha; teria de subir preço ou baixar churn. Otimista: ARPU €65, churn 1,5%, CAC €200 → LTV €3 000.</p>
+
+  <!-- ─────────────────────────── 15 ─────────────────────────── -->
+  <h2 id="s15">15. Plano para €50k/mês</h2>
+  <div class="tbl"><table>
+    <tr><th>Cenário</th><th>Salões</th><th>ARPU</th><th>MRR</th><th>Churn</th><th>Margem bruta</th><th>Equipa</th><th>Notas</th></tr>
+    <tr><td>Pessimista</td><td>1 400</td><td>€35</td><td>€49k</td><td>5%</td><td>60%</td><td>5–6</td><td>Só com um canal de parceiros forte; custo de suporte sobe.</td></tr>
+    <tr><td>Base</td><td>950</td><td>€53</td><td>€50k</td><td>2,5%</td><td>72%</td><td>4–5</td><td>ARPU sobe com Pro/Crescimento, mensagens extra e take rate de sinais.</td></tr>
+    <tr><td>Otimista</td><td>700</td><td>€72</td><td>€50k</td><td>1,5%</td><td>78%</td><td>3–4</td><td>Assistente inbound como plano premium; expansão para estética.</td></tr>
+  </table></div>
+  <p>Como se chega lá: (1) canal de parceiros a trazer 40–60 salões/mês; (2) expansão de receita dentro do cliente (mensagens, sinais, Crescimento) — 20–30% do MRR; (3) verticais adjacentes (barbearias, estética) com o mesmo motor; (4) só depois, Espanha (concorrência Koibox/Booksy) ou Brasil (mercado enorme, mas WhatsApp/PIX e cultura diferentes — não subestimar). <strong>Receita ≠ lucro:</strong> a €50k MRR com 5 pessoas e marketing, o resultado operacional anda perto de zero até o churn descer e os parceiros substituírem vendas diretas.</p>
+
+  <!-- ─────────────────────────── 16 ─────────────────────────── -->
+  <h2 id="s16">16. Maiores riscos — porque isto pode falhar</h2>
+  <ol>
+    <li><strong>O ROI não aparece nos salões pequenos.</strong> Se as faltas em PT já forem baixas (confirmação manual eficaz) e a reativação render 2%, o produto vale €20, não €59. Mitigação: medir no piloto antes de escalar; o Essencial existe para esse cenário.</li>
+    <li><strong>Meta.</strong> Verificação do negócio, Tech Provider/Embedded Signup e revisão de templates podem demorar semanas e mudar de regras (a Meta mudou o pricing em 2025 e 2026). Mitigação: wa.me manual valida o valor sem API; BSP (360dialog/Twilio) como plano B com markup.</li>
+    <li><strong>Tempo do fundador.</strong> Construir e vender ao mesmo tempo. Mitigação: congelar tudo o que não está no roadmap; 50% do tempo em vendas a partir do mês 2.</li>
+    <li><strong>Fresha/Booksy em Portugal com WhatsApp e preço agressivo.</strong> Mitigação: preço fixo com mensagens incluídas, presença local, ROI visível, parceiros.</li>
+    <li><strong>Regulação:</strong> mensagens de marketing sem opt-in explícito (RGPD/ePrivacy + regras da Meta) podem queimar o número do salão. Mitigação: utility por defeito; marketing só com consentimento registado; textos revistos por advogado (<span class="tag bad">legal</span>).</li>
+    <li><strong>Expectativa de faturação certificada.</strong> Alguns donos querem "tudo num só". Mitigação: integrar com Vendus/Moloni/InvoiceXpress no médio prazo; nunca construir.</li>
+    <li><strong>Churn por desuso.</strong> Se o dono não abre o painel, não vê valor. Mitigação: resumo semanal por WhatsApp/email ("esta semana: 3 clientes recuperados, €105").</li>
+  </ol>
+
+  <!-- ─────────────────────────── 17 ─────────────────────────── -->
+  <h2 id="s17">17. Integrações: o que é real, o que custa, o que exige aprovação</h2>
+  <div class="tbl"><table>
+    <tr><th>Canal</th><th>Estado real (set 2026)</th><th>Custo</th><th>Aprovação / requisitos</th><th>O que fazemos</th></tr>
+    <tr><td><strong>WhatsApp Business Platform (Cloud API)</strong></td><td>Preço por mensagem por categoria; respostas dentro de 24h grátis</td><td>PT: utility €0,0142 · marketing €0,049 · service grátis (+IVA 23%)</td><td>Verificação do negócio na Meta; templates aprovados; opt-in explícito para marketing; para ligar números de vários salões, programa Tech Provider/Embedded Signup ou passar por um BSP</td><td>Fase 1 manual (wa.me); fase 2 Cloud API para utility; marketing só com consentimento</td></tr>
+    <tr><td><strong>Instagram</strong></td><td>Botão nativo "Marcar" só para parceiros aprovados (Fresha, Setmore, Acuity…)</td><td>—</td><td>Não estamos na lista; Messaging API para DMs exige revisão de app</td><td>Link na bio + QR + campanhas; DMs automáticas na fase 3</td></tr>
+    <tr><td><strong>Google</strong></td><td>Reserve with Google: parceria pesada; fluxo na UE alterado pelo DMA (2024). O campo "link de marcação" do Google Business Profile é livre</td><td>Grátis</td><td>Nenhuma para o link</td><td>Kit: link de marcação no perfil Google de cada salão (dia 1)</td></tr>
+    <tr><td><strong>MB WAY / Multibanco</strong></td><td>Disponível via Ifthenpay/Eupago (SIBS) ou Stripe</td><td>Ifthenpay/Eupago €0,07 + 0,7% · Stripe MB WAY 1,5% + €0,25, Multibanco 2,95% + €0,25</td><td>Contrato comercial (2–5 dias); webhooks (Functions)</td><td>Sinais em serviços de risco; nunca pagamento obrigatório em tudo</td></tr>
+    <tr><td><strong>SMS</strong></td><td>Commodity</td><td>~€0,05–0,08/SMS em PT via gateways</td><td>Nenhuma</td><td>Fallback quando o cliente não tem WhatsApp (raro em PT)</td></tr>
+    <tr><td><strong>Faturação certificada (AT)</strong></td><td>Obrigatória para emitir faturas; software tem de ser certificado</td><td>Vendus/Moloni/InvoiceXpress €10–20/mês</td><td>Certificação AT — não construir</td><td>Integração por API mais tarde; até lá, o salão mantém o que tem</td></tr>
+  </table></div>
+  <div class="note legal"><strong>LEGAL REVIEW REQUIRED:</strong> (1) base legal para mensagens transacionais (confirmação/lembrete) sem consentimento de marketing — provável "execução do contrato", a confirmar; (2) texto e registo de consentimento de marketing (WhatsApp/SMS/email) e opt-out; (3) contrato de subcontratação salão↔Book It; (4) política de sinais/cancelamentos e devoluções (Lei de defesa do consumidor); (5) faturação de mensagens extra e IVA.</div>
+
+  <!-- ─────────────────────────── 18 ─────────────────────────── -->
+  <h2 id="s18">18. IA, automações e saúde do cliente — útil vs gimmick</h2>
+  <h3>Customer health (deteção → explicação → recomendação → ação)</h3>
+  <p>Os dados já existem em <code>bookings</code> (cliente, serviço, data, estado). Modelo simples e explicável: cadência = mediana dos intervalos entre visitas do cliente (por serviço quando há ≥3); <strong>saudável</strong> se última visita &lt; 1,25× cadência; <strong>em risco</strong> entre 1,25× e 2,5×; <strong>perdido</strong> &gt; 2,5× ou &gt; 180 dias. Cada cartão diz: "A Ana vinha a cada 5 semanas; passaram 9. Valor histórico €420/ano. Recomendação: mensagem pessoal com link para Coloração (o serviço habitual)." Ação: um clique abre o WhatsApp com o texto (fase 1) ou envia (fase 2). É uma vantagem importante porque é <em>específico, explicável e acionável</em> — e ninguém em PT o mostra ao dono de um salão de 3 pessoas.</p>
+  <h3>Motor de automações — o que entra primeiro</h3>
+  <div class="tbl"><table>
+    <tr><th>Regra</th><th>Possível já?</th><th>Impacto</th><th>Modo</th><th>Ordem</th></tr>
+    <tr><td>Marcação criada → confirmação; T−48h pedido de confirmação; T−24h lembrete</td><td>Sim (Functions + WhatsApp utility)</td><td>Alto</td><td>Automático</td><td>1</td></tr>
+    <tr><td>Não confirmada até T−12h → alerta ao dono; opção de libertar + oferecer à lista</td><td>Sim</td><td>Alto</td><td>Aprovação, depois automático</td><td>2</td></tr>
+    <tr><td>Cliente ultrapassa 1,5× cadência → mensagem de reativação</td><td>Sim (dados existentes)</td><td>Alto</td><td>Aprovação (fase 1), automático com opt-in</td><td>3</td></tr>
+    <tr><td>Cancelamento → oferta aos clientes em lista de espera compatíveis</td><td>Sim, após lista de espera</td><td>Médio-alto</td><td>Automático com notificação</td><td>4</td></tr>
+    <tr><td>1.ª visita paga → follow-up 3 dias depois + sugestão de próxima data</td><td>Sim</td><td>Médio</td><td>Automático com opt-in</td><td>5</td></tr>
+    <tr><td>Cliente frequente sem cupão → oferecer fidelização</td><td>Sim</td><td>Baixo</td><td>Aprovação</td><td>7</td></tr>
+    <tr><td>Horas fracas na próxima semana → campanha segmentada</td><td>Sim, após consentimentos</td><td>Médio</td><td>Aprovação</td><td>6</td></tr>
+  </table></div>
+  <h3>No-show engine</h3>
+  <p>Medir (já temos o estado <code>noshow</code>), prever (pontuação simples: cliente novo, faltas anteriores, marcação feita com muita antecedência, sexta/sábado, valor alto), agir (confirmação 2-vias; sinal MB WAY quando risco alto <em>e</em> serviço &gt; €X; libertar não-confirmadas; texto de política claro). Resultado a reportar: taxa de no-show antes/depois e € dos horários libertados que foram reocupados. Não prometer "evitámos N faltas" — não é observável.</p>
+  <h3>Revenue engine</h3>
+  <p>O dashboard passa de números a frases com botão: "Tens 4 horários vazios amanhã → 23 clientes costumam vir nesta altura → 8 são elegíveis (com opt-in) → Enviar oferta". Cada cartão: DATA → INSIGHT → AÇÃO → RESULTADO (medido 14 dias depois).</p>
+  <h3>ROI honesto</h3>
+  <ul>
+    <li><strong>Atribuído</strong> (determinístico): marcações criadas via link com token de reativação/oferta de vaga; horários libertados por não-confirmação que foram reocupados. Soma-se e mostra-se.</li>
+    <li><strong>Estimado</strong> (contrafactual): variação da taxa de no-show vs. baseline × ticket médio. Mostra-se à parte, com a palavra "estimado", nunca somado ao atribuído.</li>
+    <li>Tempo poupado: nº de confirmações/lembretes automáticos × 1 min — apresentado como "mensagens que não tiveste de enviar", não como euros.</li>
+  </ul>
+  <h3>IA: útil vs gimmick</h3>
+  <div class="grid2">
+    <div class="card"><p class="tag ok">Útil</p><ul><li>Perguntas em linguagem natural que se traduzem em consultas determinísticas sobre os dados do salão ("quem não vem há 90 dias?", "faturação por serviço este mês") — sem alucinar números.</li><li>Explicar porquê ("faturação caiu porque a Marta esteve de férias 2 semanas e houve 9 faltas").</li><li>Redigir a mensagem de reativação no tom do salão.</li><li>"3 ações de hoje" priorizadas por € esperado.</li><li>Fase 3: responder a DMs e marcar, com supervisão e limites.</li></ul></div>
+    <div class="card"><p class="tag bad">Gimmick</p><ul><li>Chatbot genérico "pergunta-me qualquer coisa".</li><li>Gerar campanhas antes de existir canal e consentimentos.</li><li>"Previsões" com 200 marcações de histórico.</li><li>IA a alterar preços ou horários sozinha.</li></ul></div>
+  </div>
+
+  <!-- ─────────────────────────── 19 ─────────────────────────── -->
+  <h2 id="s19">19. NÃO CONSTRUIR AGORA</h2>
+  <ul>
+    <li>Marketplace / app de consumidor (lado da procura é outro negócio).</li>
+    <li>Botão nativo "Marcar" do Instagram e Reserve with Google como parceiro (não acessível / pesado).</li>
+    <li>Faturação certificada, stock/inventário, POS, cartões-presente, memberships, multi-moeda.</li>
+    <li>Apps nativas iOS/Android (PWA chega).</li>
+    <li>Mais fidelização/pontos, referidos, ⌘K, temas, CMS do site.</li>
+    <li>Gestão de salas/cadeiras como recursos (só se estética exigir).</li>
+    <li>Construtor de emails de marketing; formulários de consulta; assinaturas digitais.</li>
+    <li>Pagamento online obrigatório em todas as marcações (mata conversão); só sinais seletivos.</li>
+    <li>IA a "gerar campanhas" sem canal, e chat genérico.</li>
+    <li>Expansão geográfica antes de 300 salões em PT.</li>
+  </ul>
+
+  <h2>Expansão vertical vs horizontal</h2>
+  <p><strong>Vertical, em beleza, por esta ordem:</strong> cabeleireiros → <strong>barbearias</strong> (cadência de 2–4 semanas: a reativação rende mais e o Instagram é o canal; ticket baixo, manter preço) → nails/lashes (cadência 3–4 semanas, muito WhatsApp) → estética (ticket alto: sinais e no-shows caros) → massagens/tatuagens (só se o motor não precisar de mudar). Horizontal (fisioterapia, veterinários, oficinas) só se três verticais de beleza mostrarem que o motor de cadência + WhatsApp generaliza sem código específico. A especialização é parte do moat; abandoná-la cedo é competir com Setmore/Calendly.</p>
+
+  <h2>North Star e métricas</h2>
+  <p><strong>North Star:</strong> <span class="big">€ de receita atribuída pelo Book It, por salão, por mês</span> (marcações via links de reativação/oferta de vaga + horários libertados e reocupados). Correlaciona com valor real, com retenção e com o preço que podemos cobrar.</p>
+  <p><strong>Secundárias (6, não mais):</strong> taxa de no-show; taxa de rebooking dentro da cadência; % marcações confirmadas por WhatsApp; salões ativos semanalmente (dono abriu o painel ou recebeu resumo); conversão trial→pago; churn mensal.</p>
+
+  <h2>Processo de venda e objeções (resumo)</h2>
+  <p><strong>PROSPECT</strong> (lista de salões 3–8 pros na zona; Instagram/Google) → <strong>DISCOVERY</strong> (15 min: "quantas faltas por semana? quantos clientes deixaram de vir? quanto tempo passas no WhatsApp?") → <strong>DEMO</strong> no telemóvel do dono, com os números dele → <strong>ROI</strong> (uma folha: faltas × ticket, clientes em risco × valor) → <strong>TRIAL</strong> 30 dias com importação feita por nós → <strong>CONVERSÃO</strong> ao ver o painel de € recuperados → <strong>ONBOARDING</strong> (WhatsApp ligado, equipa formada em 20 min) → <strong>EXPANSÃO</strong> (Pro → Crescimento quando cresce) → <strong>REFERRAL</strong> (1 mês grátis).</p>
+  <div class="tbl"><table>
+    <tr><th>Objeção</th><th>Resposta baseada em resultado</th></tr>
+    <tr><td>"Já uso Fresha/Zappy"</td><td>"Ótimo — mantém. Quantos clientes te deixaram de vir este ano sem tu saberes? Deixa-me importar a tua lista e mostrar-te o número. Se não valer o que pagas, não mudas."</td></tr>
+    <tr><td>"Não preciso"</td><td>"Quantas faltas tiveste na semana passada? A €35 cada, são €X por mês. Só te peço 30 dias para medirmos."</td></tr>
+    <tr><td>"É caro"</td><td>"€59 é um cliente e meio recuperado por mês. No trial vês o número antes de pagar."</td></tr>
+    <tr><td>"Os meus clientes ligam"</td><td>"Continuam a ligar. O que muda é que deixas de ter de lhes ligar tu para confirmar — e os que desaparecem recebem uma mensagem tua."</td></tr>
+    <tr><td>"Não quero mudar"</td><td>"Não mudas nada no primeiro mês: importamos, ligamos o WhatsApp e tu continuas a trabalhar como sempre."</td></tr>
+    <tr><td>"Vou pensar"</td><td>"Claro. Posso enviar-te na sexta a lista dos teus clientes em risco para pensares com números?"</td></tr>
+    <tr><td>"Não quero pagar mensalmente"</td><td>"Anual com 2 meses de desconto; ou cancelas quando quiseres, sem fidelização."</td></tr>
+  </table></div>
+
+  <h2>Case study — o que medir no Zen (antes e 90 dias depois)</h2>
+  <ul>
+    <li>Baseline 4 semanas: marcações/semana, receita registada, no-show %, cancelamentos %, ocupação (minutos marcados ÷ minutos disponíveis), ticket médio, rebooking dentro da cadência, clientes em risco/perdidos e o seu valor anual, tempo do dono em confirmações (auto-reportado).</li>
+    <li>90 dias: as mesmas métricas + € atribuído (reativação, vagas reocupadas) + € estimado (queda de no-show × ticket) + retenção de clientes novos a 60 dias.</li>
+    <li>Só publicar "Em 90 dias o Book It ajudou o Zen a recuperar €X e reduzir faltas em Y%" se X for atribuído e Y tiver ≥400 marcações de base.</li>
+  </ul>
+
+  <!-- ─────────────────────────── 20 ─────────────────────────── -->
+  <h2 id="s20">20. Os 3 movimentos de maior impacto (decisão pedida)</h2>
+  <div class="grid2">
+    <div class="card"><p class="tag ok">MOVIMENTO 1</p><h3 style="margin-top:4px">Construir a rail de comunicação e o baseline</h3><p>Cloud Functions + confirmações/lembretes (email já, WhatsApp manual já, WhatsApp API assim que a Meta aprovar) + telefone como identidade + painel com no-show, cancelamentos, ocupação, rebooking e origem de cada marcação. Sem isto não há produto vendável nem case study. 2–3 semanas.</p></div>
+    <div class="card"><p class="tag ok">MOVIMENTO 2</p><h3 style="margin-top:4px">Clientes em risco → reativação → € recuperado</h3><p>Modelo de cadência sobre os dados que já temos, cartões explicáveis, botão WhatsApp com link pré-preenchido e token de atribuição, painel "Receita recuperada". É o que justifica €59 e cria hábito. Validar manualmente no Zen + 2 salões antes de automatizar. 1–2 semanas.</p></div>
+    <div class="card"><p class="tag ok">MOVIMENTO 3</p><h3 style="margin-top:4px">Distribuição: 10 entrevistas, 3 pilotos, 1 parceiro</h3><p>Antes de mais código além dos movimentos 1–2: 10 conversas com donos de salões de 2–8 pessoas, 3 pilotos com baseline, e um representante de marcas a apresentar-nos. O produto só vale o que os primeiros 10 salões disserem com números.</p></div>
+  </div>
+  <p><strong>Ordem proposta:</strong> 1 e 3 em paralelo (o 3 não precisa de código), 2 logo a seguir. Não implemento nada disto sem a tua confirmação — e sugiro que a decisão de ativar o plano Blaze (custo previsível, cêntimos por salão) seja tomada já, porque é o pré-requisito de tudo.</p>
+
+  <hr>
+  <h3>Fontes consultadas (setembro 2026)</h3>
+  <p class="src">
+    Mercado PT: <a href="https://www.loreal.com/-/media/project/loreal/brand-sites/corp/master/lcorp/7-local-country-folder/portugal/documents/pr--iniciativa-a-beleza-est-em-cuidar.pdf">L'Oréal Portugal (cita INE: &gt;38 000 salões e institutos)</a> ·
+    <a href="https://www.marktest.com/wap/a/n/id~2c34.aspx">Marktest 2025 — Instagram e WhatsApp as redes mais usadas</a> ·
+    <a href="https://eco.sapo.pt/2025/09/18/instagram-e-whatsapp-sao-as-redes-sociais-mais-utilizadas-pelos-portugueses/">ECO (set 2025)</a> ·
+    <a href="https://datareportal.com/reports/digital-2025-portugal">DataReportal Digital 2025 Portugal</a> ·
+    <a href="https://sapo.pt/artigo/o-mercado-de-cosmeticos-em-portugal-em-2026-projecoes-desafios-e-oportunidades-695ff56bab728f90f0c419d9">Mercado de cosméticos PT 2026</a>.
+    Concorrência: <a href="https://zappysoftware.com/en/pricing">Zappy — preçário</a> ·
+    <a href="https://buk.app/cabeleireiros">BUK — cabeleireiros</a> ·
+    <a href="https://www.treatwell.pt/partners/precos/">Treatwell PT — preços</a> ·
+    <a href="https://pabau.com/blog/fresha-pricing/">Fresha pricing 2026 (Pabau)</a> ·
+    <a href="https://schedulingkit.com/reviews/fresha-review">Fresha review (SchedulingKit)</a> ·
+    <a href="https://biz.booksy.com/pricing">Booksy pricing</a> ·
+    <a href="https://slotcut.com/blog/booksy-pricing-2026-what-you-actually-pay">Booksy 2026 (Slotcut)</a> ·
+    <a href="https://koibox.pt/">Koibox PT</a> ·
+    <a href="https://www.itqlick.com/phorest-salon-software/pricing">Phorest pricing (ITQlick)</a> ·
+    <a href="https://pro.booksalon.pt/">Book Salon PT</a>.
+    Integrações: <a href="https://whautomate.com/whatsapp-business-api-pricing-portugal">WhatsApp API pricing Portugal 2026</a> ·
+    <a href="https://blueticks.co/blog/whatsapp-business-pricing-europe-2026">WhatsApp pricing Europe 2026 (Blueticks)</a> ·
+    <a href="https://blueticks.co/blog/whatsapp-opt-in-compliance-requirements">Opt-in compliance (Blueticks)</a> ·
+    <a href="https://help.instagram.com/122793804938499">Instagram — botões de ação</a> ·
+    <a href="https://developers.google.com/actions-center/verticals/reservations/e2e/overview">Reserve with Google — eligibility</a> ·
+    <a href="https://partnercare.treatwell.com/s/article/Reserve-with-Google?language=en_GB">Treatwell — Reserve with Google (DMA)</a> ·
+    <a href="https://stripe.com/pricing/local-payment-methods">Stripe — métodos locais (MB WAY, Multibanco)</a> ·
+    <a href="https://stripe.com/payment-method/mb-way">Stripe — MB WAY</a> ·
+    <a href="https://shelf.pt/blog/ifthenpay-review">Ifthenpay (Shelf)</a> ·
+    <a href="https://shelf.pt/blog/eupago-gateway-pagamento-portugal">Eupago (Shelf)</a>.
+    No-shows e retenção: <a href="https://www.zenoti.com/thecheckin/beauty-wellness-industry-statistics-2025">Zenoti 2025 benchmark</a> ·
+    <a href="https://www.bookrhub.com/en/no-show-report-2026">No-show report 2026 (Bookr)</a> ·
+    <a href="https://www.etisia.com/no-show-statistics">No-show statistics (Etisia)</a> ·
+    <a href="https://www.joinblvd.com/blog/salon-trends-industry-statistics">Boulevard — salon statistics 2026</a> ·
+    <a href="https://zylu.co/client-retention-benchmarks-salons/">Client retention benchmarks (Zylu)</a> ·
+    <a href="https://www.callpad.ai/post/salon-client-retention-rate-benchmarks-improve">Retention benchmarks (Callpad)</a>.
+  </p>
+</div>
