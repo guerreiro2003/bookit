@@ -1,0 +1,23 @@
+{
+  "name": "bookit",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Book It — multi-tenant salon booking SaaS (static frontend + Firebase)",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "test:rules": "node tests/rules.integration.mjs",
+    "serve": "python3 -m http.server 8000",
+    "emulators": "firebase emulators:start --only firestore,auth,hosting",
+    "deploy": "firebase deploy --only hosting:bookit-51575,firestore:rules,firestore:indexes",
+    "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes",
+    "deploy:hosting": "firebase deploy --only hosting:bookit-51575",
+    "backup:export": "node scripts/backup-export.mjs"
+  },
+  "devDependencies": {
+    "firebase": "^10.14.1"
+  }
+}

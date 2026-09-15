@@ -1,5 +1,35 @@
 # Changelog
 
+## 2.0.0 — 2026-09-15 · Production hardening (commercial release)
+
+### Motor de marcações
+- **Agenda transacional por colaborador/dia** (`agenda/{staffId}__{date}`): impossível criar marcações sobrepostas, mesmo em concorrência. Considera duração real, horário do salão e do colaborador, pausas, férias/indisponibilidades, datas encerradas, antecedência mínima/máxima e fuso horário.
+- "Sem preferência" atribui um colaborador real disponível.
+- Reagendar (admin), cancelar com libertação atómica do horário, anular cancelamento com re-verificação.
+- Máquina de estados aplicada no cliente e nas regras.
+- Fuso horário do salão em todas as datas "hoje".
+
+### Segurança / RBAC
+- Conta de equipa real por salão (`teamUid`) em vez de hash SHA-256 público + Anonymous Auth (provider desativado).
+- Marcações deixam de ser públicas; disponibilidade vem da agenda (sem dados pessoais).
+- Preços ancorados ao catálogo nas regras; fidelização não forjável; campos de faturação bloqueados.
+- Validação de tipos/tamanhos em todas as coleções; isolamento de tenants verificado por testes.
+- CSP, HSTS, Permissions-Policy; `.git`, docs e scripts fora do hosting.
+
+### Produto
+- Marcação como visitante corrigida (não dependia de leitura de `clients`).
+- Página de sucesso honesta (sem promessa de email) + .ics + Google Calendar.
+- Política de cancelamento pelo cliente (janela configurável) aplicada no cliente e no servidor.
+- Admin: horários livres reais ao criar marcação, pausas, datas encerradas, férias por colaborador, settings do motor, rotação da password da equipa, paginação de clientes, exportação JSON.
+- Cliente: exportar dados, apagar conta anonimiza marcações (RGPD).
+- Setup cria conta de equipa, defaults do motor e período de teste (plano).
+- Subscrição (`plan`/`trialEndsAt`) com gate nas regras e script de operador.
+
+### Qualidade
+- `booking-core.js` puro com testes unitários; testes de integração das regras; E2E do motor com o SDK real; stress de concorrência.
+- Documentação: README, PRODUCTION_CHECKLIST, ADMIN_GUIDE, DISASTER_RECOVERY, functions/README.
+
+
 Three-phase overhaul of Book It from prototype to production-grade SaaS.
 
 ## v2.0.0 — 2026-05-16

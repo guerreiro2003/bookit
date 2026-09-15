@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Política de Privacidade — Book It</title>
+  <meta name="robots" content="noindex" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="appbar"><div class="appbar__inner"><a class="appbar__brand" href="index.html"><div class="appbar__mark" aria-hidden="true">B</div><div><div class="appbar__name">Book It</div><div class="appbar__sub">Privacidade</div></div></a></div></header>
+  <main>
+    <div class="container--md" style="padding: var(--s-7) 0 var(--s-10); line-height: 1.6">
+      <h1 class="page-title">Política de Privacidade</h1>
+      <p class="text-muted text-sm mb-5">Modelo — <strong>LEGAL REVIEW REQUIRED</strong>: este texto é um ponto de partida técnico e deve ser revisto e completado por um responsável jurídico antes da entrada em produção (identidade do responsável pelo tratamento, base legal, prazos de conservação, encarregado de proteção de dados se aplicável).</p>
+
+      <h2 class="section-title">Que dados recolhemos</h2>
+      <ul>
+        <li><strong>Marcações:</strong> nome, email, telemóvel, serviço, data/hora, notas que escrevas, nome da pessoa a atender (se indicado).</li>
+        <li><strong>Conta de cliente (opcional):</strong> email de acesso, nome, telemóvel, data de nascimento (opcional), histórico de visitas, pontos e cupões.</li>
+        <li><strong>Dados técnicos:</strong> registos de acesso mínimos necessários à segurança do serviço.</li>
+      </ul>
+
+      <h2 class="section-title">Para que os usamos</h2>
+      <ul>
+        <li>Gerir a tua marcação (confirmação, alterações, cancelamento) e contactar-te sobre ela.</li>
+        <li>Gerir o programa de fidelização, se criares conta.</li>
+        <li>Cumprir obrigações legais e contabilísticas do salão.</li>
+      </ul>
+
+      <h2 class="section-title">Quem tem acesso</h2>
+      <p>O salão onde marcaste (responsável pelo tratamento) e a sua equipa. Os dados são alojados na Google Cloud / Firebase (subcontratante), em servidores na União Europeia ou ao abrigo de cláusulas contratuais-tipo. Não vendemos nem partilhamos os teus dados com terceiros para marketing.</p>
+
+      <h2 class="section-title">Durante quanto tempo</h2>
+      <p>Enquanto a tua marcação/conta estiver ativa e pelo período exigido por obrigações legais. Marcações passadas podem ser conservadas de forma anonimizada para fins contabilísticos.</p>
+
+      <h2 class="section-title">Os teus direitos</h2>
+      <ul>
+        <li><strong>Acesso e portabilidade:</strong> na tua área pessoal podes exportar todos os teus dados (JSON).</li>
+        <li><strong>Retificação:</strong> podes editar nome, telemóvel e data de nascimento na tua área pessoal.</li>
+        <li><strong>Eliminação:</strong> podes apagar a conta na tua área pessoal; os dados pessoais são removidos das marcações e do perfil.</li>
+        <li>Para marcações feitas sem conta, contacta o salão para exercer estes direitos.</li>
+        <li>Tens o direito de apresentar reclamação à autoridade de controlo (em Portugal, a CNPD).</li>
+      </ul>
+
+      <h2 class="section-title">Contacto</h2>
+      <p id="contactLine">Contacta o salão através dos dados indicados na página de marcações.</p>
+      <p class="text-xs text-muted mt-5">Última atualização: <span id="updated"></span></p>
+    </div>
+  </main>
+  <script type="module">
+    import { loadSalon, getSalonId } from './app.js';
+    document.getElementById('updated').textContent = '2026-09-15';
+    const s = await loadSalon(getSalonId());
+    if (s) document.getElementById('contactLine').textContent = `${s.name}${s.address ? ' · ' + s.address : ''}${s.email ? ' · ' + s.email : ''}${s.phone ? ' · ' + s.phone : ''}`;
+  </script>
+</body>
+</html>

@@ -12,3 +12,7 @@ node_modules/
 
 # Local Netlify folder
 .netlify
+
+# backups / functions deps
+backups/
+functions/node_modules/

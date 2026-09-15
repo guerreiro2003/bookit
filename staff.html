@@ -181,19 +181,18 @@
 import {
   db, auth, collection, doc, getDoc, getDocs, updateDoc,
   query, where, orderBy, onSnapshot, serverTimestamp,
-  signInWithEmailAndPassword, signInAnonymously, signOut, onAuthStateChanged
+  signInWithEmailAndPassword, signOut, onAuthStateChanged
 } from './firebase.js';
 import {
   $, $$, on, toast, toastSuccess, toastError,
   escapeHTML, htmlMix, raw,
   MONTHS_FULL, formatDate, formatDatePT, formatPrice, todayISO, relativeDay,
-  getSalonId, loadSalon, applySalonBranding,
-  authErrorMessage, showFatalError, statusBadge,
-  markBookingPaid, markBookingNoShow, verifyPassword, withLock,
+  getSalonId, loadSalon, applySalonBranding, todayForSalon,
+  authErrorMessage, friendlyError, showFatalError, statusBadge,
+  markBookingPaid, markBookingNoShow, confirmBooking, cancelBooking, restoreBooking, withLock,
   debounce, toggleTheme, getTheme, trapFocus
 } from './app.js';
 
-const SESSION_KEY = 'bookit:staff_session';
 const salonId = getSalonId();
 let salon = null, mode = 'team';
 let payContext = null, unsubToday = null;
@@ -205,25 +204,13 @@ let cachedToday = [];
   applySalonBranding(salon, { titlePrefix: 'Portal da equipa' });
   syncThemeIcon();
 
+  // Role is decided by THIS salon's document — the same uid is admin/team only
+  // where the salon says so, never across tenants.
   onAuthStateChanged(auth, async (user) => {
-    if (user) {
-      const admin = await getDocs(query(collection(db,'salons'), where('adminUid','==', user.uid)));
-      if (!admin.empty) {
-        mode = 'admin'; showApp(); return;
-      }
-    }
-    try {
-      const saved = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null');
-      if (saved && saved.salonId === salonId && saved.expires > Date.now()) {
-        mode = saved.mode || 'team';
-        // Restore a Firebase token if the anonymous session was dropped, so the
-        // team can still confirm/pay after a reload.
-        if (!user) { try { await signInAnonymously(auth); } catch (e) { console.error(e); } }
-        showApp();
-      } else {
-        mode = 'team'; showLogin();
-      }
-    } catch { showLogin(); }
+    if (unsubToday) { unsubToday(); unsubToday = null; }
+    if (user && user.uid === salon.adminUid) { mode = 'admin'; showApp(); return; }
+    if (user && salon.teamUid && user.uid === salon.teamUid) { mode = 'team'; showApp(); return; }
+    mode = 'team'; showLogin();
   });
 })();
 
@@ -265,25 +252,17 @@ $('#formTeam').addEventListener('submit', withLock('team-login', async (e) => {
   setErr('');
   const pw = $('#teamPw').value;
   if (!pw) return setErr('Escreve a password da equipa.');
-  const hash = salon.teamPasswordHash || salon.teamPassword; // legacy fallback
-  if (!hash) return setErr('A administração ainda não definiu password da equipa.');
+  if (!salon.teamEmail || !salon.teamUid) return setErr('A administração ainda não definiu a password da equipa (Configurações).');
   const btn = $('#teamBtn'); btn.disabled = true;
-  const ok = await verifyPassword(pw, hash);
-  if (!ok) { setErr('Password incorreta.'); btn.disabled = false; return; }
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify({
-    salonId, mode: 'team', expires: Date.now() + 8 * 60 * 60 * 1000
-  }));
-  mode = 'team';
-  // Obtain a real Firebase token so the team can actually write (confirm/pay/
-  // no-show). The shared password is only the UX gate; Firestore rules scope
-  // what an anonymous team session is allowed to change.
   try {
-    if (!auth.currentUser) await signInAnonymously(auth);
+    // The team is a real Firebase account (one per salon). Firebase enforces
+    // rate limiting and lockout; Firestore rules scope what the team may do.
+    await signInWithEmailAndPassword(auth, salon.teamEmail, pw);
+    // onAuthStateChanged takes it from here
   } catch (err) {
-    console.error('anon sign-in', err);
-    toastError('Sessão iniciada em modo leitura. Recarrega se as ações não funcionarem.');
+    setErr(err.code === 'auth/too-many-requests' ? authErrorMessage(err.code) : 'Password incorreta.');
+    btn.disabled = false;
   }
-  showApp();
 }));
 
 $('#formAdmin').addEventListener('submit', withLock('admin-login', async (e) => {
@@ -302,7 +281,6 @@ $('#formAdmin').addEventListener('submit', withLock('admin-login', async (e) => 
 
 on('logout', async () => {
   if (unsubToday) { unsubToday(); unsubToday = null; }
-  sessionStorage.removeItem(SESSION_KEY);
   try { await signOut(auth); } catch {}
   mode = 'team';
   showLogin();
@@ -342,17 +320,14 @@ on('switch-tab', (el) => {
 /* ── HOJE (real-time) ────────────────────────────────────── */
 function subscribeToday() {
   if (unsubToday) unsubToday();
-  const today = new Date();
-  const dateStr = formatDate(today);
-  $('#todayTitle').textContent = `Marcações de hoje · ${today.getDate()} ${MONTHS_FULL[today.getMonth()]}`;
+  const dateStr = todayForSalon(salon);
+  const [ty, tm, td] = dateStr.split('-').map(Number);
+  $('#todayTitle').textContent = `Marcações de hoje · ${td} ${MONTHS_FULL[tm - 1]}`;
 
-  const q = query(
-    collection(db,'salons',salonId,'bookings'),
-    where('date','==', dateStr),
-    orderBy('time','asc')
-  );
+  // Single-field query + client-side sort: no composite index dependency.
+  const q = query(collection(db,'salons',salonId,'bookings'), where('date','==', dateStr));
   unsubToday = onSnapshot(q, snap => {
-    cachedToday = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    cachedToday = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
     const active = cachedToday.filter(b => b.status !== 'cancelled');
     $('#statTotal').textContent     = active.length;
     $('#statPending').textContent   = active.filter(b => b.status === 'pending').length;
@@ -436,29 +411,28 @@ function bookingActions(b) {
   return btns.join(' ');
 }
 
-on('confirm-booking', async (el) => {
-  await updateDoc(doc(db,'salons',salonId,'bookings', el.dataset.id), { status: 'confirmed' });
-  toastSuccess('Marcação confirmada.');
-});
+on('confirm-booking', withLock('confirm', async (el) => {
+  try { await confirmBooking({ salonId, bookingId: el.dataset.id }); toastSuccess('Marcação confirmada.'); }
+  catch (e) { console.error(e); toastError(friendlyError(e)); }
+}));
 
-on('cancel-booking', async (el) => {
+on('cancel-booking', withLock('cancel', async (el) => {
   const id = el.dataset.id;
-  const snap = await getDoc(doc(db,'salons',salonId,'bookings', id));
-  if (!snap.exists()) return;
-  const prev = snap.data().status;
-  await updateDoc(doc(db,'salons',salonId,'bookings', id), { status: 'cancelled', cancelledAt: serverTimestamp() });
-  toastSuccess('Cancelada.', { undo: async () => {
-    await updateDoc(doc(db,'salons',salonId,'bookings', id), { status: prev, cancelledAt: null });
-    toastSuccess('Anulado.');
-  }});
-});
+  try {
+    await cancelBooking({ salonId, bookingId: id, by: mode === 'admin' ? 'admin' : 'team' });
+    toastSuccess('Cancelada. O horário ficou livre.', { undo: async () => {
+      try { await restoreBooking({ salonId, bookingId: id }); toastSuccess('Cancelamento anulado.'); }
+      catch (e) { toastError(friendlyError(e, 'Não foi possível anular: o horário já foi ocupado.')); }
+    }});
+  } catch (e) { console.error(e); toastError(friendlyError(e)); }
+}));
 
 on('noshow-booking', async (el) => {
   if (!confirm('Marcar como "Não compareceu"?')) return;
   try {
-    await markBookingNoShow({ salonId, bookingId: el.dataset.id, penalty: salon.noShowPenalty || 0 });
+    await markBookingNoShow({ salonId, salon, bookingId: el.dataset.id });
     toastSuccess('Marcado como "Não compareceu".');
-  } catch (e) { console.error(e); toastError('Erro.'); }
+  } catch (e) { console.error(e); toastError(friendlyError(e)); }
 });
 
 /* ── PAYMENT MODAL ───────────────────────────────────────── */
@@ -491,15 +465,11 @@ on('confirm-pay', withLock('confirm-pay', async () => {
   if (!payContext?.method) return;
   $('#payConfirmBtn').disabled = true;
   try {
-    await markBookingPaid({
-      salonId, bookingId: payContext.bookingId, method: payContext.method,
-      pointsPerVisit: salon.pointsPerVisit, loyaltyVisits: salon.loyaltyVisits,
-      loyaltyDiscount: salon.loyaltyDiscount,
-    });
+    await markBookingPaid({ salonId, salon, bookingId: payContext.bookingId, method: payContext.method });
     toastSuccess('Pagamento registado · pontos atribuídos.');
     document.querySelector('[data-action="close-pay"]').click();
   } catch (e) {
-    console.error(e); toastError('Erro ao registar pagamento.');
+    console.error(e); toastError(friendlyError(e, 'Erro ao registar pagamento.'));
     $('#payConfirmBtn').disabled = false;
   }
 }));

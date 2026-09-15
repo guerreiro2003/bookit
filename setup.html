@@ -79,11 +79,17 @@
             <label for="aEmail">Email do admin *</label>
             <input type="email" id="aEmail" required placeholder="admin@exemplo.com" autocomplete="email" />
           </div>
-          <div class="field field--password" data-revealed="false" style="margin-bottom:0">
+          <div class="field field--password" data-revealed="false">
             <label for="aPw">Password *</label>
-            <input type="password" id="aPw" required minlength="6" autocomplete="new-password" placeholder="Mínimo 6 caracteres" />
+            <input type="password" id="aPw" required minlength="8" autocomplete="new-password" placeholder="Mínimo 8 caracteres" />
             <button type="button" class="pw-toggle" data-action="toggle-pw" aria-label="Mostrar password"></button>
-            <div class="field__hint">A password é usada para entrar em <code>admin.html</code>.</div>
+            <div class="field__hint">A password é usada para entrar no painel de administração.</div>
+          </div>
+          <div class="field field--password" data-revealed="false" style="margin-bottom:0">
+            <label for="tPw">Password da equipa *</label>
+            <input type="password" id="tPw" required minlength="8" autocomplete="off" placeholder="Mínimo 8 caracteres" />
+            <button type="button" class="pw-toggle" data-action="toggle-pw" aria-label="Mostrar password"></button>
+            <div class="field__hint">Partilhada com os colaboradores para o portal da equipa (confirmar, registar pagamentos). Podes mudá-la nas Configurações.</div>
           </div>
         </div>
 
@@ -110,13 +116,15 @@
 
 <script type="module">
 import {
-  db, auth, doc, getDoc, setDoc, collection, serverTimestamp,
-  writeBatch, createUserWithEmailAndPassword
+  db, auth, doc, getDoc, setDoc, collection, serverTimestamp, Timestamp,
+  writeBatch, createUserWithEmailAndPassword, getSecondaryAuth, signOut
 } from './firebase.js';
 import {
-  on, toastSuccess, authErrorMessage, $, hashPassword,
-  isSlug, isEmail, withLock, WEEKDAY_KEYS
+  on, toastSuccess, authErrorMessage, friendlyError, $,
+  isSlug, isEmail, withLock, SALON_DEFAULTS
 } from './app.js';
+
+const TRIAL_DAYS = 30;
 
 const DAYS = [
   { key: 'monday',    label: 'Segunda' },
@@ -211,11 +219,14 @@ $('#setupForm').addEventListener('submit', withLock('setup', async (e) => {
   const color   = colorEl.value.trim() || '#6b7c5a';
   const aEmail  = $('#aEmail').value.trim();
   const aPw     = $('#aPw').value;
+  const tPw     = $('#tPw').value;
 
-  if (!name || !slug || !aEmail || !aPw) return setError('Preenche todos os campos obrigatórios (*).');
+  if (!name || !slug || !aEmail || !aPw || !tPw) return setError('Preenche todos os campos obrigatórios (*).');
   if (!isSlug(slug))   return setError('Slug inválido: apenas letras minúsculas, números e hífens.');
   if (!isEmail(aEmail)) return setError('Email do admin inválido.');
-  if (aPw.length < 6)  return setError('A password deve ter pelo menos 6 caracteres.');
+  if (aPw.length < 8)  return setError('A password do admin deve ter pelo menos 8 caracteres.');
+  if (tPw.length < 8)  return setError('A password da equipa deve ter pelo menos 8 caracteres.');
+  if (tPw === aPw)     return setError('A password da equipa deve ser diferente da do admin.');
 
   const schedule = {};
   DAYS.forEach(d => {
@@ -240,6 +251,14 @@ $('#setupForm').addEventListener('submit', withLock('setup', async (e) => {
     const userCred = await createUserWithEmailAndPassword(auth, aEmail, aPw);
     const uid = userCred.user.uid;
 
+    /* The team is a real Firebase account (one per salon) created on a
+     * secondary Auth instance so the admin session stays signed in. */
+    const teamEmail = `equipa-${slug}-${Date.now().toString(36)}@bookit.team`;
+    const teamAuth = getSecondaryAuth();
+    const teamCred = await createUserWithEmailAndPassword(teamAuth, teamEmail, tPw);
+    const teamUid = teamCred.user.uid;
+    await signOut(teamAuth).catch(() => {});
+
     /* Firestore rules can't reference docs being created in the same batch:
      * services/staff/promotions writes call isAdmin(salonId) which reads the
      * salon doc. So we commit in two phases — first the salon (creatable by
@@ -249,11 +268,17 @@ $('#setupForm').addEventListener('submit', withLock('setup', async (e) => {
     salonBatch.set(doc(db, 'salons', slug), {
       name, slug, tagline, address, phone, email,
       primaryColor: color, primaryColorDark: color, primaryColorLight: '#eef3e8',
-      loyaltyVisits: 5, loyaltyDiscount: 20,
-      referralDiscount: 10, birthdayDiscount: 15,
-      noShowPenalty: 5, pointsPerVisit: 10,
-      teamPasswordHash: '',
+      loyaltyVisits: SALON_DEFAULTS.loyaltyVisits, loyaltyDiscount: SALON_DEFAULTS.loyaltyDiscount,
+      referralDiscount: SALON_DEFAULTS.referralDiscount, birthdayDiscount: SALON_DEFAULTS.birthdayDiscount,
+      noShowPenalty: SALON_DEFAULTS.noShowPenalty, pointsPerVisit: SALON_DEFAULTS.pointsPerVisit,
+      timezone: SALON_DEFAULTS.timezone, slotInterval: SALON_DEFAULTS.slotInterval,
+      bookingLeadMinutes: SALON_DEFAULTS.bookingLeadMinutes, maxAdvanceDays: SALON_DEFAULTS.maxAdvanceDays,
+      cancellationHours: SALON_DEFAULTS.cancellationHours, closedDates: [],
+      teamUid, teamEmail,
       adminUid: uid, adminEmail: aEmail,
+      // Every new salon starts on a trial; the operator activates it (scripts/set-plan.mjs).
+      plan: 'trial', subscriptionStatus: 'trial',
+      trialEndsAt: Timestamp.fromDate(new Date(Date.now() + TRIAL_DAYS * 86400000)),
       createdAt: serverTimestamp()
     });
     await salonBatch.commit();
@@ -277,11 +302,11 @@ $('#setupForm').addEventListener('submit', withLock('setup', async (e) => {
     }
     await batch.commit();
 
-    toastSuccess('Salão criado com sucesso!');
-    setTimeout(() => { window.location.href = 'login.html'; }, 1200);
+    toastSuccess('Salão criado! A entrar no painel…');
+    setTimeout(() => { window.location.href = 'admin.html'; }, 900);
   } catch (e) {
     console.error(e);
-    setError(authErrorMessage(e.code) || 'Erro ao criar salão. Tenta novamente.');
+    setError(String(e.code || '').startsWith('auth/') ? authErrorMessage(e.code) : friendlyError(e, 'Erro ao criar salão. Tenta novamente.'));
     setLoading(false);
   }
 }));

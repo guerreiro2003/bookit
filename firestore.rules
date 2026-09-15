@@ -2,28 +2,86 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    /* ───────────────────────── identity & roles ───────────────────────── */
     function isAuth() { return request.auth != null; }
+    function salon(salonId) { return get(/databases/$(database)/documents/salons/$(salonId)).data; }
+    // Owner/admin of THIS salon (tenant-scoped: a uid is only admin where adminUid matches)
+    function isAdmin(salonId) { return isAuth() && salon(salonId).adminUid == request.auth.uid; }
+    // Team account of THIS salon (one shared Firebase account per salon; see staff.html)
+    function isTeam(salonId)  { return isAuth() && salon(salonId).get('teamUid', '') == request.auth.uid; }
+    function isStaff(salonId) { return isAdmin(salonId) || isTeam(salonId); }
+    function ownsClientDoc(d) {
+      return isAuth() && (
+        d.get('uid', '') == request.auth.uid ||
+        (d.get('email', '') != '' && d.get('email', '') == request.auth.token.email)
+      );
+    }
+    function ownsBooking(d) {
+      return isAuth() && (
+        d.get('clientId', '') == request.auth.uid ||
+        (d.get('clientEmail', '') != '' && d.get('clientEmail', '') == request.auth.token.email)
+      );
+    }
+    // Subscription gate. Salons without a plan field are treated as active.
+    function planActive(salonId) {
+      let s = salon(salonId);
+      return s.get('plan', 'active') == 'active'
+          || (s.get('plan', '') == 'trial' && s.get('trialEndsAt', null) != null && request.time < s.trialEndsAt);
+    }
+    function changedOnly(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys); }
 
-    function isAdmin(salonId) {
-      return isAuth() &&
-        get(/databases/$(database)/documents/salons/$(salonId)).data.adminUid == request.auth.uid;
+    /* ───────────────────────── validators ───────────────────────── */
+    function str(v, max)     { return v is string && v.size() <= max; }
+    function optStr(v, max)  { return v == null || str(v, max); }
+    // Shape + real calendar date (timestamp.date normalises Feb 30 → Mar 2, so the month must round-trip).
+    function validDate(v)    { return v is string && v.matches('^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$')
+                                && timestamp.date(int(v[0:4]), int(v[5:7]), int(v[8:10])).month() == int(v[5:7]); }
+    function validTime(v)    { return v is string && v.matches('^([01]\\d|2[0-3]):[0-5]\\d$'); }
+    function validEmail(v)   { return v is string && v.size() <= 120 && v.matches('^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$'); }
+    function validHex(v)     { return v is string && v.matches('^#[0-9A-Fa-f]{6}$'); }
+    function intIn(v, lo, hi){ return v is int && v >= lo && v <= hi; }
+    function numIn(v, lo, hi){ return v is number && v >= lo && v <= hi; }
+    function validTransition(f, t) {
+      return (f == 'pending'   && t in ['confirmed','completed','cancelled','noshow'])
+          || (f == 'confirmed' && t in ['completed','cancelled','noshow'])
+          || (f == 'cancelled' && t in ['pending','confirmed']);
+    }
+    // Appointment instant (UTC midnight of the date + wall-clock time). Salon
+    // timezone skew (≤ ±1h for Europe/Lisbon) is acceptable for a policy check.
+    function apptTs(d, t) {
+      return timestamp.date(int(d[0:4]), int(d[5:7]), int(d[8:10]))
+           + duration.value(int(t[0:2]), 'h') + duration.value(int(t[3:5]), 'm');
     }
 
-    // Team portal (staff.html) signs in with Firebase Anonymous Auth after the
-    // shared team password is verified client-side. We can't prove *who* they are
-    // server-side without a backend, so anonymous sessions get a tightly-scoped
-    // set of operational permissions (below): they may move a booking through its
-    // status machine and award/deduct loyalty points, but may NOT alter money,
-    // dates, client identity, or create records out of thin air.
-    function isTeam() {
-      return isAuth() && request.auth.token.firebase.sign_in_provider == 'anonymous';
-    }
-
+    /* ───────────────────────── salons ───────────────────────── */
     match /salons/{salonId} {
-      // Public read (booking site needs salon name / colour / schedule)
-      allow read: if true;
-      allow update: if isAdmin(salonId);
-      allow create: if isAuth() && request.resource.data.adminUid == request.auth.uid;
+      allow read: if true;   // public booking page needs name / colour / settings
+      allow create: if isAuth()
+        && request.resource.data.adminUid == request.auth.uid
+        && str(request.resource.data.name, 80)
+        && request.resource.data.get('slug', salonId) == salonId;
+      // Billing-controlled fields can never be edited from the app.
+      allow update: if isAdmin(salonId)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['adminUid','plan','trialEndsAt','subscriptionStatus','slug','createdAt'])
+        && str(request.resource.data.name, 80)
+        && optStr(request.resource.data.get('tagline', null), 120)
+        && optStr(request.resource.data.get('address', null), 200)
+        && optStr(request.resource.data.get('phone', null), 30)
+        && optStr(request.resource.data.get('email', null), 120)
+        && (request.resource.data.get('primaryColor', null) == null || validHex(request.resource.data.primaryColor))
+        && (request.resource.data.get('slotInterval', 15) in [5, 10, 15, 20, 30, 60])
+        && intIn(request.resource.data.get('bookingLeadMinutes', 30), 0, 1440)
+        && intIn(request.resource.data.get('maxAdvanceDays', 90), 1, 365)
+        && intIn(request.resource.data.get('cancellationHours', 24), 0, 336)
+        && intIn(request.resource.data.get('loyaltyVisits', 5), 1, 100)
+        && intIn(request.resource.data.get('loyaltyDiscount', 20), 0, 100)
+        && intIn(request.resource.data.get('referralDiscount', 10), 0, 100)
+        && intIn(request.resource.data.get('birthdayDiscount', 15), 0, 100)
+        && intIn(request.resource.data.get('noShowPenalty', 5), 0, 1000)
+        && intIn(request.resource.data.get('pointsPerVisit', 10), 0, 1000)
+        && (request.resource.data.get('closedDates', []) is list)
+        && optStr(request.resource.data.get('teamUid', null), 128)
+        && optStr(request.resource.data.get('teamEmail', null), 120);
       allow delete: if false;
 
       match /config/{document=**} {
@@ -33,82 +91,180 @@ service cloud.firestore {
 
       match /users/{uid} {
         allow read: if isAuth() && request.auth.uid == uid;
-        allow write: if isAdmin(salonId) || request.auth.uid == uid;
+        allow write: if isAdmin(salonId) || (isAuth() && request.auth.uid == uid);
       }
 
-      match /services/{id}      { allow read: if true; allow write: if isAdmin(salonId); }
-      match /staff/{id}         { allow read: if true; allow write: if isAdmin(salonId); }
-      match /promotions/{id}    { allow read: if true; allow write: if isAdmin(salonId); }
-      match /site_gallery/{id}  { allow read: if true; allow write: if isAdmin(salonId); }
-      match /site_partners/{id} { allow read: if true; allow write: if isAdmin(salonId); }
+      /* ───────────── catalogue (public read, admin write with shape checks) ───────────── */
+      match /services/{id} {
+        allow read: if true;
+        allow write: if isAdmin(salonId) && (request.method == 'delete' || (
+          str(request.resource.data.name, 80) && request.resource.data.name.size() > 0
+          && numIn(request.resource.data.price, 0, 10000)
+          && intIn(request.resource.data.duration, 5, 600)
+          && request.resource.data.get('active', true) is bool
+          && optStr(request.resource.data.get('description', null), 300)
+          && optStr(request.resource.data.get('includes', null), 300)
+        ));
+      }
+      match /staff/{id} {
+        allow read: if true;
+        allow write: if isAdmin(salonId) && (request.method == 'delete' || (
+          str(request.resource.data.name, 80) && request.resource.data.name.size() > 0
+          && optStr(request.resource.data.get('role', null), 60)
+          && optStr(request.resource.data.get('specialties', null), 120)
+          && optStr(request.resource.data.get('bio', null), 300)
+          && optStr(request.resource.data.get('photoUrl', null), 400000)
+          && request.resource.data.get('active', true) is bool
+          && (request.resource.data.get('timeOff', []) is list)
+        ));
+      }
+      match /promotions/{id} {
+        allow read: if true;
+        allow write: if isAdmin(salonId) && (request.method == 'delete' || (
+          str(request.resource.data.title, 80) && optStr(request.resource.data.get('description', null), 300)
+          && optStr(request.resource.data.get('badgeText', null), 20) && request.resource.data.get('active', true) is bool
+        ));
+      }
+      match /site_gallery/{id} {
+        allow read: if true;
+        allow write: if isAdmin(salonId) && (request.method == 'delete' || (
+          str(request.resource.data.url, 400000) && optStr(request.resource.data.get('caption', null), 120)
+        ));
+      }
+      match /site_partners/{id} {
+        allow read: if true;
+        allow write: if isAdmin(salonId) && (request.method == 'delete' || (
+          str(request.resource.data.name, 80) && optStr(request.resource.data.get('icon', null), 8) && optStr(request.resource.data.get('desc', null), 200)
+        ));
+      }
 
-      match /clients/{clientId} {
-        allow read: if isAdmin(salonId)
-          || (isAuth() && resource.data.uid == request.auth.uid)
-          || (isAuth() && resource.data.email == request.auth.token.email);
+      /* ───────────── referral codes (public lookup, no PII) ───────────── */
+      match /referrals/{code} {
+        allow read: if true;
+        allow create: if str(request.resource.data.clientId, 128) && (
+          isStaff(salonId) || (isAuth() && request.resource.data.clientId == request.auth.uid)
+        );
+        allow update, delete: if isAdmin(salonId);
+      }
 
-        // New clients must start with a clean slate. Prevents anyone from
-        // birthing a client document pre-loaded with points or discount coupons.
-        allow create: if request.resource.data.get('visits', 0) == 0
-          && request.resource.data.get('points', 0) == 0
-          && request.resource.data.get('totalSpent', 0) == 0
-          && request.resource.data.get('discounts', []).size() == 0;
-
-        // The owner may edit their own profile (name/phone/birthday) and mark
-        // coupons used, but may NOT inflate their loyalty balance or mint coupons:
-        //  · points / visits / totalSpent must stay unchanged
-        //  · the discounts array may only shrink or stay equal (mark-as-used), never grow
-        allow update: if isAdmin(salonId)
-          || ( isAuth()
-               && (resource.data.get('uid', '') == request.auth.uid
-                   || resource.data.get('email', '') == request.auth.token.email)
-               && request.resource.data.get('points', 0) == resource.data.get('points', 0)
-               && request.resource.data.get('visits', 0) == resource.data.get('visits', 0)
-               && request.resource.data.get('totalSpent', 0) == resource.data.get('totalSpent', 0)
-               && request.resource.data.get('discounts', []).size() <= resource.data.get('discounts', []).size() )
-          // Team session awarding points / loyalty coupons through the app's atomic
-          // transactions (markBookingPaid / markBookingNoShow).
-          || isTeam();
-
+      /* ───────────── agenda: per staff / per day occupancy (no PII) ───────────── */
+      match /agenda/{agendaDoc} {
+        function validAgenda() {
+          return str(request.resource.data.staffId, 128)
+              && validDate(request.resource.data.date)
+              && request.resource.data.intervals is list
+              && agendaDoc == request.resource.data.staffId + '__' + request.resource.data.date;
+        }
+        allow read: if true;
+        allow create: if validAgenda() && (isStaff(salonId) || (planActive(salonId) && request.resource.data.intervals.size() == 1));
+        allow update: if validAgenda() && (
+             isStaff(salonId)
+          || (planActive(salonId) && request.resource.data.intervals.size() == resource.data.intervals.size() + 1)  // public booking adds one
+          || (isAuth() && request.resource.data.intervals.size() == resource.data.intervals.size() - 1)             // client cancel frees one
+        );
         allow delete: if isAdmin(salonId);
       }
 
+      /* ───────────── clients ───────────── */
+      match /clients/{clientId} {
+        function validClient() {
+          return str(request.resource.data.name, 80)
+              && optStr(request.resource.data.get('email', null), 120)
+              && optStr(request.resource.data.get('phone', null), 30)
+              && optStr(request.resource.data.get('birthday', null), 10)
+              && (request.resource.data.get('discounts', []) is list)
+              && numIn(request.resource.data.get('points', 0), -100000, 1000000)
+              && intIn(request.resource.data.get('visits', 0), 0, 100000);
+        }
+        function zeroLoyalty() {
+          return request.resource.data.get('visits', 0) == 0
+              && request.resource.data.get('points', 0) == 0
+              && request.resource.data.get('totalSpent', 0) == 0
+              && request.resource.data.get('discounts', []).size() == 0;
+        }
+        allow read: if isStaff(salonId) || ownsClientDoc(resource.data);
+        // Self-registration: uid + email must be the caller's own, and loyalty starts at zero.
+        allow create: if validClient() && (
+             isStaff(salonId)
+          || (isAuth() && request.resource.data.get('uid', '') == request.auth.uid
+                       && request.resource.data.get('email', '') == request.auth.token.email
+                       && zeroLoyalty())
+        );
+        // Owner may edit profile / link uid / mark coupons used / erase (GDPR),
+        // but can never inflate loyalty, mint coupons, or change the email they log in with.
+        allow update: if validClient() && (
+             isStaff(salonId)
+          || ( ownsClientDoc(resource.data)
+               && request.resource.data.get('points', 0)     == resource.data.get('points', 0)
+               && request.resource.data.get('visits', 0)     == resource.data.get('visits', 0)
+               && request.resource.data.get('totalSpent', 0) == resource.data.get('totalSpent', 0)
+               && request.resource.data.get('discounts', []).size() <= resource.data.get('discounts', []).size()
+               && (request.resource.data.get('email', '') == resource.data.get('email', '') || request.resource.data.get('deleted', false) == true)
+               && (resource.data.get('uid', null) == null || request.resource.data.get('uid', null) == resource.data.get('uid', null) || request.resource.data.get('deleted', false) == true) )
+        );
+        allow delete: if isAdmin(salonId);
+      }
+
+      /* ───────────── bookings ───────────── */
       match /bookings/{id} {
-        // Public READ — the anonymous booking flow needs to see which slots are
-        // taken. Trade-off: only date/time/staff are operationally sensitive here;
-        // for a hardened production build this would move behind a Cloud Function
-        // returning slot availability without client PII.
-        allow read: if true;
+        function d() { return request.resource.data; }
+        function svc() { return get(/databases/$(database)/documents/salons/$(salonId)/services/$(d().serviceId)).data; }
+        function validShape() {
+          return str(d().clientName, 80) && d().clientName.size() >= 2
+              && optStr(d().get('clientEmail', null), 120)
+              && optStr(d().get('clientPhone', null), 30)
+              && optStr(d().get('notes', null), 500)
+              && optStr(d().get('forSomeone', null), 80)
+              && validDate(d().date) && validTime(d().time)
+              && d().startMin is int && d().endMin is int && d().endMin > d().startMin
+              && intIn(d().serviceDuration, 5, 600) && d().endMin - d().startMin == d().serviceDuration
+              && str(d().staffId, 128) && str(d().staffName, 80)
+              && str(d().serviceId, 128) && str(d().serviceName, 80)
+              && d().paid == false;
+        }
+        // Money is pinned to the catalogue: base price must equal the real
+        // service price, final price within [50%, 100%] of it.
+        function honestPrice() {
+          return exists(/databases/$(database)/documents/salons/$(salonId)/services/$(d().serviceId))
+              && d().servicePrice == svc().price
+              && svc().get('active', true) == true
+              && d().finalPrice is number
+              && d().finalPrice >= d().servicePrice * 0.5
+              && d().finalPrice <= d().servicePrice;
+        }
+        function frozenForStaff() {
+          return d().serviceId == resource.data.serviceId
+              && d().servicePrice == resource.data.servicePrice
+              && d().get('clientEmail', '') == resource.data.get('clientEmail', '')
+              && (resource.data.get('clientId', null) == null || d().get('clientId', null) == resource.data.get('clientId', null))
+              && (isAdmin(salonId) || d().finalPrice == resource.data.finalPrice);
+        }
 
-        // Public create, but the price is pinned to reality: servicePrice must
-        // equal the real service's price, and finalPrice can't drop below 50% of
-        // it. This neutralises forged discount codes / "free service" attacks —
-        // even a fake 100%-off coupon can't push the price to zero.
-        allow create: if request.resource.data.status == 'pending'
-          && request.resource.data.paid == false
-          && request.resource.data.serviceId is string
-          && exists(/databases/$(database)/documents/salons/$(salonId)/services/$(request.resource.data.serviceId))
-          && request.resource.data.servicePrice ==
-               get(/databases/$(database)/documents/salons/$(salonId)/services/$(request.resource.data.serviceId)).data.price
-          && request.resource.data.finalPrice is number
-          && request.resource.data.finalPrice >= request.resource.data.servicePrice * 0.5;
+        // Read: salon staff, or the client who owns it. No public reads — availability comes from /agenda.
+        allow read: if isStaff(salonId) || ownsBooking(resource.data);
 
-        allow update: if isAdmin(salonId)
-          // A signed-in client may cancel their own booking (nothing else).
-          || ( isAuth()
-               && resource.data.clientEmail == request.auth.token.email
-               && request.resource.data.status == 'cancelled' )
-          // Team session moving a booking through its status machine. Money, date,
-          // time and client identity are frozen — they can only change status/paid.
-          // .get() guards against bookings that omit an optional field.
-          || ( isTeam()
-               && request.resource.data.get('clientEmail', '')  == resource.data.get('clientEmail', '')
-               && request.resource.data.get('clientId', '')     == resource.data.get('clientId', '')
-               && request.resource.data.get('servicePrice', 0)  == resource.data.get('servicePrice', 0)
-               && request.resource.data.get('finalPrice', 0)    == resource.data.get('finalPrice', 0)
-               && request.resource.data.get('date', '')         == resource.data.get('date', '')
-               && request.resource.data.get('time', '')         == resource.data.get('time', '')
-               && request.resource.data.status in ['pending','confirmed','completed','cancelled','noshow'] );
+        allow create: if validShape() && honestPrice() && (
+             ( d().get('source', 'online') == 'online' && planActive(salonId) && d().status == 'pending' && validEmail(d().clientEmail) )
+          || ( isStaff(salonId) && d().status in ['pending', 'confirmed'] )
+        );
+
+        allow update: if (
+          // Staff: state machine + frozen money/identity. Date/time/staff may change (reschedule).
+          ( isStaff(salonId)
+            && frozenForStaff()
+            && d().status in ['pending','confirmed','completed','cancelled','noshow']
+            && (d().status == resource.data.status || validTransition(resource.data.status, d().status))
+            && validDate(d().date) && validTime(d().time) )
+          // Client cancels their own booking, respecting the salon's cancellation window.
+          || ( ownsBooking(resource.data)
+               && resource.data.status in ['pending', 'confirmed'] && d().status == 'cancelled'
+               && changedOnly(['status', 'cancelledAt', 'cancelledBy', 'previousStatus'])
+               && request.time + duration.value(salon(salonId).get('cancellationHours', 24), 'h') <= apptTs(resource.data.date, resource.data.time) )
+          // Client erases their personal data from their own bookings (GDPR).
+          || ( ownsBooking(resource.data)
+               && changedOnly(['clientName', 'clientEmail', 'clientPhone', 'notes', 'forSomeone', 'clientId', 'anonymised', 'anonymisedAt'])
+               && d().get('anonymised', false) == true )
+        );
 
         allow delete: if isAdmin(salonId);
       }

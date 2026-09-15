@@ -1,3 +1,5 @@
+> **Nota (2026-09):** este documento está desatualizado. Usa `README.md` (deploy), `PRODUCTION_CHECKLIST.md` e `DISASTER_RECOVERY.md`.
+
 # 🚀 How to put your site online
 
 A super simple guide to getting your Book It website live on the internet, even if you've never done it before.

@@ -4,7 +4,7 @@ import {
   addDoc, setDoc, updateDoc, deleteDoc, query, where,
   orderBy, limit, onSnapshot, serverTimestamp, writeBatch,
   arrayUnion, arrayRemove, increment, runTransaction,
-  startAfter, endBefore
+  startAfter, endBefore, getCountFromServer, deleteField, Timestamp, documentId
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import {
   getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
@@ -25,12 +25,20 @@ const app  = initializeApp(firebaseConfig);
 const db   = getFirestore(app);
 const auth = getAuth(app);
 
+/** Secondary Auth instance used by the admin panel to create/rotate the
+ *  per-salon team account WITHOUT signing the admin out of the main session. */
+let _secondaryAuth = null;
+export function getSecondaryAuth() {
+  if (!_secondaryAuth) _secondaryAuth = getAuth(initializeApp(firebaseConfig, 'bookit-secondary'));
+  return _secondaryAuth;
+}
+
 export {
-  db, auth,
+  app, db, auth, firebaseConfig,
   collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, deleteDoc,
-  query, where, orderBy, limit, startAfter, endBefore,
+  query, where, orderBy, limit, startAfter, endBefore, documentId,
   onSnapshot, serverTimestamp, writeBatch, runTransaction,
-  arrayUnion, arrayRemove, increment,
+  arrayUnion, arrayRemove, increment, getCountFromServer, deleteField, Timestamp,
   signInWithEmailAndPassword, createUserWithEmailAndPassword,
   signInAnonymously, signOut, onAuthStateChanged, sendPasswordResetEmail,
   updatePassword, updateProfile, deleteUser

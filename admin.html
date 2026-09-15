@@ -161,6 +161,10 @@
         </div>
       </div>
 
+      <div id="planBanner" hidden class="promo mb-4" style="border-color:var(--danger-border)">
+        <div><div class="promo__title">Marcações online bloqueadas</div><div class="promo__desc">A subscrição deste salão não está ativa. Os clientes não conseguem marcar online até ser ativada. <a href="#" data-action="show-panel" data-panel="settings">Ver estado</a>.</div></div>
+      </div>
+
       <!-- Onboarding card for first-time admin (no services and no bookings) -->
       <div id="onboardingCard" hidden class="card card--accent mb-4">
         <div class="flex" style="gap:var(--s-4);align-items:flex-start">
@@ -373,6 +377,26 @@
         </div>
       </div>
 
+      <div class="card mb-4">
+        <div class="card__head">
+          <div>
+            <div class="card__title">Férias e indisponibilidades</div>
+            <div class="card__sub">Períodos em que o colaborador não aceita marcações (férias, formação, baixa).</div>
+          </div>
+        </div>
+        <div class="field">
+          <label for="timeOffStaff">Colaborador</label>
+          <select id="timeOffStaff"><option value="">— Escolhe um colaborador —</option></select>
+        </div>
+        <div class="grid-3">
+          <div class="field"><label for="timeOffFrom">De</label><input type="date" id="timeOffFrom" /></div>
+          <div class="field"><label for="timeOffTo">Até (inclusive)</label><input type="date" id="timeOffTo" /></div>
+          <div class="field"><label for="timeOffReason">Motivo (opcional)</label><input type="text" id="timeOffReason" maxlength="60" placeholder="Férias" /></div>
+        </div>
+        <button class="btn btn--sm" type="button" data-action="add-time-off">Registar indisponibilidade</button>
+        <div class="chips" id="timeOffList"><span class="text-sm text-muted">Seleciona um colaborador para ver as indisponibilidades.</span></div>
+      </div>
+
       <div class="table-card">
         <div class="table-card__head">
           <div class="card__title">Colaboradores <span class="badge badge--gray" id="staffCount" style="margin-left:6px">0</span></div>
@@ -385,10 +409,25 @@
 
     <section class="panel" id="panel-schedule">
       <h1 class="page-title">Horários</h1>
-      <p class="page-sub mb-5">Horários de funcionamento. Dias fechados ficam indisponíveis para marcação.</p>
-      <div class="card">
+      <p class="page-sub mb-5">Horário de funcionamento e pausas. Dias fechados e datas encerradas ficam indisponíveis para marcação.</p>
+      <div class="card mb-4">
+        <div class="card__head"><div class="card__title">Horário semanal</div></div>
         <div id="scheduleEditor"></div>
-        <button class="btn btn--primary mt-5" type="button" data-action="save-schedule">Guardar horário</button>
+        <p class="text-xs text-muted mt-3">A pausa (ex.: almoço) é opcional. Os colaboradores podem ter horários próprios em <em>Equipa</em>.</p>
+        <button class="btn btn--primary mt-4" type="button" data-action="save-schedule">Guardar horário</button>
+      </div>
+      <div class="card">
+        <div class="card__head">
+          <div>
+            <div class="card__title">Datas encerradas</div>
+            <div class="card__sub">Feriados, férias do salão, eventos. Nenhum colaborador aceita marcações nestes dias.</div>
+          </div>
+        </div>
+        <div class="flex" style="gap:8px;flex-wrap:wrap">
+          <input type="date" id="closedDateInput" class="input" style="max-width:180px" aria-label="Data a encerrar" />
+          <button class="btn btn--sm" type="button" data-action="add-closed-date">Encerrar data</button>
+        </div>
+        <div class="chips" id="closedDatesList"></div>
       </div>
     </section>
 
@@ -528,14 +567,63 @@
           <label for="cfgBdayDiscount">Desconto de aniversário (%)</label>
           <input type="number" id="cfgBdayDiscount" min="1" max="100" />
         </div>
+        <div class="divider"></div>
+        <div class="card__head"><div><div class="card__title">Marcações online</div><div class="card__sub">Regras aplicadas à página pública de marcações.</div></div></div>
+        <div class="grid-2">
+          <div class="field">
+            <label for="cfgTimezone">Fuso horário</label>
+            <select id="cfgTimezone">
+              <option value="Europe/Lisbon">Europe/Lisbon (Portugal continental)</option>
+              <option value="Atlantic/Azores">Atlantic/Azores</option>
+              <option value="Atlantic/Madeira">Atlantic/Madeira</option>
+              <option value="Europe/Madrid">Europe/Madrid</option>
+              <option value="Europe/London">Europe/London</option>
+              <option value="Europe/Paris">Europe/Paris</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="cfgInterval">Intervalo entre horários</label>
+            <select id="cfgInterval">
+              <option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option>
+              <option value="20">20 min</option><option value="30">30 min</option><option value="60">60 min</option>
+            </select>
+            <div class="field__hint">Grelha dos horários apresentados ao cliente.</div>
+          </div>
+          <div class="field">
+            <label for="cfgLead">Antecedência mínima (min)</label>
+            <input type="number" id="cfgLead" min="0" max="1440" step="5" />
+            <div class="field__hint">Ex.: 30 = não aceita marcações para daqui a menos de 30 min.</div>
+          </div>
+          <div class="field">
+            <label for="cfgAdvance">Antecedência máxima (dias)</label>
+            <input type="number" id="cfgAdvance" min="1" max="365" />
+          </div>
+          <div class="field">
+            <label for="cfgCancelHours">Cancelamento pelo cliente até (horas antes)</label>
+            <input type="number" id="cfgCancelHours" min="0" max="336" />
+            <div class="field__hint">Depois deste limite o cliente tem de contactar o salão.</div>
+          </div>
+        </div>
+        <div class="divider"></div>
         <div class="field field--password" data-revealed="false">
-          <label for="cfgTeamPw">Password da equipa <span class="text-muted text-sm" style="font-weight:400">(staff.html)</span></label>
-          <input type="password" id="cfgTeamPw" placeholder="Define ou altera" />
+          <label for="cfgTeamPw">Password da equipa <span class="text-muted text-sm" style="font-weight:400">(portal staff.html)</span></label>
+          <input type="password" id="cfgTeamPw" placeholder="Deixa vazio para manter" minlength="8" autocomplete="new-password" />
           <button type="button" class="pw-toggle" data-action="toggle-pw" aria-label="Mostrar password"></button>
-          <div class="field__hint">Hashada antes de gravar. Muda quando alguém sair da equipa.</div>
+          <div class="field__hint" id="teamStatus">—</div>
+          <div class="field__hint">Mínimo 8 caracteres. Definir uma nova password invalida a anterior de imediato (útil quando alguém sai da equipa).</div>
         </div>
         <button class="btn btn--primary mt-3" type="submit">Guardar configurações</button>
       </form>
+
+      <div class="card mt-4">
+        <div class="card__head"><div><div class="card__title">Subscrição</div><div class="card__sub">Estado da conta deste salão.</div></div></div>
+        <div id="planStatus">—</div>
+      </div>
+
+      <div class="card mt-4">
+        <div class="card__head"><div><div class="card__title">Os teus dados</div><div class="card__sub">Exporta tudo o que está guardado sobre o teu salão (serviços, equipa, clientes, marcações). Ficheiro JSON, portável.</div></div></div>
+        <button class="btn btn--sm" type="button" data-action="export-salon-json">⬇ Exportar tudo (JSON)</button>
+      </div>
     </section>
 
   </main>
@@ -592,17 +680,44 @@
         <div class="field"><label for="nbService">Serviço *</label><select id="nbService" required></select></div>
         <div class="field"><label for="nbStaff">Colaborador</label><select id="nbStaff"><option value="">Sem preferência</option></select></div>
       </div>
-      <div class="grid-2">
-        <div class="field"><label for="nbDate">Data *</label><input type="date" id="nbDate" required /></div>
-        <div class="field"><label for="nbTime">Hora *</label><input type="time" id="nbTime" required step="900" /></div>
+      <div class="field"><label for="nbDate">Data *</label><input type="date" id="nbDate" required /></div>
+      <div class="field">
+        <label>Horário livre *</label>
+        <div id="nbSlots" class="slot-picker"><div class="slot-picker__empty">Escolhe o serviço e a data para ver horários livres.</div></div>
+        <input type="hidden" id="nbTime" />
       </div>
-      <div class="field"><label for="nbNotes">Notas</label><textarea id="nbNotes"></textarea></div>
+      <div class="field"><label for="nbNotes">Notas</label><textarea id="nbNotes" maxlength="500"></textarea></div>
       <div id="nbErr" class="error-msg" role="alert"></div>
       <div class="btn-group--full">
         <button class="btn" type="button" data-action="close-new-booking">Cancelar</button>
         <button class="btn btn--primary" type="submit" id="nbSubmit">Criar marcação</button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- Reschedule modal -->
+<div id="rescheduleModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="rsTitle" aria-hidden="true">
+  <div class="modal modal--wide">
+    <button class="modal__close" type="button" data-action="close-reschedule" aria-label="Fechar">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <h2 class="modal__title" id="rsTitle">Reagendar marcação</h2>
+    <p class="modal__sub" id="rsSub">—</p>
+    <div class="grid-2">
+      <div class="field"><label for="rsStaff">Colaborador</label><select id="rsStaff"></select></div>
+      <div class="field"><label for="rsDate">Nova data</label><input type="date" id="rsDate" /></div>
+    </div>
+    <div class="field">
+      <label>Horário livre</label>
+      <div id="rsSlots" class="slot-picker"></div>
+      <input type="hidden" id="rsTime" />
+    </div>
+    <div id="rsErr" class="error-msg" role="alert"></div>
+    <div class="btn-group--full">
+      <button class="btn" type="button" data-action="close-reschedule">Cancelar</button>
+      <button class="btn btn--primary" type="button" data-action="confirm-reschedule">Confirmar novo horário</button>
+    </div>
   </div>
 </div>
 
@@ -617,17 +732,22 @@
 <script type="module">
 import {
   db, auth, collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, deleteDoc,
-  query, where, orderBy, limit, serverTimestamp, onSnapshot,
-  signOut, onAuthStateChanged
+  query, where, orderBy, limit, startAfter, serverTimestamp, onSnapshot, getCountFromServer,
+  signOut, onAuthStateChanged, getSecondaryAuth, createUserWithEmailAndPassword
 } from './firebase.js';
 import {
   $, $$, on, toast, toastSuccess, toastError, escapeHTML, htmlMix, raw,
-  MONTHS_FULL, formatDate, formatDatePT, formatPrice, todayISO, relativeDay,
-  STATUS_LABELS, statusBadge, withLock,
-  hashPassword, debounce, toggleTheme, getTheme, setTheme,
-  markBookingPaid, markBookingNoShow, downloadCSV, subscribe, trapFocus,
+  MONTHS_FULL, formatDate, formatDatePT, formatPrice, todayISO, relativeDay, todayForSalon,
+  STATUS_LABELS, statusBadge, withLock, friendlyError, salonSetting, SALON_DEFAULTS, planActive,
+  debounce, toggleTheme, getTheme, setTheme,
+  markBookingPaid, markBookingNoShow, confirmBooking, cancelBooking, restoreBooking, rescheduleBooking,
+  createBooking, computeAvailability, minToTime, timeToMin, isValidDateStr, BLOCKING_STATUSES,
+  downloadCSV, subscribe, trapFocus,
   isEmail, isPhone, isHexColor
 } from './app.js';
+
+/** Booking-engine context (schedule + active staff) kept in sync with the panels. */
+const bookingCtx = { schedule: null, staff: [] };
 
 let salonId = null, salon = null, allStaff = [], allServices = [], allClients = [];
 let editingServiceId = null, payContext = null;
@@ -716,7 +836,15 @@ async function loadSalon(uid) {
   $('#cfgColor').value    = salon.primaryColor || '#6b7c5a';
   $('#cfgColorPicker').value = salon.primaryColor || '#6b7c5a';
   $('#cfgBdayDiscount').value = salon.birthdayDiscount || 15;
-  $('#cfgTeamPw').value = ''; // Never display existing hash; user retypes to change
+  $('#cfgTeamPw').value = '';
+  // Booking-engine settings
+  $('#cfgTimezone').value   = salonSetting(salon, 'timezone');
+  $('#cfgInterval').value   = String(salonSetting(salon, 'slotInterval'));
+  $('#cfgLead').value       = salonSetting(salon, 'bookingLeadMinutes');
+  $('#cfgAdvance').value    = salonSetting(salon, 'maxAdvanceDays');
+  $('#cfgCancelHours').value= salonSetting(salon, 'cancellationHours');
+  $('#teamStatus').textContent = salon.teamUid ? 'Definida · a equipa entra em staff.html com esta password.' : 'Ainda não definida — a equipa não consegue entrar.';
+  renderPlanStatus();
 
   $('#cfgColorPicker').addEventListener('input', debounce(e => {
     $('#cfgColor').value = e.target.value;
@@ -788,9 +916,9 @@ on('logout', async () => { await signOut(auth); window.location.href = 'login.ht
 /* ── DASHBOARD live ──────────────────────────────────────── */
 function subscribeToday() {
   if (unsubToday) unsubToday();
-  const today = new Date();
-  $('#dashDate').textContent = `${today.getDate()} ${MONTHS_FULL[today.getMonth()]} ${today.getFullYear()}`;
-  const dateStr = formatDate(today);
+  const dateStr = todayForSalon(salon);
+  const [ty, tm, td] = dateStr.split('-').map(Number);
+  $('#dashDate').textContent = `${td} ${MONTHS_FULL[tm - 1]} ${ty}`;
 
   const q = query(collection(db,'salons',salonId,'bookings'), where('date','==', dateStr));
   unsubToday = onSnapshot(q, snap => {
@@ -811,7 +939,8 @@ function subscribeToday() {
     if ($('#panel-dayview').classList.contains('active')) renderDayview();
   });
 
-  getDocs(collection(db,'salons',salonId,'clients')).then(s => $('#statClients').textContent = s.size);
+  // Aggregation query: counts server-side without downloading every client document.
+  getCountFromServer(collection(db,'salons',salonId,'clients')).then(s => $('#statClients').textContent = s.data().count).catch(() => {});
   $('#liveBadge').innerHTML = '<span class="dot" style="margin-right:6px"></span>Em tempo real';
   refreshOnboarding();
 }
@@ -828,7 +957,7 @@ async function refreshOnboarding() {
     const hasServices = svc.size > 0;
     const hasStaff = staff.size > 0;
     const hasSchedule = schedDoc.exists();
-    const hasTeamPw = !!(salon.teamPasswordHash || salon.teamPassword);
+    const hasTeamPw = !!salon.teamUid;
     const allDone = hasServices && hasStaff && hasSchedule && hasTeamPw;
     const card = $('#onboardingCard');
     if (allDone) { card.hidden = true; return; }
@@ -892,15 +1021,28 @@ on('clear-filters', () => {
   loadBookings();
 });
 
-function loadBookings() {
+let bookingsByDateCache = { date: null, rows: [] };
+async function loadBookings() {
   if (!salonId) return;
   const el = $('#bookingsList');
   const statusFilter = $('#filterStatus').value;
   const dateFilter   = $('#filterDate').value;
   const search       = $('#bookingsSearch').value.trim().toLowerCase();
-  let bookings = cachedBookings.slice();
+  let bookings;
+  if (dateFilter && isValidDateStr(dateFilter)) {
+    // A specific day is fetched from the server so history beyond the live
+    // window (last 500) is always reachable.
+    if (bookingsByDateCache.date !== dateFilter) {
+      try {
+        const snap = await getDocs(query(collection(db,'salons',salonId,'bookings'), where('date','==', dateFilter)));
+        bookingsByDateCache = { date: dateFilter, rows: snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.time || '').localeCompare(b.time || '')) };
+      } catch (e) { console.error(e); toastError(friendlyError(e)); bookingsByDateCache = { date: dateFilter, rows: [] }; }
+    }
+    bookings = bookingsByDateCache.rows.slice();
+  } else {
+    bookings = cachedBookings.slice();
+  }
   if (statusFilter) bookings = bookings.filter(b => b.status === statusFilter);
-  if (dateFilter)   bookings = bookings.filter(b => b.date === dateFilter);
   if (search) {
     bookings = bookings.filter(b =>
       (b.clientName || '').toLowerCase().includes(search) ||
@@ -937,36 +1079,36 @@ function bookingActions(b) {
   if (!b.paid && !['cancelled','noshow'].includes(b.status))
     btns.push(htmlMix`<button class="btn btn--sm btn--primary" type="button" data-action="open-pay" data-id="${b.id}" data-client="${b.clientName}" data-amount="${b.finalPrice ?? b.servicePrice}">Pagamento</button>`);
   if (['pending','confirmed'].includes(b.status))
+    btns.push(htmlMix`<button class="btn btn--sm" type="button" data-action="open-reschedule" data-id="${b.id}">Reagendar</button>`);
+  if (['pending','confirmed'].includes(b.status))
     btns.push(htmlMix`<button class="btn btn--sm" type="button" data-action="noshow-booking" data-id="${b.id}">Não compareceu</button>`);
   if (!['cancelled','noshow','completed'].includes(b.status))
     btns.push(htmlMix`<button class="btn btn--sm btn--danger" type="button" data-action="cancel-booking" data-id="${b.id}">Cancelar</button>`);
   return btns.join(' ');
 }
 
-on('confirm-booking', async (el) => {
-  await updateDoc(doc(db,'salons',salonId,'bookings', el.dataset.id), { status: 'confirmed' });
-  toastSuccess('Marcação confirmada.');
-});
+on('confirm-booking', withLock('confirm', async (el) => {
+  try { await confirmBooking({ salonId, bookingId: el.dataset.id }); toastSuccess('Marcação confirmada.'); }
+  catch (e) { console.error(e); toastError(friendlyError(e)); }
+}));
 
-on('cancel-booking', async (el) => {
+on('cancel-booking', withLock('cancel', async (el) => {
   const id = el.dataset.id;
-  const snap = await getDoc(doc(db,'salons',salonId,'bookings', id));
-  if (!snap.exists()) return;
-  const prev = snap.data().status;
-  await updateDoc(doc(db,'salons',salonId,'bookings', id),
-    { status: 'cancelled', cancelledAt: serverTimestamp() });
-  toastSuccess('Cancelada.', { undo: async () => {
-    await updateDoc(doc(db,'salons',salonId,'bookings', id), { status: prev, cancelledAt: null });
-    toastSuccess('Cancelamento anulado.');
-  }});
-});
+  try {
+    await cancelBooking({ salonId, bookingId: id, by: 'admin' });
+    toastSuccess('Cancelada. O horário ficou livre.', { undo: async () => {
+      try { await restoreBooking({ salonId, bookingId: id }); toastSuccess('Cancelamento anulado.'); }
+      catch (e) { toastError(friendlyError(e, 'Não foi possível anular: o horário já foi ocupado.')); }
+    }});
+  } catch (e) { console.error(e); toastError(friendlyError(e)); }
+}));
 
 on('noshow-booking', async (el) => {
   if (!confirm('Marcar como "Não compareceu"? Vão ser deduzidos pontos ao cliente.')) return;
   try {
-    await markBookingNoShow({ salonId, bookingId: el.dataset.id, penalty: salon.noShowPenalty || 0 });
+    await markBookingNoShow({ salonId, salon, bookingId: el.dataset.id });
     toastSuccess('Marcado como "Não compareceu".');
-  } catch (e) { console.error(e); toastError('Erro.'); }
+  } catch (e) { console.error(e); toastError(friendlyError(e)); }
 });
 
 /* ── PAYMENT MODAL ───────────────────────────────────────── */
@@ -1000,16 +1142,12 @@ on('confirm-pay', withLock('confirm-pay', async () => {
   if (!payContext?.method) return;
   $('#payConfirmBtn').disabled = true;
   try {
-    await markBookingPaid({
-      salonId, bookingId: payContext.bookingId, method: payContext.method,
-      pointsPerVisit: salon.pointsPerVisit, loyaltyVisits: salon.loyaltyVisits,
-      loyaltyDiscount: salon.loyaltyDiscount,
-    });
+    await markBookingPaid({ salonId, salon, bookingId: payContext.bookingId, method: payContext.method });
     toastSuccess('Pagamento registado · pontos atribuídos.');
     callPayClose();
   } catch (e) {
     console.error(e);
-    toastError('Erro ao registar pagamento.');
+    toastError(friendlyError(e, 'Erro ao registar pagamento.'));
     $('#payConfirmBtn').disabled = false;
   }
 }));
@@ -1018,16 +1156,42 @@ on('confirm-pay', withLock('confirm-pay', async () => {
 let releaseNbFocus = null;
 on('open-new-booking', () => {
   const o = $('#newBookingModal');
+  $('#newBookingForm').reset();
   $('#nbService').innerHTML = '<option value="">— escolhe —</option>' +
     allServices.filter(s => s.active !== false).map(s => htmlMix`<option value="${s.id}">${s.name} · ${s.price}€ · ${s.duration}min</option>`).join('');
-  $('#nbStaff').innerHTML = '<option value="">Sem preferência</option>' +
+  $('#nbStaff').innerHTML = '<option value="">Sem preferência (atribui o primeiro livre)</option>' +
     allStaff.filter(s => s.active !== false).map(s => htmlMix`<option value="${s.id}">${s.name}</option>`).join('');
-  $('#nbDate').value = todayISO();
-  $('#newBookingForm').reset();
-  $('#nbDate').value = todayISO();
+  $('#nbDate').value = todayForSalon(salon);
+  $('#nbDate').min = todayForSalon(salon);
+  $('#nbTime').value = '';
   $('#nbErr').classList.remove('show');
+  renderNbSlots();
   o.classList.add('show'); o.setAttribute('aria-hidden','false');
   releaseNbFocus = trapFocus(o.querySelector('.modal'));
+});
+
+/* Slot picker: the admin sees exactly what is really free (same engine as the public page). */
+let nbSlotsToken = 0;
+async function renderNbSlots() {
+  const box = $('#nbSlots'); $('#nbTime').value = '';
+  const serviceId = $('#nbService').value, staffId = $('#nbStaff').value, date = $('#nbDate').value;
+  const service = allServices.find(s => s.id === serviceId);
+  if (!service || !isValidDateStr(date)) { box.innerHTML = '<div class="slot-picker__empty">Escolhe o serviço e a data para ver horários livres.</div>'; return; }
+  box.innerHTML = '<div class="slot-picker__empty"><span class="spinner" aria-hidden="true"></span></div>';
+  const token = ++nbSlotsToken;
+  try {
+    const staff = staffId ? allStaff.find(s => s.id === staffId) : null;
+    const { slots, window } = await computeAvailability({ salonId, salon: { ...salon, bookingLeadMinutes: 0 }, ctx: bookingCtx, service, staff, dateStr: date });
+    if (token !== nbSlotsToken) return;
+    if (window?.closed) { box.innerHTML = `<div class="slot-picker__empty">${escapeHTML(friendlyError({ code: window.reason }, 'Fechado neste dia.'))}</div>`; return; }
+    if (!slots.length) { box.innerHTML = '<div class="slot-picker__empty">Sem horários livres neste dia.</div>'; return; }
+    box.innerHTML = slots.map(m => htmlMix`<button type="button" class="timeslot" data-action="nb-pick" data-min="${m}">${minToTime(m)}</button>`).join('');
+  } catch (e) { console.error(e); box.innerHTML = `<div class="slot-picker__empty">${escapeHTML(friendlyError(e))}</div>`; }
+}
+['nbService','nbStaff','nbDate'].forEach(id => $('#' + id).addEventListener('change', renderNbSlots));
+on('nb-pick', (el) => {
+  $('#nbTime').value = el.dataset.min;
+  $$('#nbSlots .timeslot').forEach(b => b.classList.toggle('selected', b === el));
 });
 on('close-new-booking', () => {
   $('#newBookingModal').classList.remove('show');
@@ -1046,62 +1210,116 @@ $('#newBookingForm').addEventListener('submit', withLock('nb', async (e) => {
   const serviceId = $('#nbService').value;
   const staffId = $('#nbStaff').value;
   const date = $('#nbDate').value;
-  const time = $('#nbTime').value;
+  const startMin = $('#nbTime').value === '' ? null : Number($('#nbTime').value);
   const notes = $('#nbNotes').value.trim();
-  if (!clientName || !clientPhone || !serviceId || !date || !time) {
-    err.textContent = 'Preenche os campos obrigatórios.'; err.classList.add('show'); return;
+  if (!clientName || !clientPhone || !serviceId || !date || startMin == null) {
+    err.textContent = 'Preenche os campos obrigatórios e escolhe um horário livre.'; err.classList.add('show'); return;
   }
   if (!isPhone(clientPhone)) { err.textContent = 'Telefone inválido.'; err.classList.add('show'); return; }
   if (clientEmail && !isEmail(clientEmail)) { err.textContent = 'Email inválido.'; err.classList.add('show'); return; }
 
+  $('#nbSubmit').disabled = true;
   try {
     const s = allServices.find(x => x.id === serviceId);
     const staff = staffId ? allStaff.find(x => x.id === staffId) : null;
-
-    // Conflict check
-    if (staff) {
-      const conflicts = cachedBookings.filter(b =>
-        b.date === date && b.time === time && b.staffId === staff.id &&
-        ['pending','confirmed'].includes(b.status));
-      if (conflicts.length && !confirm('Já existe uma marcação para este colaborador na mesma hora. Continuar?')) return;
-    }
-
+    // Link to an existing client record by email (admins can look clients up).
     let clientId = null;
     if (clientEmail) {
-      const existing = await getDocs(query(collection(db,'salons',salonId,'clients'), where('email','==', clientEmail)));
+      const existing = await getDocs(query(collection(db,'salons',salonId,'clients'), where('email','==', clientEmail.toLowerCase()), limit(1)));
       if (!existing.empty) clientId = existing.docs[0].id;
     }
-
-    await addDoc(collection(db,'salons',salonId,'bookings'), {
-      clientId, clientName, clientEmail: clientEmail || '', clientPhone,
-      serviceId, serviceName: s.name, serviceDuration: s.duration, servicePrice: s.price,
-      finalPrice: s.price,
-      staffId: staff?.id || null, staffName: staff?.name || 'Sem preferência',
-      date, time, notes, forSomeone: null,
-      status: 'confirmed', paid: false,
-      salonId, source: 'admin',
-      createdAt: serverTimestamp()
+    // Same atomic engine as the public page: the agenda transaction is the arbiter.
+    const res = await createBooking({
+      salonId, salon: { ...salon, bookingLeadMinutes: 0 }, ctx: bookingCtx, service: s, staff, dateStr: date, startMin,
+      client: { id: clientId, name: clientName, email: clientEmail, phone: clientPhone, notes },
+      discount: null, source: 'admin', status: 'confirmed',
     });
-    toastSuccess('Marcação criada.');
+    toastSuccess(`Marcação criada às ${res.time} com ${res.staff.name}.`);
     document.querySelector('[data-action="close-new-booking"]').click();
   } catch (e) {
-    console.error(e); err.textContent = 'Erro a criar marcação.'; err.classList.add('show');
-  }
+    console.error(e); err.textContent = friendlyError(e, 'Erro a criar marcação.'); err.classList.add('show');
+    renderNbSlots();
+  } finally { $('#nbSubmit').disabled = false; }
+}));
+
+/* ── RESCHEDULE ──────────────────────────────────────────── */
+let rsContext = null, releaseRsFocus = null, rsSlotsToken = 0;
+on('open-reschedule', async (el) => {
+  const b = cachedBookings.find(x => x.id === el.dataset.id) || bookingsByDateCache.rows.find(x => x.id === el.dataset.id);
+  if (!b) return toastError('Marcação não encontrada.');
+  rsContext = { booking: b };
+  $('#rsSub').textContent = `${b.clientName} · ${b.serviceName} · atualmente ${formatDatePT(b.date, { short: true })} às ${b.time}`;
+  $('#rsStaff').innerHTML = allStaff.filter(s => s.active !== false || s.id === b.staffId).map(s => htmlMix`<option value="${s.id}" ${raw(s.id === b.staffId ? 'selected' : '')}>${s.name}</option>`).join('');
+  $('#rsDate').value = b.date; $('#rsDate').min = todayForSalon(salon);
+  $('#rsTime').value = '';
+  $('#rsErr').classList.remove('show');
+  const o = $('#rescheduleModal');
+  o.classList.add('show'); o.setAttribute('aria-hidden','false');
+  releaseRsFocus = trapFocus(o.querySelector('.modal'));
+  renderRsSlots();
+});
+on('close-reschedule', () => {
+  $('#rescheduleModal').classList.remove('show'); $('#rescheduleModal').setAttribute('aria-hidden','true');
+  rsContext = null; if (releaseRsFocus) { releaseRsFocus(); releaseRsFocus = null; }
+});
+$('#rescheduleModal').addEventListener('click', (e) => { if (e.target === e.currentTarget) document.querySelector('[data-action="close-reschedule"]').click(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#rescheduleModal').classList.contains('show')) document.querySelector('[data-action="close-reschedule"]').click(); });
+async function renderRsSlots() {
+  if (!rsContext) return;
+  const b = rsContext.booking, box = $('#rsSlots'); $('#rsTime').value = '';
+  const date = $('#rsDate').value, staff = allStaff.find(s => s.id === $('#rsStaff').value) || { id: b.staffId, name: b.staffName };
+  if (!isValidDateStr(date)) { box.innerHTML = '<div class="slot-picker__empty">Escolhe uma data.</div>'; return; }
+  box.innerHTML = '<div class="slot-picker__empty"><span class="spinner" aria-hidden="true"></span></div>';
+  const token = ++rsSlotsToken;
+  try {
+    const service = allServices.find(s => s.id === b.serviceId) || { id: b.serviceId, duration: b.serviceDuration || 30, price: b.servicePrice };
+    const { slots, window } = await computeAvailability({ salonId, salon: { ...salon, bookingLeadMinutes: 0 }, ctx: bookingCtx, service: { ...service, duration: b.serviceDuration || service.duration }, staff, dateStr: date, excludeBookingId: b.id });
+    if (token !== rsSlotsToken) return;
+    if (window?.closed) { box.innerHTML = `<div class="slot-picker__empty">${escapeHTML(friendlyError({ code: window.reason }, 'Fechado neste dia.'))}</div>`; return; }
+    if (!slots.length) { box.innerHTML = '<div class="slot-picker__empty">Sem horários livres neste dia.</div>'; return; }
+    const cur = (date === b.date && staff.id === b.staffId) ? timeToMin(b.time) : null;
+    box.innerHTML = slots.map(m => htmlMix`<button type="button" class="timeslot ${raw(m === cur ? 'selected' : '')}" data-action="rs-pick" data-min="${m}">${minToTime(m)}</button>`).join('');
+    if (cur != null && slots.includes(cur)) $('#rsTime').value = cur;
+  } catch (e) { console.error(e); box.innerHTML = `<div class="slot-picker__empty">${escapeHTML(friendlyError(e))}</div>`; }
+}
+['rsStaff','rsDate'].forEach(id => $('#' + id).addEventListener('change', renderRsSlots));
+on('rs-pick', (el) => { $('#rsTime').value = el.dataset.min; $$('#rsSlots .timeslot').forEach(x => x.classList.toggle('selected', x === el)); });
+on('confirm-reschedule', withLock('reschedule', async () => {
+  if (!rsContext) return;
+  const err = $('#rsErr'); err.classList.remove('show');
+  const date = $('#rsDate').value, startMin = $('#rsTime').value === '' ? null : Number($('#rsTime').value);
+  const staff = allStaff.find(s => s.id === $('#rsStaff').value) || null;
+  if (!isValidDateStr(date) || startMin == null) { err.textContent = 'Escolhe data e horário.'; err.classList.add('show'); return; }
+  try {
+    await rescheduleBooking({ salonId, salon, ctx: bookingCtx, bookingId: rsContext.booking.id, newDate: date, newStartMin: startMin, newStaff: staff });
+    toastSuccess(`Reagendada para ${formatDatePT(date, { short: true })} às ${minToTime(startMin)}.`);
+    bookingsByDateCache = { date: null, rows: [] };
+    document.querySelector('[data-action="close-reschedule"]').click();
+  } catch (e) { console.error(e); err.textContent = friendlyError(e, 'Não foi possível reagendar.'); err.classList.add('show'); renderRsSlots(); }
 }));
 
 /* ── CLIENTS ─────────────────────────────────────────────── */
-async function loadClients() {
+const CLIENTS_PAGE = 200;
+let clientsCursor = null, clientsHasMore = false;
+async function loadClients(more = false) {
   if (!salonId) return;
   const el = $('#clientsList');
   try {
-    const snap = await getDocs(query(collection(db,'salons',salonId,'clients'), orderBy('visits','desc')));
-    allClients = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(c => !c.deleted);
+    // Paged by visits desc so the list stays fast with thousands of clients.
+    const base = [collection(db,'salons',salonId,'clients'), orderBy('visits','desc'), limit(CLIENTS_PAGE)];
+    const q = more && clientsCursor ? query(...base.slice(0, 2), startAfter(clientsCursor), limit(CLIENTS_PAGE)) : query(...base);
+    const snap = await getDocs(q);
+    const rows = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(c => !c.deleted);
+    allClients = more ? allClients.concat(rows) : rows;
+    clientsCursor = snap.docs.at(-1) || null;
+    clientsHasMore = snap.docs.length === CLIENTS_PAGE;
     renderClients();
   } catch (e) {
     console.error(e);
-    el.innerHTML = `<div class="error-state"><div class="error-state__icon">⚠️</div><div class="error-state__title">Erro a carregar</div></div>`;
+    el.innerHTML = `<div class="error-state"><div class="error-state__icon">⚠️</div><div class="error-state__title">${escapeHTML(friendlyError(e, 'Erro a carregar'))}</div></div>`;
   }
 }
+on('clients-more', () => loadClients(true));
 const onClientsSearch = debounce(renderClients, 200);
 $('#clientsSearch').addEventListener('input', onClientsSearch);
 
@@ -1136,7 +1354,8 @@ function renderClients() {
         </td>
         <td><code>${c.referralCode || '—'}</code></td>
       </tr>`;
-    }).join('')}</tbody></table></div>`;
+    }).join('')}</tbody></table></div>
+    ${clientsHasMore && !search ? '<div class="text-center" style="padding:var(--s-4)"><button class="btn btn--sm" type="button" data-action="clients-more">Carregar mais</button></div>' : ''}`;
 }
 
 on('export-clients', () => {
@@ -1163,6 +1382,27 @@ on('export-bookings', () => {
   downloadCSV(`marcacoes-${todayISO()}.csv`, rows);
   toastSuccess(`${rows.length} marcações exportadas.`);
 });
+
+/* Full data export (portability / own backups): every collection of this salon as JSON. */
+on('export-salon-json', withLock('export-json', async () => {
+  try {
+    toast('A preparar exportação…');
+    const cols = ['services','staff','promotions','clients','bookings','site_gallery','site_partners','referrals','agenda'];
+    const out = { exportedAt: new Date().toISOString(), salon: { id: salonId, ...salon }, collections: {} };
+    const norm = (v) => (v && typeof v.toDate === 'function') ? v.toDate().toISOString() : v;
+    for (const c of cols) {
+      const snap = await getDocs(collection(db,'salons',salonId,c));
+      out.collections[c] = snap.docs.map(d => Object.fromEntries(Object.entries({ id: d.id, ...d.data() }).map(([k, v]) => [k, norm(v)])));
+    }
+    const sched = await getDoc(doc(db,'salons',salonId,'config','schedule'));
+    out.collections.config = sched.exists() ? [{ id: 'schedule', ...sched.data() }] : [];
+    const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `bookit-${salonId}-${todayISO()}.json`;
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    toastSuccess('Exportação concluída.');
+  } catch (e) { console.error(e); toastError(friendlyError(e, 'Não foi possível exportar.')); }
+}));
 
 /* ── SERVICES ────────────────────────────────────────────── */
 async function loadServices() {
@@ -1276,40 +1516,89 @@ on('delete-service', async (el) => {
 });
 
 /* ── SCHEDULE ────────────────────────────────────────────── */
+/** Renders one editable day row (shared by salon hours and per-staff hours). */
+function dayRowHTML(prefix, d, day, closedLabel) {
+  const dis = day.closed ? 'disabled' : '';
+  return htmlMix`
+    <div class="time-row">
+      <div class="time-row__day">${d.label}</div>
+      <input type="time" id="${raw(prefix)}o-${raw(d.key)}" value="${day.open || ''}"  aria-label="Abre"  ${raw(dis)} />
+      <span class="time-row__sep">até</span>
+      <input type="time" id="${raw(prefix)}c-${raw(d.key)}" value="${day.close || ''}" aria-label="Fecha" ${raw(dis)} />
+      <label class="time-row__closed">
+        <input type="checkbox" id="${raw(prefix)}x-${raw(d.key)}" ${raw(day.closed ? 'checked' : '')} data-action="toggle-day-row" data-prefix="${raw(prefix)}" data-key="${raw(d.key)}" />
+        ${closedLabel}
+      </label>
+      <span class="time-row__break">pausa
+        <input type="time" id="${raw(prefix)}bs-${raw(d.key)}" value="${day.breakStart || ''}" aria-label="Início da pausa" ${raw(dis)} />–
+        <input type="time" id="${raw(prefix)}be-${raw(d.key)}" value="${day.breakEnd || ''}" aria-label="Fim da pausa" ${raw(dis)} />
+      </span>
+    </div>`;
+}
+/** Reads a day row back; validates and returns { day, error }. */
+function readDayRow(prefix, key, label) {
+  const closed = $(`#${prefix}x-${key}`).checked;
+  if (closed) return { day: { open: '', close: '', closed: true } };
+  const open = $(`#${prefix}o-${key}`).value, close = $(`#${prefix}c-${key}`).value;
+  const bs = $(`#${prefix}bs-${key}`).value, be = $(`#${prefix}be-${key}`).value;
+  if (!open || !close) return { error: `${label}: indica abertura e fecho ou marca como fechado.` };
+  if (timeToMin(close) <= timeToMin(open)) return { error: `${label}: a hora de fecho tem de ser depois da abertura.` };
+  const day = { open, close, closed: false };
+  if (bs || be) {
+    if (!bs || !be || timeToMin(be) <= timeToMin(bs)) return { error: `${label}: pausa inválida.` };
+    if (timeToMin(bs) < timeToMin(open) || timeToMin(be) > timeToMin(close)) return { error: `${label}: a pausa tem de estar dentro do horário.` };
+    day.breakStart = bs; day.breakEnd = be;
+  }
+  return { day };
+}
+on('toggle-day-row', (el) => {
+  const { prefix, key } = el.dataset, checked = el.checked;
+  ['o','c','bs','be'].forEach(s => { const i = $(`#${prefix}${s}-${key}`); if (i) i.disabled = checked; });
+});
+
 async function loadSchedule() {
   if (!salonId) return;
   const schedDoc = await getDoc(doc(db,'salons',salonId,'config','schedule'));
   const sched = schedDoc.exists() ? schedDoc.data() : {};
-  $('#scheduleEditor').innerHTML = DAYS_CONFIG.map(d => {
-    const day = sched[d.key] || { open:'10:00', close:'19:00', closed: false };
-    return htmlMix`
-      <div class="time-row">
-        <div class="time-row__day">${d.label}</div>
-        <input type="time" id="so-${raw(d.key)}" value="${day.open}"  aria-label="Abre"  ${raw(day.closed ? 'disabled' : '')} />
-        <span class="time-row__sep">até</span>
-        <input type="time" id="sc-${raw(d.key)}" value="${day.close}" aria-label="Fecha" ${raw(day.closed ? 'disabled' : '')} />
-        <label class="time-row__closed">
-          <input type="checkbox" id="sx-${raw(d.key)}" ${raw(day.closed ? 'checked' : '')} data-action="toggle-schedule-day" data-key="${raw(d.key)}" />
-          Fechado
-        </label>
-      </div>`;
-  }).join('');
+  bookingCtx.schedule = schedDoc.exists() ? sched : null;
+  $('#scheduleEditor').innerHTML = DAYS_CONFIG.map(d => dayRowHTML('s', d, sched[d.key] || { open:'10:00', close:'19:00', closed: false }, 'Fechado')).join('');
+  renderClosedDates();
 }
-on('toggle-schedule-day', (el) => {
-  const key = el.dataset.key, checked = $('#sx-' + key).checked;
-  $('#so-' + key).disabled = checked; $('#sc-' + key).disabled = checked;
-});
-on('save-schedule', async () => {
+on('save-schedule', withLock('save-schedule', async () => {
   const sched = {};
-  DAYS_CONFIG.forEach(d => {
-    const closed = $('#sx-' + d.key).checked;
-    sched[d.key] = {
-      open:  closed ? '' : $('#so-' + d.key).value,
-      close: closed ? '' : $('#sc-' + d.key).value, closed
-    };
-  });
-  await setDoc(doc(db,'salons',salonId,'config','schedule'), sched);
-  toastSuccess('Horário guardado.');
+  for (const d of DAYS_CONFIG) {
+    const r = readDayRow('s', d.key, d.label);
+    if (r.error) return toastError(r.error);
+    sched[d.key] = r.day;
+  }
+  try {
+    await setDoc(doc(db,'salons',salonId,'config','schedule'), sched);
+    bookingCtx.schedule = sched;
+    toastSuccess('Horário guardado. Já se reflete nas marcações online.');
+  } catch (e) { toastError(friendlyError(e)); }
+}));
+
+/* ── CLOSED DATES (holidays, salon closures) ─────────────── */
+function renderClosedDates() {
+  const list = (salon.closedDates || []).slice().sort();
+  $('#closedDatesList').innerHTML = list.length
+    ? list.map(d => htmlMix`<span class="chip">${formatDatePT(d, { short: true })}<button type="button" data-action="remove-closed-date" data-date="${d}" aria-label="Remover">×</button></span>`).join('')
+    : '<span class="text-sm text-muted">Sem datas encerradas.</span>';
+}
+async function saveClosedDates(next) {
+  await updateDoc(doc(db,'salons',salonId), { closedDates: next });
+  salon.closedDates = next; renderClosedDates();
+}
+on('add-closed-date', withLock('closed-date', async () => {
+  const d = $('#closedDateInput').value;
+  if (!isValidDateStr(d)) return toastError('Escolhe uma data válida.');
+  if ((salon.closedDates || []).includes(d)) return toast('Essa data já está encerrada.');
+  try { await saveClosedDates([...(salon.closedDates || []), d]); $('#closedDateInput').value = ''; toastSuccess('Data encerrada. Deixa de aparecer nas marcações.'); }
+  catch (e) { toastError(friendlyError(e)); }
+}));
+on('remove-closed-date', async (el) => {
+  try { await saveClosedDates((salon.closedDates || []).filter(x => x !== el.dataset.date)); toastSuccess('Data reaberta.'); }
+  catch (e) { toastError(friendlyError(e)); }
 });
 
 /* ── PROMOTIONS ──────────────────────────────────────────── */
@@ -1549,28 +1838,65 @@ $('#settingsForm').addEventListener('submit', async (e) => {
   const bdayDiscount = parseInt($('#cfgBdayDiscount').value, 10) || 15;
   const teamPasswordRaw = $('#cfgTeamPw').value;
   if (!name) return toast('O nome do salão é obrigatório.');
-  const updates = { name, tagline, address, phone, email, primaryColor: color, birthdayDiscount: bdayDiscount };
-  if (teamPasswordRaw && teamPasswordRaw.length >= 4) {
-    updates.teamPasswordHash = await hashPassword(teamPasswordRaw);
-    salon.teamPasswordHash = updates.teamPasswordHash;
-  }
-  await updateDoc(doc(db,'salons', salonId), updates);
-  Object.assign(salon, updates);
-  $('#sidebarMark').textContent = name.charAt(0);
-  $('#sidebarName').textContent = name;
-  $('#mobileName').textContent  = name;
-  $('#cfgTeamPw').value = '';
-  toastSuccess('Configurações guardadas.');
+  if (!isHexColor(color)) return toast('Cor inválida (formato #RRGGBB).');
+  const timezone = $('#cfgTimezone').value;
+  const slotInterval = parseInt($('#cfgInterval').value, 10);
+  const bookingLeadMinutes = parseInt($('#cfgLead').value, 10);
+  const maxAdvanceDays = parseInt($('#cfgAdvance').value, 10);
+  const cancellationHours = parseInt($('#cfgCancelHours').value, 10);
+  if (![5,10,15,20,30,60].includes(slotInterval)) return toast('Intervalo entre horários inválido.');
+  if (!(bookingLeadMinutes >= 0 && bookingLeadMinutes <= 1440)) return toast('Antecedência mínima: 0 a 1440 minutos.');
+  if (!(maxAdvanceDays >= 1 && maxAdvanceDays <= 365)) return toast('Antecedência máxima: 1 a 365 dias.');
+  if (!(cancellationHours >= 0 && cancellationHours <= 336)) return toast('Cancelamento: 0 a 336 horas.');
+  const updates = { name, tagline, address, phone, email, primaryColor: color, birthdayDiscount: bdayDiscount,
+                    timezone, slotInterval, bookingLeadMinutes, maxAdvanceDays, cancellationHours };
+  const btn = e.submitter || $('#settingsForm button[type="submit"]'); if (btn) btn.disabled = true;
+  try {
+    if (teamPasswordRaw) {
+      if (teamPasswordRaw.length < 8) throw Object.assign(new Error('weak'), { code: 'auth/weak-password' });
+      // The team is a real Firebase account. Rotating the password = creating a
+      // fresh account and pointing the salon at it (the old one loses access
+      // immediately). Done on a secondary Auth instance so the admin stays signed in.
+      const teamAuth = getSecondaryAuth();
+      const teamEmail = `equipa-${salonId}-${Date.now().toString(36)}@bookit.team`;
+      const cred = await createUserWithEmailAndPassword(teamAuth, teamEmail, teamPasswordRaw);
+      await signOut(teamAuth).catch(() => {});
+      updates.teamUid = cred.user.uid; updates.teamEmail = teamEmail;
+    }
+    await updateDoc(doc(db,'salons', salonId), updates);
+    Object.assign(salon, updates);
+    $('#sidebarMark').textContent = name.charAt(0);
+    $('#sidebarName').textContent = name;
+    $('#mobileName').textContent  = name;
+    $('#cfgTeamPw').value = '';
+    $('#teamStatus').textContent = salon.teamUid ? 'Definida · a equipa entra em staff.html com esta password.' : 'Ainda não definida.';
+    toastSuccess(updates.teamUid ? 'Configurações guardadas · password da equipa atualizada.' : 'Configurações guardadas.');
+    refreshOnboarding();
+  } catch (err) { console.error(err); toastError(friendlyError(err, 'Não foi possível guardar.')); }
+  finally { if (btn) btn.disabled = false; }
 });
+
+function renderPlanStatus() {
+  const el = $('#planStatus'); if (!el) return;
+  const plan = salon.plan || 'active';
+  const t = salon.trialEndsAt; const ms = t?.toMillis ? t.toMillis() : (t?.seconds ? t.seconds * 1000 : null);
+  const ok = planActive(salon);
+  const label = plan === 'active' ? 'Ativa' : plan === 'trial' ? (ok ? `Período de teste até ${ms ? new Date(ms).toLocaleDateString('pt-PT') : '—'}` : 'Período de teste terminado') : 'Suspensa';
+  el.innerHTML = `<span class="badge ${ok ? 'badge--green' : 'badge--red'}">${escapeHTML(label)}</span>` +
+    (ok ? '' : ' <span class="text-sm text-muted">As marcações online estão bloqueadas. Contacta o suporte para ativar.</span>');
+  const banner = $('#planBanner'); if (banner) banner.hidden = ok;
+}
 
 /* ── STAFF ───────────────────────────────────────────────── */
 async function loadStaff() {
   if (!salonId) return;
   try {
-    const snap = await getDocs(query(collection(db,'salons',salonId,'staff'), orderBy('order','asc')));
-    allStaff = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderStaffList(); renderStaffSelect();
-  } catch (e) { console.error(e); }
+    // No orderBy in the query: Firestore would silently drop staff without an `order` field.
+    const snap = await getDocs(collection(db,'salons',salonId,'staff'));
+    allStaff = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999));
+    bookingCtx.staff = allStaff.filter(s => s.active !== false);
+    renderStaffList(); renderStaffSelect(); renderTimeOffSelect();
+  } catch (e) { console.error(e); toastError(friendlyError(e)); }
 }
 
 function renderStaffList() {
@@ -1734,9 +2060,13 @@ on('toggle-staff', async (el) => {
   loadStaff();
 });
 on('delete-staff', async (el) => {
-  if (!confirm('Remover colaborador?')) return;
-  await deleteDoc(doc(db,'salons',salonId,'staff', el.dataset.id));
-  loadStaff();
+  const id = el.dataset.id;
+  const today = todayForSalon(salon);
+  const future = cachedBookings.filter(b => b.staffId === id && b.date >= today && BLOCKING_STATUSES.includes(b.status));
+  if (future.length) return toastError(`Este colaborador tem ${future.length} marcação(ões) futura(s). Reagenda-as ou desativa o colaborador em vez de o remover.`);
+  if (!confirm('Remover colaborador? Esta ação não pode ser anulada.')) return;
+  try { await deleteDoc(doc(db,'salons',salonId,'staff', id)); toastSuccess('Colaborador removido.'); loadStaff(); }
+  catch (e) { toastError(friendlyError(e)); }
 });
 
 const DAYS_STAFF = [
@@ -1753,37 +2083,61 @@ on('load-staff-schedule', async () => {
   editorEl.hidden = false;
   const staffDoc = await getDoc(doc(db,'salons',salonId,'staff', id));
   const sched = staffDoc.data()?.schedule || {};
-  $('#staffSchedFields').innerHTML = DAYS_STAFF.map(d => {
-    const day = sched[d.key] || { open:'10:00', close:'19:00', closed: false };
-    return htmlMix`
-      <div class="time-row">
-        <div class="time-row__day">${d.label}</div>
-        <input type="time" id="sso-${raw(d.key)}" value="${day.open}"  aria-label="Abre"  ${raw(day.closed ? 'disabled' : '')} />
-        <span class="time-row__sep">até</span>
-        <input type="time" id="ssc-${raw(d.key)}" value="${day.close}" aria-label="Fecha" ${raw(day.closed ? 'disabled' : '')} />
-        <label class="time-row__closed">
-          <input type="checkbox" id="ssx-${raw(d.key)}" ${raw(day.closed ? 'checked' : '')} data-action="toggle-staff-day" data-key="${raw(d.key)}" />
-          Folga
-        </label>
-      </div>`;
-  }).join('');
+  const salonSched = bookingCtx.schedule || {};
+  $('#staffSchedFields').innerHTML = DAYS_STAFF.map(d => dayRowHTML('ss', d, sched[d.key] || salonSched[d.key] || { open:'10:00', close:'19:00', closed: false }, 'Folga')).join('');
 });
-on('toggle-staff-day', (el) => {
-  const key = el.dataset.key, checked = $('#ssx-' + key).checked;
-  $('#sso-' + key).disabled = checked; $('#ssc-' + key).disabled = checked;
-});
-on('save-staff-schedule', async () => {
+on('save-staff-schedule', withLock('save-staff-sched', async () => {
   const id = $('#staffSchedSelect').value; if (!id) return;
   const schedule = {};
-  DAYS_STAFF.forEach(d => {
-    const closed = $('#ssx-' + d.key).checked;
-    schedule[d.key] = {
-      open:  closed ? '' : $('#sso-' + d.key).value,
-      close: closed ? '' : $('#ssc-' + d.key).value, closed
-    };
-  });
-  await updateDoc(doc(db,'salons',salonId,'staff', id), { schedule });
-  toastSuccess('Horário do colaborador guardado.');
+  for (const d of DAYS_STAFF) {
+    const r = readDayRow('ss', d.key, d.label);
+    if (r.error) return toastError(r.error);
+    schedule[d.key] = r.day;
+  }
+  try { await updateDoc(doc(db,'salons',salonId,'staff', id), { schedule }); toastSuccess('Horário do colaborador guardado.'); loadStaff(); }
+  catch (e) { toastError(friendlyError(e)); }
+}));
+
+/* ── STAFF TIME OFF (férias / indisponibilidades) ────────── */
+function renderTimeOffSelect() {
+  const sel = $('#timeOffStaff'); if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— Escolhe um colaborador —</option>' + allStaff.map(s => htmlMix`<option value="${s.id}">${s.name}</option>`).join('');
+  if (cur && allStaff.some(s => s.id === cur)) sel.value = cur;
+  renderTimeOffList();
+}
+function renderTimeOffList() {
+  const id = $('#timeOffStaff').value, el = $('#timeOffList');
+  const s = allStaff.find(x => x.id === id);
+  if (!s) { el.innerHTML = '<span class="text-sm text-muted">Seleciona um colaborador para ver as indisponibilidades.</span>'; return; }
+  const list = (s.timeOff || []).slice().sort((a, b) => a.from.localeCompare(b.from));
+  el.innerHTML = list.length
+    ? list.map((t, i) => htmlMix`<span class="chip">${formatDatePT(t.from, { short: true })} → ${formatDatePT(t.to, { short: true })}${t.reason ? ' · ' + t.reason : ''}<button type="button" data-action="remove-time-off" data-idx="${i}" aria-label="Remover">×</button></span>`).join('')
+    : '<span class="text-sm text-muted">Sem férias/indisponibilidades registadas.</span>';
+}
+$('#timeOffStaff').addEventListener('change', renderTimeOffList);
+on('add-time-off', withLock('time-off', async () => {
+  const id = $('#timeOffStaff').value, from = $('#timeOffFrom').value, to = $('#timeOffTo').value || $('#timeOffFrom').value;
+  const reason = $('#timeOffReason').value.trim().slice(0, 60);
+  const s = allStaff.find(x => x.id === id);
+  if (!s) return toastError('Escolhe um colaborador.');
+  if (!isValidDateStr(from) || !isValidDateStr(to) || to < from) return toastError('Intervalo de datas inválido.');
+  const today = todayForSalon(salon);
+  const clash = cachedBookings.filter(b => b.staffId === id && b.date >= from && b.date <= to && b.date >= today && BLOCKING_STATUSES.includes(b.status));
+  if (clash.length && !confirm(`Existem ${clash.length} marcação(ões) neste período. Vão continuar válidas — reagenda-as depois. Continuar?`)) return;
+  const sorted = [...(s.timeOff || []), { from, to, reason }].sort((a, b) => a.from.localeCompare(b.from));
+  try {
+    await updateDoc(doc(db,'salons',salonId,'staff', id), { timeOff: sorted });
+    $('#timeOffFrom').value = ''; $('#timeOffTo').value = ''; $('#timeOffReason').value = '';
+    toastSuccess('Indisponibilidade registada.'); await loadStaff();
+  } catch (e) { toastError(friendlyError(e)); }
+}));
+on('remove-time-off', async (el) => {
+  const id = $('#timeOffStaff').value, s = allStaff.find(x => x.id === id); if (!s) return;
+  const list = (s.timeOff || []).slice().sort((a, b) => a.from.localeCompare(b.from));
+  list.splice(Number(el.dataset.idx), 1);
+  try { await updateDoc(doc(db,'salons',salonId,'staff', id), { timeOff: list }); toastSuccess('Removida.'); await loadStaff(); }
+  catch (e) { toastError(friendlyError(e)); }
 });
 
 /* ── DAY VIEW ────────────────────────────────────────────── */

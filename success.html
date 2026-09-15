@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Marcação confirmada." />
+  <meta name="description" content="Marcação registada." />
   <meta name="robots" content="noindex" />
   <meta name="theme-color" content="#ffffff" />
-  <title>Marcação confirmada — Book It</title>
+  <title>Marcação registada — Book It</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -16,10 +16,7 @@
     <div class="appbar__inner">
       <a class="appbar__brand" href="index.html" aria-label="Página inicial">
         <div class="appbar__mark" id="headerMark" aria-hidden="true">B</div>
-        <div>
-          <div class="appbar__name" id="headerName">Book It</div>
-          <div class="appbar__sub" id="headerSub">Marcações</div>
-        </div>
+        <div><div class="appbar__name" id="headerName">Book It</div><div class="appbar__sub" id="headerSub">Marcações</div></div>
       </a>
     </div>
   </header>
@@ -27,115 +24,107 @@
   <main>
     <div class="container" style="padding: var(--s-10) 0 var(--s-10); text-align:center">
       <div class="success-mark" aria-hidden="true">
-        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="20 6 9 17 4 12"/>
-        </svg>
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
       </div>
-      <p class="eyebrow" style="margin-bottom: var(--s-3)">Marcação confirmada</p>
+      <p class="eyebrow" style="margin-bottom: var(--s-3)">Marcação registada</p>
       <h1 class="display" style="margin-bottom: var(--s-4)">Até <em>breve</em>.</h1>
-      <p class="text-lg text-muted" id="leadCopy" style="margin: 0 auto var(--s-7); max-width: 42ch; line-height: 1.55">
-        Recebes em breve um email com os detalhes. Guarda esta página para referência.
+      <p class="text-lg text-muted" id="leadCopy" style="margin: 0 auto var(--s-7); max-width: 44ch; line-height: 1.55">
+        A tua marcação está <strong>pendente de confirmação</strong> pelo salão. Guarda os detalhes ou adiciona-a ao teu calendário.
       </p>
 
       <div class="card mb-3" style="text-align:left">
         <table class="kv-table" aria-label="Resumo da marcação">
           <tbody>
             <tr><td class="label">Serviço</td><td class="value" id="rService">—</td></tr>
+            <tr><td class="label">Colaborador</td><td class="value" id="rStaff">—</td></tr>
             <tr><td class="label">Data</td>   <td class="value" id="rDate">—</td></tr>
             <tr><td class="label">Hora</td>   <td class="value tabular" id="rTime">—</td></tr>
             <tr><td class="label">Preço</td>  <td class="value tabular" id="rPrice">—</td></tr>
             <tr><td class="label">Nome</td>   <td class="value" id="rName">—</td></tr>
+            <tr><td class="label">Referência</td><td class="value tabular" id="rRef" style="font-family:var(--font-mono);font-size:var(--text-sm)">—</td></tr>
           </tbody>
         </table>
       </div>
 
-      <!-- Referral code (only for new clients without account) -->
-      <div id="referralCard" class="card mb-3" hidden style="text-align:left">
-        <div class="card__head">
-          <div class="card__title">🎁 O teu código de referido</div>
-        </div>
-        <div class="refcode-box">
-          <div class="text-sm text-muted">Partilha com amigos para ambos ganharem desconto</div>
-          <div id="refCodeDisplay" class="refcode-value">—</div>
-          <button class="btn btn--sm" type="button" data-action="copy-code">Copiar código</button>
-        </div>
+      <div class="btn-group--full mb-3">
+        <button class="btn" type="button" data-action="download-ics">📅 Adicionar ao calendário</button>
+        <a class="btn" id="gcalLink" href="#" target="_blank" rel="noopener">Google Calendar</a>
       </div>
 
-      <!-- "Create account" invite — ONLY shown when user is NOT logged in -->
       <div id="inviteCard" class="card card--accent mb-3" hidden style="text-align:left">
         <div class="flex" style="align-items:flex-start;gap:var(--s-3)">
           <div style="font-size:22px">🌿</div>
           <div class="flex-1">
             <div style="font-weight:600;font-size:var(--text-md)">Conta gratuita</div>
-            <div class="text-sm text-muted mt-1">Acompanha pontos, descontos e histórico. Menos de 30 segundos.</div>
+            <div class="text-sm text-muted mt-1">Acompanha o estado desta marcação, cancela online e acumula pontos. Menos de 30 segundos.</div>
             <a class="btn btn--primary btn--sm mt-3" id="btnAccount" href="account.html">Criar conta / Entrar</a>
           </div>
         </div>
       </div>
 
-      <!-- Logged-in path: show prominent CTA back to portal -->
       <div id="loggedInActions" hidden style="display: flex; flex-direction: column; gap: 8px">
         <a class="btn btn--primary btn--full btn--lg" id="btnPortal" href="account.html">Ver as minhas marcações →</a>
         <a class="btn btn--full" id="btnBackLoggedIn" href="index.html">Marcar mais um serviço</a>
       </div>
-
-      <!-- Anonymous path: just back to booking -->
       <a class="btn btn--full" id="btnBack" href="index.html">Nova marcação</a>
     </div>
   </main>
 
 <script type="module">
-import { loadSalon, applySalonBranding, getSalonId, on, toastSuccess, toastError } from './app.js';
+import { loadSalon, applySalonBranding, getSalonId, on, toastError, MONTHS_FULL, buildICS, googleCalendarUrl, salonSetting, formatPrice } from './app.js';
 import { auth, onAuthStateChanged } from './firebase.js';
 
 const salonId = getSalonId();
-const params  = new URLSearchParams(window.location.search);
-
-(async () => {
-  const salon = await loadSalon(salonId);
-  if (salon) applySalonBranding(salon, { titlePrefix: 'Marcação confirmada' });
-})();
+const p = new URLSearchParams(window.location.search);
+const dateStr = p.get('date') || '', time = p.get('time') || '', duration = Number(p.get('duration')) || 30;
+const service = p.get('service') || 'Marcação', staffName = p.get('staff') || '', name = p.get('name') || '';
+let salon = null;
 
 const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v || '—'; };
-set('rService', params.get('service'));
-set('rDate',    params.get('date'));
-set('rTime',    params.get('time'));
-const price = params.get('price');
-set('rPrice', price ? `${price}€` : '—');
-set('rName',  params.get('name'));
-
-const refCode = params.get('refCode');
-if (refCode) {
-  document.getElementById('referralCard').hidden = false;
-  document.getElementById('refCodeDisplay').textContent = refCode;
-}
+set('rService', service); set('rStaff', staffName); set('rTime', time); set('rName', name);
+set('rPrice', p.get('price') ? formatPrice(p.get('price')) : '—');
+set('rRef', (p.get('id') || '').slice(0, 8).toUpperCase());
+if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) { const [y, m, d] = dateStr.split('-').map(Number); set('rDate', `${d} de ${MONTHS_FULL[m - 1]} de ${y}`); }
+else set('rDate', dateStr);
 
 const qs = `?salon=${encodeURIComponent(salonId)}`;
-document.getElementById('btnBack').href           = `index.html${qs}`;
-document.getElementById('btnBackLoggedIn').href   = `index.html${qs}`;
-document.getElementById('btnPortal').href         = `account.html${qs}`;
-document.getElementById('btnAccount').href        = `account.html${qs}`;
+document.getElementById('btnBack').href = `index.html${qs}`;
+document.getElementById('btnBackLoggedIn').href = `index.html${qs}`;
+document.getElementById('btnPortal').href = `account.html${qs}`;
+document.getElementById('btnAccount').href = `account.html${qs}`;
 
-// Switch UI based on auth state — logged-in users skip the "create account" pitch
+(async () => {
+  salon = await loadSalon(salonId);
+  if (salon) applySalonBranding(salon, { titlePrefix: 'Marcação registada' });
+  const tz = salonSetting(salon, 'timezone');
+  const title = `${service} · ${salon?.name || 'Book It'}`;
+  if (dateStr && time) {
+    document.getElementById('gcalLink').href = googleCalendarUrl({ title, details: staffName ? `Com ${staffName}` : '', location: salon?.address || '', dateStr, time, durationMin: duration, tz });
+  } else {
+    document.getElementById('gcalLink').hidden = true;
+  }
+})();
+
+on('download-ics', () => {
+  if (!dateStr || !time) return toastError('Sem dados suficientes para o calendário.');
+  const ics = buildICS({
+    uid: `${p.get('id') || Date.now()}@bookit`, title: `${service} · ${salon?.name || 'Book It'}`,
+    description: staffName ? `Com ${staffName}. Estado: pendente de confirmação.` : 'Estado: pendente de confirmação.',
+    location: salon?.address || '', dateStr, time, durationMin: duration,
+    tz: salonSetting(salon, 'timezone'), url: window.location.origin + `/account.html${qs}`,
+  });
+  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'marcacao.ics';
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+});
+
 onAuthStateChanged(auth, (user) => {
   const isLoggedIn = !!user;
   document.getElementById('loggedInActions').hidden = !isLoggedIn;
-  document.getElementById('btnBack').hidden         = isLoggedIn;
-  document.getElementById('inviteCard').hidden      = isLoggedIn;
-  if (isLoggedIn) {
-    document.getElementById('leadCopy').textContent =
-      'A tua marcação está pendente. Vai acompanhar o estado na tua área pessoal.';
-  }
-});
-
-on('copy-code', async () => {
-  if (!refCode) return;
-  try {
-    await navigator.clipboard.writeText(refCode);
-    toastSuccess('Código copiado');
-  } catch {
-    toastError('Não foi possível copiar.');
-  }
+  document.getElementById('btnBack').hidden = isLoggedIn;
+  document.getElementById('inviteCard').hidden = isLoggedIn;
+  if (isLoggedIn) document.getElementById('leadCopy').innerHTML = 'A tua marcação está <strong>pendente de confirmação</strong> pelo salão. Acompanha o estado na tua área pessoal.';
 });
 </script>
 </body>

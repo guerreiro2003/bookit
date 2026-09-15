@@ -227,11 +227,21 @@
             <button class="btn" type="submit">Alterar password</button>
           </form>
 
+          <div class="card mb-3">
+            <div class="card__head">
+              <div>
+                <div class="card__title">Os meus dados</div>
+                <div class="card__sub">Descarrega uma cópia de tudo o que este salão guarda sobre ti (perfil, pontos, marcações).</div>
+              </div>
+            </div>
+            <button class="btn" type="button" data-action="export-data">⬇ Exportar os meus dados (JSON)</button>
+          </div>
+
           <div class="card" style="border-color: var(--danger-border)">
             <div class="card__head">
               <div>
                 <div class="card__title" style="color:var(--danger-fg)">Zona de risco</div>
-                <div class="card__sub">Apagar a conta remove todos os teus dados pessoais permanentemente. As marcações passadas mantêm-se anonimizadas.</div>
+                <div class="card__sub">Apagar a conta remove os teus dados pessoais do perfil e das marcações. O histórico de visitas fica anonimizado.</div>
               </div>
             </div>
             <button class="btn btn--danger" type="button" data-action="delete-account">Apagar a minha conta</button>
@@ -252,10 +262,10 @@ import {
 } from './firebase.js';
 import {
   $, $$, on, toast, toastSuccess, toastError, escapeHTML, htmlMix, raw,
-  MONTHS_FULL, formatDate, formatDatePT, formatPrice, todayISO,
+  MONTHS_FULL, formatDate, formatDatePT, formatPrice, todayISO, todayForSalon,
   getSalonId, loadSalon, applySalonBranding,
-  generateReferralCode, authErrorMessage, statusBadge, withLock,
-  isEmail
+  generateReferralCode, authErrorMessage, friendlyError, statusBadge, withLock,
+  isEmail, cancelBooking, clientCanCancel, salonSetting, nowInTimezone
 } from './app.js';
 
 const salonId = getSalonId();
@@ -356,12 +366,17 @@ $('#authRegister').addEventListener('submit', withLock('register', async (e) => 
     const uid  = cred.user.uid;
     const refCode = generateReferralCode(name, salonId);
 
-    // Atomically: if email already in clients, link to UID; otherwise create new
+    // If a guest record with this email already exists (created by the salon at
+    // a paid visit), link it to the new account; otherwise create a fresh one.
+    // The referral code is also published to /referrals (public, no PII) so
+    // friends can redeem it without reading client documents.
+    const existing = await getDocs(query(collection(db,'salons',salonId,'clients'), where('email','==', email)));
     await runTransaction(db, async (tx) => {
-      const existing = await getDocs(query(collection(db,'salons',salonId,'clients'), where('email','==', email)));
       if (!existing.empty) {
         const ref = doc(db,'salons',salonId,'clients', existing.docs[0].id);
-        tx.update(ref, { uid, name, phone, birthday: birthday || null, referralCode: refCode, updatedAt: serverTimestamp() });
+        const cur = existing.docs[0].data();
+        tx.update(ref, { uid, name, phone, birthday: birthday || null, referralCode: cur.referralCode || refCode, updatedAt: serverTimestamp() });
+        if (!cur.referralCode) tx.set(doc(db,'salons',salonId,'referrals', refCode), { clientId: uid, createdAt: serverTimestamp() });
       } else {
         tx.set(doc(db,'salons',salonId,'clients', uid), {
           uid, name, email, phone, birthday: birthday || null,
@@ -370,6 +385,7 @@ $('#authRegister').addEventListener('submit', withLock('register', async (e) => 
           referredBy: null, referrals: [], discounts: [],
           createdAt: serverTimestamp()
         });
+        tx.set(doc(db,'salons',salonId,'referrals', refCode), { clientId: uid, createdAt: serverTimestamp() });
       }
     });
     toastSuccess('Conta criada com sucesso!');
@@ -398,6 +414,7 @@ async function loadClient(u) {
           referredBy: null, referrals: [], discounts: [],
           createdAt: serverTimestamp()
         });
+        await setDoc(doc(db,'salons',salonId,'referrals', refCode), { clientId: u.uid, createdAt: serverTimestamp() }).catch(console.error);
         snap = await getDoc(doc(db,'salons',salonId,'clients', u.uid));
         client = { id: u.uid, ...snap.data() };
       }
@@ -530,8 +547,10 @@ async function loadHistory() {
 }
 
 function renderBookingRow(b, upcoming) {
-  const isToday = b.date === todayISO();
-  const canCancel = upcoming && ['pending','confirmed'].includes(b.status);
+  const isToday = b.date === todayForSalon(salon);
+  const policy = clientCanCancel({ booking: b, cancellationHours: salonSetting(salon, 'cancellationHours'), now: nowInTimezone(salonSetting(salon, 'timezone')) });
+  const canCancel = upcoming && policy.ok;
+  const lockedCancel = upcoming && ['pending','confirmed'].includes(b.status) && !policy.ok;
   return htmlMix`
     <div class="row-card ${raw(upcoming && isToday ? 'row-card--accent' : '')}">
       <div class="row-card__main">
@@ -553,19 +572,40 @@ function renderBookingRow(b, upcoming) {
         </div>
         ${b.paid && b.pointsAwarded ? raw(htmlMix`<div class="text-sm text-muted">+${b.pointsAwarded} pts</div>`) : ''}
         ${canCancel ? raw(htmlMix`<button class="btn btn--danger btn--sm" type="button" data-action="cancel-booking" data-id="${b.id}">Cancelar</button>`) : ''}
+        ${lockedCancel ? raw(htmlMix`<div class="text-xs text-muted" title="Cancelamentos online só até ${salonSetting(salon, 'cancellationHours')}h antes">Para cancelar, contacta o salão</div>`) : ''}
       </div>
     </div>`;
 }
 
-on('cancel-booking', async (el) => {
+on('cancel-booking', withLock('client-cancel', async (el) => {
   if (!confirm('Cancelar esta marcação?')) return;
   try {
-    await updateDoc(doc(db,'salons',salonId,'bookings', el.dataset.id),
-      { status: 'cancelled', cancelledAt: serverTimestamp(), cancelledBy: 'client' });
+    await cancelBooking({
+      salonId, bookingId: el.dataset.id, by: 'client',
+      enforcePolicy: { cancellationHours: salonSetting(salon, 'cancellationHours'), now: nowInTimezone(salonSetting(salon, 'timezone')) },
+    });
     toastSuccess('Marcação cancelada.');
     invalidateCache();
     loadUpcoming(); loadHistory();
-  } catch (e) { console.error(e); toastError('Erro ao cancelar.'); }
+  } catch (e) { console.error(e); toastError(friendlyError(e, 'Não foi possível cancelar.')); }
+}));
+
+/* ── GDPR: export everything we hold about this client ── */
+on('export-data', async () => {
+  try {
+    const bookings = await fetchBookings();
+    const payload = {
+      exportedAt: new Date().toISOString(), salon: { id: salonId, name: salon?.name },
+      account: { email: user.email, uid: user.uid },
+      profile: client,
+      bookings: bookings.map(b => ({ ...b, createdAt: b.createdAt?.toDate?.()?.toISOString?.() || b.createdAt || null })),
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `os-meus-dados-${salonId}.json`;
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    toastSuccess('Ficheiro exportado.');
+  } catch (e) { console.error(e); toastError(friendlyError(e, 'Não foi possível exportar.')); }
 });
 
 function loadDiscounts() {
@@ -704,19 +744,30 @@ $('#passwordForm').addEventListener('submit', async (e) => {
   } catch (e) { toastError(authErrorMessage(e.code)); }
 });
 
-on('delete-account', async () => {
-  if (!confirm('Tens a certeza? Esta ação não pode ser anulada. Vamos manter o histórico de visitas anonimizado por motivos contabilísticos.')) return;
+on('delete-account', withLock('delete-account', async () => {
+  if (!confirm('Tens a certeza? Esta ação não pode ser anulada. Os teus dados pessoais são removidos das marcações e do perfil; o histórico fica anonimizado por motivos contabilísticos.')) return;
   try {
-    // Anonymize client document (don't delete to preserve booking history references)
+    // 1. Strip personal data from every booking that belongs to this client
+    //    (rules allow the owner to anonymise their own bookings).
+    const mine = await fetchBookings();
+    for (const b of mine) {
+      await updateDoc(doc(db,'salons',salonId,'bookings', b.id), {
+        clientName: 'Cliente anonimizado', clientEmail: '', clientPhone: '', notes: '', forSomeone: null,
+        anonymised: true, anonymisedAt: serverTimestamp(),
+      }).catch(err => console.error('anonymise booking', b.id, err));
+    }
+    // 2. Anonymise the profile (kept so points/visits history stays consistent)
     await updateDoc(doc(db,'salons',salonId,'clients', client.id), {
       name: 'Cliente anonimizado',
       email: 'anonimo@deleted.local',
       phone: '',
       birthday: null,
       uid: null,
+      discounts: [],
       deleted: true,
       deletedAt: serverTimestamp()
     });
+    // 3. Delete the login
     await deleteUser(user);
     toastSuccess('Conta apagada.');
     setTimeout(() => window.location.href = 'index.html', 1500);
@@ -728,7 +779,7 @@ on('delete-account', async () => {
       toastError('Erro ao apagar conta. Contacta-nos.');
     }
   }
-});
+}));
 </script>
 </body>
 </html>

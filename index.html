@@ -57,6 +57,7 @@
       </ol>
 
       <div id="promoBanners" aria-live="polite"></div>
+      <div id="planNotice" class="promo mb-3" hidden><div><div class="promo__title">Marcações online indisponíveis</div><div class="promo__desc">Este salão não está a aceitar marcações online neste momento. Contacta o salão diretamente.</div></div></div>
 
       <section id="screenServices" aria-labelledby="title1">
         <p class="eyebrow" style="margin-bottom: var(--s-2)">Passo 1 de 5</p>
@@ -69,7 +70,7 @@
 
       <section id="screenStaff" aria-labelledby="title2" hidden>
         <h2 class="section-title" id="title2">Escolhe um colaborador</h2>
-        <p class="section-sub">Ou avança com "Sem preferência" para o primeiro disponível</p>
+        <p class="section-sub">Ou avança com "Sem preferência" — atribuímos o primeiro disponível</p>
         <div class="select-list" id="staffList"></div>
         <div class="btn-group--full mt-5">
           <button class="btn" type="button" data-action="back-to" data-step="1">← Voltar</button>
@@ -78,7 +79,7 @@
 
       <section id="screenDateTime" aria-labelledby="title3" hidden>
         <h2 class="section-title" id="title3">Quando preferes?</h2>
-        <p class="section-sub">Escolhe o dia e a hora</p>
+        <p class="section-sub" id="dateSub">Escolhe o dia e a hora</p>
 
         <div class="calendar">
           <div class="calendar__header">
@@ -111,38 +112,40 @@
         <div class="card">
           <div class="field">
             <label for="clientName">Nome completo *</label>
-            <input type="text" id="clientName" required autocomplete="name" placeholder="O teu nome" />
+            <input type="text" id="clientName" required autocomplete="name" maxlength="80" placeholder="O teu nome" />
           </div>
           <div class="field">
             <label for="clientEmail">Email *</label>
-            <input type="email" id="clientEmail" required autocomplete="email" placeholder="email@exemplo.com" />
+            <input type="email" id="clientEmail" required autocomplete="email" maxlength="120" placeholder="email@exemplo.com" />
           </div>
           <div class="field">
             <label for="clientPhone">Telemóvel *</label>
-            <input type="tel" id="clientPhone" required autocomplete="tel" placeholder="912 345 678" />
+            <input type="tel" id="clientPhone" required autocomplete="tel" maxlength="20" placeholder="912 345 678" />
           </div>
           <div class="field">
             <label for="forSomeone">Esta marcação é para outra pessoa? <span class="text-muted text-sm" style="font-weight:400">(opcional)</span></label>
-            <input type="text" id="forSomeone" placeholder="Nome de quem vai ser atendido" />
-            <div class="field__hint">Se preencheres, os pontos Zen Club ficam na tua conta.</div>
+            <input type="text" id="forSomeone" maxlength="80" placeholder="Nome de quem vai ser atendido" />
+            <div class="field__hint">Se preencheres, os pontos ficam na tua conta.</div>
           </div>
           <div class="field">
-            <label for="referralCode">Código promocional <span class="text-muted text-sm" style="font-weight:400">(opcional)</span></label>
-            <input type="text" id="referralCode" placeholder="Ex: ZEN-ANA42 ou BDAY2026-XX" style="text-transform:uppercase;font-family:var(--font-mono)" />
-            <div class="field__hint">Código de amigo, de aniversário ou de fidelização. Verifica-se ao confirmar.</div>
+            <label for="referralCode">Código de desconto <span class="text-muted text-sm" style="font-weight:400">(opcional)</span></label>
+            <input type="text" id="referralCode" maxlength="24" placeholder="Código de amigo ou cupão" style="text-transform:uppercase;font-family:var(--font-mono)" autocomplete="off" />
+            <div class="field__hint">Código de referido, de aniversário ou de fidelização. Verifica-se ao confirmar.</div>
           </div>
           <div class="field" style="margin-bottom:0">
             <label for="clientNotes">Notas <span class="text-muted text-sm" style="font-weight:400">(opcional)</span></label>
-            <textarea id="clientNotes" placeholder="Alguma preferência ou informação extra…"></textarea>
+            <textarea id="clientNotes" maxlength="500" placeholder="Alguma preferência ou informação extra…"></textarea>
           </div>
         </div>
+
+        <p class="privacy-note">Os teus dados são usados apenas para gerir esta marcação e contactar-te sobre ela. <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a>.</p>
 
         <div id="accountInvite" class="card card--accent mt-3">
           <div class="flex" style="align-items:flex-start;gap:var(--s-3)">
             <div style="font-size:22px">🌿</div>
             <div class="flex-1">
-              <div style="font-weight:600;font-size:var(--text-md);color:var(--fg)">Ganha pontos Zen Club</div>
-              <div class="text-sm text-muted mt-1">Cria conta grátis para acumular pontos por cada visita paga.</div>
+              <div style="font-weight:600;font-size:var(--text-md);color:var(--fg)">Ganha pontos a cada visita</div>
+              <div class="text-sm text-muted mt-1">Cria conta grátis para acumular pontos, ver o histórico e cancelar online.</div>
               <a class="btn btn--primary btn--sm mt-3" id="inviteAccountLink" href="account.html">Criar conta →</a>
             </div>
           </div>
@@ -178,10 +181,12 @@
 
         <div id="discountInfo" hidden class="promo mb-3">
           <div>
-            <div class="promo__title">Desconto aplicado</div>
+            <div class="promo__title" id="discountTitle">Desconto</div>
             <div class="promo__desc" id="discountDesc"></div>
           </div>
         </div>
+
+        <p class="text-sm text-muted mb-3" id="policyNote"></p>
 
         <div class="btn-group--full">
           <button class="btn" type="button" data-action="back-to" data-step="4">← Voltar</button>
@@ -200,66 +205,57 @@
   </main>
 
 <script type="module">
+import { db, auth, collection, doc, getDoc, getDocs, updateDoc, query, where, onAuthStateChanged } from './firebase.js';
 import {
-  db, auth, collection, doc, getDoc, getDocs, addDoc, updateDoc, runTransaction,
-  query, where, orderBy, serverTimestamp, onAuthStateChanged
-} from './firebase.js';
-import {
-  $, $$, on, toast, toastError, escapeHTML, html, htmlMix, raw,
-  MONTHS_FULL, WEEKDAY_KEYS, WEEKDAYS_SHORT,
-  formatDate, formatDateLongPT, formatPrice, todayISO,
-  getSalonId, loadSalon, applySalonBranding,
-  generateReferralCode, showFatalError, isEmail, isPhone, withLock
+  $, $$, on, toast, toastError, escapeHTML, htmlMix, raw,
+  MONTHS_FULL, WEEKDAYS_SHORT, formatPrice,
+  getSalonId, loadSalon, applySalonBranding, showFatalError, withLock, friendlyError,
+  salonSetting, planActive, nowInTimezone, addDaysStr, resolveDayWindow,
+  loadBookingContext, computeAvailability, createBooking, minToTime,
+  validateBookingInput, applyDiscount, clampStr,
 } from './app.js';
 
 const state = {
-  salon: null,
-  salonId: getSalonId(),
-  services: [], staff: [], promotions: [], schedule: null,
+  salon: null, salonId: getSalonId(), ctx: { schedule: null, staff: [] },
+  services: [], promotions: [],
   selectedService: null, selectedStaff: null,
-  selectedDate: null, selectedTime: null,
-  currentMonth: new Date(),
-  referralValid: false, referralDiscount: 0,
+  selectedDate: null, selectedStart: null,      // 'YYYY-MM-DD', minutes
+  calYear: 0, calMonth: 0,                       // month being displayed
+  today: null, maxDate: null,
+  discount: null,                                // { type, code, percent, title }
   authUser: null, clientData: null,
+  slotsToken: 0,
 };
 
 (async function init() {
   onAuthStateChanged(auth, async (user) => {
-    state.authUser = user || null;
-    state.clientData = null;
+    state.authUser = user || null; state.clientData = null;
     updateAuthUI();
     if (user) await loadClientForAuth(user);
   });
-
   try {
     state.salon = await loadSalon(state.salonId);
     if (!state.salon) { showFatalError('Salão não encontrado. Verifica o link.'); return; }
     applySalonBranding(state.salon, { titlePrefix: 'Marcar' });
     $('#salonTagline').textContent = state.salon.address || state.salon.tagline || 'Seleciona o que pretendes';
+    const now = nowInTimezone(salonSetting(state.salon, 'timezone'));
+    state.today = now.dateStr;
+    state.maxDate = addDaysStr(now.dateStr, salonSetting(state.salon, 'maxAdvanceDays'));
+    [state.calYear, state.calMonth] = [Number(now.dateStr.slice(0, 4)), Number(now.dateStr.slice(5, 7)) - 1];
 
-    const schedDoc = await getDoc(doc(db, 'salons', state.salonId, 'config', 'schedule'));
-    if (schedDoc.exists()) state.schedule = schedDoc.data();
-
-    // NB: we intentionally do NOT orderBy('order') in the query — Firestore drops
-    // documents that lack the field, which would silently hide a service/staff
-    // member. We sort client-side with a safe fallback instead.
-    const byOrder = (a, b) => (a.order ?? 9999) - (b.order ?? 9999);
-    const [staffSnap, promoSnap, svcSnap] = await Promise.all([
-      getDocs(query(collection(db,'salons',state.salonId,'staff'), where('active','==',true))).catch(() => ({docs:[]})),
-      getDocs(query(collection(db,'salons',state.salonId,'promotions'), where('active','==',true))).catch(() => ({docs:[]})),
-      getDocs(query(collection(db,'salons',state.salonId,'services'), where('active','==',true))).catch(() => ({docs:[]})),
+    const [ctx, promoSnap, svcSnap] = await Promise.all([
+      loadBookingContext(state.salonId),
+      getDocs(query(collection(db, 'salons', state.salonId, 'promotions'), where('active', '==', true))).catch(() => ({ docs: [] })),
+      getDocs(query(collection(db, 'salons', state.salonId, 'services'), where('active', '==', true))).catch(() => ({ docs: [] })),
     ]);
-    state.staff      = staffSnap.docs.map(d => ({ id:d.id, ...d.data() })).sort(byOrder);
-    state.promotions = promoSnap.docs.map(d => ({ id:d.id, ...d.data() }));
-    state.services   = svcSnap.docs.map(d  => ({ id:d.id, ...d.data() })).sort(byOrder);
-
-    renderPromos();
-    renderServices();
-    // The Zen Club invite is shown AFTER a successful booking (success.html),
-    // when the visitor has already got value — not as an interrupting auto-popup.
+    state.ctx = ctx;
+    state.promotions = promoSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    state.services = svcSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999));
+    renderPromos(); renderServices();
+    if (!planActive(state.salon)) { $('#planNotice').hidden = false; $$('#servicesList .select-item').forEach(b => b.disabled = true); }
   } catch (e) {
     console.error(e);
-    showFatalError('Erro ao carregar. Verifica a tua ligação.');
+    showFatalError(friendlyError(e, 'Erro ao carregar. Verifica a tua ligação.'));
   }
 })();
 
@@ -282,44 +278,30 @@ function updateAuthUI() {
 
 async function loadClientForAuth(user) {
   try {
-    let snap = await getDoc(doc(db,'salons',state.salonId,'clients', user.uid));
+    let snap = await getDoc(doc(db, 'salons', state.salonId, 'clients', user.uid));
     if (!snap.exists()) {
-      const q = await getDocs(query(collection(db,'salons',state.salonId,'clients'), where('email','==', user.email)));
+      const q = await getDocs(query(collection(db, 'salons', state.salonId, 'clients'), where('email', '==', user.email)));
       if (!q.empty) state.clientData = { id: q.docs[0].id, ...q.docs[0].data() };
-    } else {
-      state.clientData = { id: user.uid, ...snap.data() };
-    }
+    } else state.clientData = { id: user.uid, ...snap.data() };
     prefillFromClient();
   } catch (e) { console.error('loadClient', e); }
 }
-
 function prefillFromClient() {
   if (!state.clientData) return;
   const set = (id, v) => { const el = document.getElementById(id); if (el && !el.value && v) el.value = v; };
-  set('clientName',  state.clientData.name);
-  set('clientEmail', state.clientData.email);
-  set('clientPhone', state.clientData.phone);
+  set('clientName', state.clientData.name); set('clientEmail', state.clientData.email); set('clientPhone', state.clientData.phone);
 }
 
 function renderPromos() {
-  const wrap = $('#promoBanners');
-  wrap.innerHTML = state.promotions.map(p => htmlMix`
-    <div class="promo">
-      <div>
-        <div class="promo__title">${p.title}</div>
-        <div class="promo__desc">${p.description}</div>
-      </div>
-      ${p.badgeText ? raw(htmlMix`<div class="badge badge--green">${p.badgeText}</div>`) : ''}
-    </div>`).join('');
+  $('#promoBanners').innerHTML = state.promotions.map(p => htmlMix`
+    <div class="promo"><div><div class="promo__title">${p.title}</div><div class="promo__desc">${p.description}</div></div>
+      ${p.badgeText ? raw(htmlMix`<div class="badge badge--green">${p.badgeText}</div>`) : ''}</div>`).join('');
 }
 
 function renderServices() {
   const list = $('#servicesList');
   if (!state.services.length) {
-    list.innerHTML = `<div class="empty-state">
-      <div class="empty-state__icon">📭</div>
-      <div class="empty-state__title">Sem serviços disponíveis</div>
-      <div class="empty-state__desc">O salão ainda não publicou serviços. Volta mais tarde.</div></div>`;
+    list.innerHTML = `<div class="empty-state"><div class="empty-state__icon">📭</div><div class="empty-state__title">Sem serviços disponíveis</div><div class="empty-state__desc">O salão ainda não publicou serviços. Volta mais tarde.</div></div>`;
     return;
   }
   list.innerHTML = state.services.map(s => {
@@ -331,447 +313,227 @@ function renderServices() {
           <div class="select-item__desc">${s.duration} min${s.description ? ' · ' + s.description : ''}${s.includes ? ' · Inclui: ' + s.includes : ''}</div>
           ${s.isPackage || savings > 0 ? raw(htmlMix`<div class="select-item__meta-row">
             ${raw(s.isPackage ? '<span class="badge badge--green">Pacote</span>' : '')}
-            ${raw(savings > 0 ? htmlMix`<span class="badge badge--amber">Poupas ${savings}€</span>` : '')}
-          </div>`) : ''}
+            ${raw(savings > 0 ? htmlMix`<span class="badge badge--amber">Poupas ${savings}€</span>` : '')}</div>`) : ''}
         </div>
         <div class="select-item__side">
           ${savings > 0 ? raw(htmlMix`<div class="select-item__price-old">${s.originalPrice}€</div>`) : ''}
-          <div class="select-item__price">${s.price}€</div>
+          <div class="select-item__price">${formatPrice(s.price)}</div>
         </div>
       </button>`;
   }).join('');
 }
 
 on('pick-service', (el) => {
-  const id = el.dataset.id;
-  state.selectedService = state.services.find(s => s.id === id);
+  if (!planActive(state.salon)) return toast('Este salão não está a aceitar marcações online.');
+  state.selectedService = state.services.find(s => s.id === el.dataset.id);
+  state.selectedStart = null; $('#btnDateNext').disabled = true;
   $$('.select-item').forEach(o => o.classList.toggle('selected', o === el));
   setTimeout(() => goTo(2), 220);
 });
 
 function renderStaff() {
-  const list = $('#staffList');
   const items = [htmlMix`
     <button class="select-item ${raw(!state.selectedStaff ? 'selected' : '')}" type="button" data-action="pick-staff" data-id="">
       <div class="select-item__avatar" aria-hidden="true">✦</div>
-      <div class="select-item__main">
-        <div class="select-item__name">Sem preferência</div>
-        <div class="select-item__desc">Primeiro colaborador disponível</div>
-      </div>
+      <div class="select-item__main"><div class="select-item__name">Sem preferência</div><div class="select-item__desc">Primeiro colaborador disponível</div></div>
     </button>`];
-  for (const s of state.staff) {
-    const sel = state.selectedStaff?.id === s.id;
+  for (const s of state.ctx.staff) {
     items.push(htmlMix`
-      <button class="select-item ${raw(sel ? 'selected' : '')}" type="button" data-action="pick-staff" data-id="${s.id}">
+      <button class="select-item ${raw(state.selectedStaff?.id === s.id ? 'selected' : '')}" type="button" data-action="pick-staff" data-id="${s.id}">
         <div class="select-item__avatar" aria-hidden="true">${(s.name || '?').charAt(0)}</div>
-        <div class="select-item__main">
-          <div class="select-item__name">${s.name}</div>
-          <div class="select-item__desc">${s.role || 'Cabeleireiro/a'}${s.specialties ? ' · ' + s.specialties : ''}</div>
-        </div>
+        <div class="select-item__main"><div class="select-item__name">${s.name}</div><div class="select-item__desc">${s.role || 'Cabeleireiro/a'}${s.specialties ? ' · ' + s.specialties : ''}</div></div>
       </button>`);
   }
-  list.innerHTML = items.join('');
+  $('#staffList').innerHTML = items.join('');
 }
-
 on('pick-staff', (el) => {
-  const id = el.dataset.id;
-  state.selectedStaff = id ? state.staff.find(s => s.id === id) : null;
+  state.selectedStaff = el.dataset.id ? state.ctx.staff.find(s => s.id === el.dataset.id) : null;
+  state.selectedStart = null; $('#btnDateNext').disabled = true;
   $$('#staffList .select-item').forEach(o => o.classList.toggle('selected', o === el));
   setTimeout(() => goTo(3), 220);
 });
 
+/* ── calendar (string-date based, salon timezone) ── */
+function dayIsClosed(dateStr) {
+  const closedDates = state.salon.closedDates || [];
+  const cands = state.selectedStaff ? [state.selectedStaff] : state.ctx.staff;
+  if (!cands.length) return resolveDayWindow({ salonSchedule: state.ctx.schedule, staff: null, dateStr, closedDates }).closed;
+  return cands.every(s => resolveDayWindow({ salonSchedule: state.ctx.schedule, staff: s, dateStr, closedDates }).closed);
+}
 function renderCalendar() {
-  const d = state.currentMonth;
-  const year = d.getFullYear(), month = d.getMonth();
-  const today = new Date(); today.setHours(0,0,0,0);
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-  $('#calTitle').textContent = `${MONTHS_FULL[month]} ${year}`;
-  $('#calPrev').disabled = (year < today.getFullYear()) || (year === today.getFullYear() && month <= today.getMonth());
+  const y = state.calYear, m = state.calMonth;
+  const firstDay = new Date(Date.UTC(y, m, 1)).getUTCDay();
+  const daysInMonth = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  $('#calTitle').textContent = `${MONTHS_FULL[m]} ${y}`;
+  const [ty, tm] = [Number(state.today.slice(0, 4)), Number(state.today.slice(5, 7)) - 1];
+  $('#calPrev').disabled = (y < ty) || (y === ty && m <= tm);
+  const [xy, xm] = [Number(state.maxDate.slice(0, 4)), Number(state.maxDate.slice(5, 7)) - 1];
+  $('#calNext').disabled = (y > xy) || (y === xy && m >= xm);
 
   let cells = WEEKDAYS_SHORT.map(d => `<div class="calendar__day-name" role="columnheader">${d}</div>`).join('');
   for (let i = 0; i < firstDay; i++) cells += `<div class="calendar__day empty" aria-hidden="true"></div>`;
   for (let day = 1; day <= daysInMonth; day++) {
-    const date = new Date(year, month, day); date.setHours(0,0,0,0);
-    const isPast    = date < today;
-    const isClosed  = isClosedDay(date);
-    const isSel     = state.selectedDate && date.toDateString() === state.selectedDate.toDateString();
-    const isToday   = date.toDateString() === today.toDateString();
-    const isDisabled = isPast || isClosed;
-    const cls = ['calendar__day',
-      isDisabled ? 'disabled' : '',
-      isSel ? 'selected' : '',
-      (isToday && !isSel) ? 'today' : ''
-    ].filter(Boolean).join(' ');
-    cells += isDisabled
+    const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const disabled = dateStr < state.today || dateStr > state.maxDate || dayIsClosed(dateStr);
+    const isSel = state.selectedDate === dateStr, isToday = dateStr === state.today;
+    const cls = ['calendar__day', disabled ? 'disabled' : '', isSel ? 'selected' : '', (isToday && !isSel) ? 'today' : ''].filter(Boolean).join(' ');
+    cells += disabled
       ? `<div class="${cls}" role="gridcell" aria-disabled="true">${day}</div>`
-      : `<button type="button" class="${cls}" role="gridcell" data-action="pick-day" data-y="${year}" data-m="${month}" data-d="${day}" aria-label="${day} de ${MONTHS_FULL[month]}">${day}</button>`;
+      : `<button type="button" class="${cls}" role="gridcell" data-action="pick-day" data-date="${dateStr}" aria-label="${day} de ${MONTHS_FULL[m]}" ${isSel ? 'aria-selected="true"' : ''}>${day}</button>`;
   }
   $('#calGrid').innerHTML = cells;
 }
-function isClosedDay(date) {
-  if (!state.schedule) return false;
-  const cfg = state.schedule[WEEKDAY_KEYS[date.getDay()]];
-  return cfg && cfg.closed;
-}
+$('#calPrev').addEventListener('click', () => { if (--state.calMonth < 0) { state.calMonth = 11; state.calYear--; } renderCalendar(); });
+$('#calNext').addEventListener('click', () => { if (++state.calMonth > 11) { state.calMonth = 0; state.calYear++; } renderCalendar(); });
+
 on('pick-day', (el) => {
-  const y = +el.dataset.y, m = +el.dataset.m, d = +el.dataset.d;
-  state.selectedDate = new Date(y, m, d);
-  state.selectedTime = null;
+  state.selectedDate = el.dataset.date; state.selectedStart = null;
   $('#btnDateNext').disabled = true;
-  renderCalendar();
-  loadTimeslots();
+  renderCalendar(); loadTimeslots();
 });
 
 async function loadTimeslots() {
-  const wrap  = $('#timeslotsWrap');
-  const list  = $('#timeslotsList');
-  const label = $('#selectedDateLabel');
-  const date  = state.selectedDate;
-  label.textContent = `Horários disponíveis · ${date.getDate()} de ${MONTHS_FULL[date.getMonth()]}`;
+  const list = $('#timeslotsList'), wrap = $('#timeslotsWrap');
+  const dateStr = state.selectedDate;
+  const [y, m, d] = dateStr.split('-').map(Number);
+  $('#selectedDateLabel').textContent = `Horários disponíveis · ${d} de ${MONTHS_FULL[m - 1]}`;
   wrap.hidden = false;
   list.innerHTML = '<div class="loading-state" style="grid-column:1/-1;padding:var(--s-5) 0"><span class="spinner" aria-hidden="true"></span></div>';
-
-  const dayName = WEEKDAY_KEYS[date.getDay()];
-  // Check staff-specific schedule first; if staff has explicit closed day, no slots
-  const staffDay = state.selectedStaff?.schedule?.[dayName];
-  if (staffDay && staffDay.closed) {
-    list.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
-      <div class="empty-state__icon">😴</div>
-      <div class="empty-state__title">Colaborador de folga</div>
-      <div class="empty-state__desc">${escapeHTML(state.selectedStaff.name)} não trabalha neste dia.</div></div>`;
-    return;
-  }
-  const salonDay = state.schedule?.[dayName];
-  const dayCfg = staffDay || salonDay || {};
-  const open  = dayCfg.open  || '10:00';
-  const close = dayCfg.close || '19:00';
-  const duration = state.selectedService?.duration || 60;
-  let slots = generateSlots(open, close, duration);
-
-  // Filter past time slots if booking for today
-  const todayStr = formatDate(new Date());
-  if (formatDate(date) === todayStr) {
-    const now = new Date();
-    const nowMins = now.getHours() * 60 + now.getMinutes() + 10; // 10 min buffer
-    slots = slots.filter(slot => {
-      const [h, m] = slot.split(':').map(Number);
-      return h * 60 + m >= nowMins;
-    });
-  }
-
+  const token = ++state.slotsToken;
   try {
-    const dateStr = formatDate(date);
-    let q;
-    if (state.selectedStaff) {
-      q = query(collection(db,'salons',state.salonId,'bookings'),
-            where('date','==', dateStr),
-            where('staffId','==', state.selectedStaff.id),
-            where('status','in', ['pending','confirmed']));
-    } else {
-      q = query(collection(db,'salons',state.salonId,'bookings'),
-            where('date','==', dateStr),
-            where('status','in', ['pending','confirmed']));
-    }
-    let booked;
-    try {
-      const snap = await getDocs(q);
-      booked = new Set(snap.docs.map(d => d.data().time));
-    } catch (idxErr) {
-      // Missing composite index fallback: get all for date, filter client-side
-      console.warn('Falling back without index:', idxErr.message);
-      const snap = await getDocs(query(collection(db,'salons',state.salonId,'bookings'),
-        where('date','==', dateStr)));
-      booked = new Set(snap.docs
-        .map(d => d.data())
-        .filter(b => ['pending','confirmed'].includes(b.status))
-        .filter(b => !state.selectedStaff || b.staffId === state.selectedStaff.id)
-        .map(b => b.time));
-    }
-
-    if (!slots.length) {
-      list.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
-        <div class="empty-state__icon">⏰</div>
-        <div class="empty-state__title">Sem horários neste dia</div>
-        <div class="empty-state__desc">Escolhe outro dia.</div></div>`;
+    const { slots, window } = await computeAvailability({ salonId: state.salonId, salon: state.salon, ctx: state.ctx, service: state.selectedService, staff: state.selectedStaff, dateStr });
+    if (token !== state.slotsToken) return; // a newer request superseded this one
+    if (window?.closed) {
+      const msg = { 'staff-time-off': 'Colaborador de férias neste dia.', 'staff-day-off': 'Colaborador de folga neste dia.', 'salon-closed-date': 'Salão encerrado nesta data.' }[window.reason] || 'Fechado neste dia.';
+      list.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-state__icon">😴</div><div class="empty-state__title">${escapeHTML(msg)}</div><div class="empty-state__desc">Escolhe outro dia.</div></div>`;
       return;
     }
-    list.innerHTML = slots.map(slot => {
-      const isBooked = booked.has(slot);
-      return isBooked
-        ? `<div class="timeslot booked" aria-disabled="true">${slot}</div>`
-        : htmlMix`<button class="timeslot" type="button" data-action="pick-time" data-time="${slot}" role="option" aria-selected="false">${slot}</button>`;
-    }).join('');
+    if (!slots.length) {
+      list.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-state__icon">⏰</div><div class="empty-state__title">Sem horários livres neste dia</div><div class="empty-state__desc">Escolhe outro dia${state.selectedStaff ? ' ou outro colaborador' : ''}.</div></div>`;
+      return;
+    }
+    list.innerHTML = slots.map(min => htmlMix`<button class="timeslot" type="button" data-action="pick-time" data-min="${min}" role="option" aria-selected="false">${minToTime(min)}</button>`).join('');
   } catch (e) {
     console.error(e);
-    list.innerHTML = `<div class="error-state" style="grid-column:1/-1">
-      <div class="error-state__icon">⚠️</div>
-      <div class="error-state__title">Erro a carregar horários</div></div>`;
+    list.innerHTML = `<div class="error-state" style="grid-column:1/-1"><div class="error-state__icon">⚠️</div><div class="error-state__title">${escapeHTML(friendlyError(e, 'Erro a carregar horários'))}</div><button class="btn btn--sm mt-3" type="button" data-action="retry-slots">Tentar de novo</button></div>`;
   }
 }
-
-function generateSlots(open, close, duration) {
-  const slots = [];
-  let [h, m] = open.split(':').map(Number);
-  const [eH, eM] = close.split(':').map(Number);
-  const endTotal = eH * 60 + eM;
-  while (h * 60 + m + duration <= endTotal) {
-    slots.push(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
-    m += duration;
-    if (m >= 60) { h += Math.floor(m / 60); m = m % 60; }
-  }
-  return slots;
-}
-
+on('retry-slots', loadTimeslots);
 on('pick-time', (el) => {
-  state.selectedTime = el.dataset.time;
-  $$('.timeslot').forEach(o => {
-    o.classList.toggle('selected', o === el);
-    o.setAttribute('aria-selected', String(o === el));
-  });
+  state.selectedStart = Number(el.dataset.min);
+  $$('.timeslot').forEach(o => { const sel = o === el; o.classList.toggle('selected', sel); o.setAttribute('aria-selected', String(sel)); });
   $('#btnDateNext').disabled = false;
 });
 
-on('go-to',   (el) => goTo(+el.dataset.step));
+on('go-to', (el) => goTo(+el.dataset.step));
 on('back-to', (el) => goTo(+el.dataset.step));
 
 function goTo(step) {
   if (step === 2 && !state.selectedService) return toast('Escolhe um serviço.');
-  if (step === 4 && (!state.selectedDate || !state.selectedTime)) return toast('Escolhe data e hora.');
+  if (step === 4 && (!state.selectedDate || state.selectedStart == null)) return toast('Escolhe data e hora.');
   if (step === 5) {
-    const name  = $('#clientName').value.trim();
-    const email = $('#clientEmail').value.trim();
-    const phone = $('#clientPhone').value.trim();
-    if (!name || !email || !phone) return toast('Preenche os campos obrigatórios.');
-    if (!isEmail(email)) return toast('Email inválido.');
-    if (!isPhone(phone)) return toast('Telefone inválido.');
+    const v = validateBookingInput({ name: $('#clientName').value, email: $('#clientEmail').value, phone: $('#clientPhone').value, date: state.selectedDate, time: minToTime(state.selectedStart), notes: $('#clientNotes').value, forSomeone: $('#forSomeone').value });
+    if (!v.ok) return toast(Object.values(v.errors)[0]);
     fillConfirmation();
   }
-
-  ['Services','Staff','DateTime','Data','Confirm','Loading'].forEach(s => {
-    const el = document.getElementById('screen' + s);
-    if (el) el.hidden = true;
-  });
-  const map = { 1:'Services', 2:'Staff', 3:'DateTime', 4:'Data', 5:'Confirm' };
-  document.getElementById('screen' + map[step]).hidden = false;
+  ['Services', 'Staff', 'DateTime', 'Data', 'Confirm', 'Loading'].forEach(s => { const el = document.getElementById('screen' + s); if (el) el.hidden = true; });
+  document.getElementById('screen' + { 1: 'Services', 2: 'Staff', 3: 'DateTime', 4: 'Data', 5: 'Confirm' }[step]).hidden = false;
   updateStepper(step);
   window.scrollTo({ top: 0, behavior: 'smooth' });
   if (step === 2) renderStaff();
-  if (step === 3) { renderCalendar(); setupCalNav(); }
+  if (step === 3) { renderCalendar(); if (state.selectedDate) loadTimeslots(); }
 }
-
-function setupCalNav() {
-  $('#calPrev').onclick = () => { state.currentMonth = new Date(state.currentMonth.getFullYear(), state.currentMonth.getMonth() - 1, 1); renderCalendar(); };
-  $('#calNext').onclick = () => { state.currentMonth = new Date(state.currentMonth.getFullYear(), state.currentMonth.getMonth() + 1, 1); renderCalendar(); };
-}
-
 function updateStepper(current) {
   for (let i = 1; i <= 5; i++) {
-    const el = document.getElementById('step' + i);
-    if (!el) continue;
+    const el = document.getElementById('step' + i); if (!el) continue;
     el.classList.remove('active', 'done');
-    if (i < current)  el.classList.add('done');
-    if (i === current){ el.classList.add('active'); el.setAttribute('aria-current','step'); }
-    else el.removeAttribute('aria-current');
-    if (i < 5) {
-      const line = document.getElementById('line' + i);
-      if (line) line.classList.toggle('done', i < current);
-    }
+    if (i < current) el.classList.add('done');
+    if (i === current) { el.classList.add('active'); el.setAttribute('aria-current', 'step'); } else el.removeAttribute('aria-current');
+    if (i < 5) document.getElementById('line' + i)?.classList.toggle('done', i < current);
   }
 }
 
 function fillConfirmation() {
-  const s = state.selectedService, d = state.selectedDate;
-  $('#confirmService').textContent  = s.name;
-  $('#confirmDate').textContent     = formatDateLongPT(d);
-  $('#confirmTime').textContent     = state.selectedTime;
+  const s = state.selectedService;
+  const [y, m, d] = state.selectedDate.split('-').map(Number);
+  $('#confirmService').textContent = s.name;
+  $('#confirmDate').textContent = `${d} de ${MONTHS_FULL[m - 1]} de ${y}`;
+  $('#confirmTime').textContent = minToTime(state.selectedStart);
   $('#confirmDuration').textContent = `${s.duration} min`;
-  $('#confirmPrice').textContent    = formatPrice(s.price);
-  $('#confirmName').textContent     = $('#clientName').value.trim();
-  $('#confirmEmail').textContent    = $('#clientEmail').value.trim();
-  $('#confirmPhone').textContent    = $('#clientPhone').value.trim();
-  $('#confirmStaff').textContent    = state.selectedStaff ? state.selectedStaff.name : 'Sem preferência';
+  $('#confirmName').textContent = $('#clientName').value.trim();
+  $('#confirmEmail').textContent = $('#clientEmail').value.trim();
+  $('#confirmPhone').textContent = $('#clientPhone').value.trim();
+  $('#confirmStaff').textContent = state.selectedStaff ? state.selectedStaff.name : 'Sem preferência (atribuído automaticamente)';
   const forName = $('#forSomeone').value.trim();
-  $('#confirmForRow').hidden = !forName;
-  if (forName) $('#confirmFor').textContent = forName;
-  checkReferral();
+  $('#confirmForRow').hidden = !forName; if (forName) $('#confirmFor').textContent = forName;
+  const hours = salonSetting(state.salon, 'cancellationHours');
+  $('#policyNote').textContent = `A marcação fica pendente até o salão confirmar. Cancelamentos online até ${hours}h antes da hora marcada.`;
+  checkDiscountCode();
 }
 
-async function checkReferral() {
+/* ── discount / referral codes ── */
+async function checkDiscountCode() {
   const code = $('#referralCode').value.trim().toUpperCase();
-  const wrap = $('#discountInfo'), desc = $('#discountDesc');
-  state.referralValid = false;
-  state.referralDiscount = 0;
-  state.personalDiscount = null;
+  const wrap = $('#discountInfo'), desc = $('#discountDesc'), title = $('#discountTitle');
+  state.discount = null;
+  $('#confirmPrice').textContent = formatPrice(state.selectedService.price);
   if (!code) { wrap.hidden = true; return; }
+  wrap.hidden = false; title.textContent = 'Código';
   try {
-    // 1. Check against logged-in user's own discount codes (loyalty/birthday)
-    if (state.clientData && Array.isArray(state.clientData.discounts)) {
-      const myDisc = state.clientData.discounts.find(d => d.code === code && !d.used);
-      if (myDisc) {
-        const now = new Date();
-        if (myDisc.expiresAt && new Date(myDisc.expiresAt) < now) {
-          desc.textContent = `Código "${code}" expirado.`;
-          wrap.hidden = false;
-          return;
-        }
-        state.referralValid = true;
-        state.referralDiscount = Number(myDisc.discount) || 0;
-        state.personalDiscount = myDisc;
-        desc.textContent = `${myDisc.title} · ${myDisc.discount}% de desconto aplicado.`;
-        wrap.hidden = false;
-        return;
-      }
-    }
-    // 2. Otherwise treat as referral code (someone else's)
-    const snap = await getDocs(query(
-      collection(db,'salons',state.salonId,'clients'),
-      where('referralCode','==', code)));
-    if (!snap.empty) {
-      // Prevent self-referral
-      if (state.clientData && snap.docs[0].id === state.clientData.id) {
-        desc.textContent = `Não podes usar o teu próprio código de referido.`;
-        wrap.hidden = false;
-        return;
-      }
-      const discount = state.salon.referralDiscount || 10;
-      state.referralValid = true; state.referralDiscount = discount;
-      desc.textContent = `Código de referido válido · ${discount}% de desconto`;
-      wrap.hidden = false;
+    // 1) own coupons (loyalty / birthday) — only for signed-in clients
+    const mine = (state.clientData?.discounts || []).find(x => x.code === code && !x.used);
+    if (mine) {
+      if (mine.expiresAt && new Date(mine.expiresAt) < new Date()) { desc.textContent = `Código "${code}" expirado.`; return; }
+      state.discount = { type: mine.type, code, percent: Number(mine.discount) || 0, title: mine.title };
+      title.textContent = 'Desconto aplicado'; desc.textContent = `${mine.title} · ${state.discount.percent}%`;
     } else {
-      desc.textContent = `Código "${code}" não encontrado.`;
-      wrap.hidden = false;
+      // 2) someone else's referral code — public lookup, no personal data
+      const ref = await getDoc(doc(db, 'salons', state.salonId, 'referrals', code));
+      if (!ref.exists()) { desc.textContent = `Código "${code}" não encontrado.`; return; }
+      const ownerId = ref.data().clientId;
+      if (state.authUser && (ownerId === state.authUser.uid || ownerId === state.clientData?.id)) { desc.textContent = 'Não podes usar o teu próprio código de referido.'; return; }
+      state.discount = { type: 'referral', code, percent: salonSetting(state.salon, 'referralDiscount'), title: 'Código de amigo' };
+      title.textContent = 'Desconto aplicado'; desc.textContent = `Código de amigo válido · ${state.discount.percent}% de desconto`;
     }
-  } catch (e) { console.error(e); }
+    $('#confirmPrice').textContent = formatPrice(applyDiscount(state.selectedService.price, state.discount.percent));
+  } catch (e) { console.error(e); desc.textContent = 'Não foi possível validar o código agora.'; }
 }
 
-// Submit guarded against double-click via withLock
+/* ── submit (atomic; the server decides, not the UI) ── */
 on('submit-booking', withLock('submit-booking', async () => {
-  $('#screenConfirm').hidden = true;
-  $('#screenLoading').hidden = false;
-  $('#btnConfirm').disabled = true;
-
+  $('#screenConfirm').hidden = true; $('#screenLoading').hidden = false; $('#btnConfirm').disabled = true;
+  const client = {
+    id: state.authUser && state.clientData ? state.clientData.id : null,
+    name: $('#clientName').value, email: $('#clientEmail').value, phone: $('#clientPhone').value,
+    forSomeone: $('#forSomeone').value, notes: $('#clientNotes').value,
+  };
   try {
-    const name  = $('#clientName').value.trim();
-    const email = $('#clientEmail').value.trim();
-    const phone = $('#clientPhone').value.trim();
-    const notes = $('#clientNotes').value.trim();
-    const forSomeone = $('#forSomeone').value.trim();
-    const referralCode = $('#referralCode').value.trim().toUpperCase();
-    const s = state.selectedService;
-    const newReferralCode = generateReferralCode(name, state.salonId);
-    const dateStr = formatDate(state.selectedDate);
-
-    // Re-check slot availability (race protection: someone might have booked it
-    // while the user was filling the form)
-    {
-      let q;
-      if (state.selectedStaff) {
-        q = query(collection(db,'salons',state.salonId,'bookings'),
-              where('date','==', dateStr),
-              where('time','==', state.selectedTime),
-              where('staffId','==', state.selectedStaff.id),
-              where('status','in', ['pending','confirmed']));
-      } else {
-        q = query(collection(db,'salons',state.salonId,'bookings'),
-              where('date','==', dateStr),
-              where('time','==', state.selectedTime),
-              where('status','in', ['pending','confirmed']));
-      }
-      let conflict = false;
-      try {
-        const recheck = await getDocs(q);
-        conflict = !recheck.empty;
-      } catch {
-        const recheck = await getDocs(query(collection(db,'salons',state.salonId,'bookings'),
-          where('date','==', dateStr), where('time','==', state.selectedTime)));
-        conflict = recheck.docs.some(d => {
-          const b = d.data();
-          if (!['pending','confirmed'].includes(b.status)) return false;
-          return !state.selectedStaff || b.staffId === state.selectedStaff.id;
-        });
-      }
-      if (conflict) {
-        $('#screenLoading').hidden = true;
-        $('#screenConfirm').hidden = false;
-        $('#btnConfirm').disabled = false;
-        toastError('Esse horário já foi ocupado. Escolhe outro.');
-        // Force the user back to step 3 to pick a different slot
-        state.selectedTime = null;
-        $('#btnDateNext').disabled = true;
-        setTimeout(() => { goTo(3); loadTimeslots(); }, 800);
-        return;
-      }
-    }
-
-    let clientId;
-    if (state.authUser && state.clientData) {
-      clientId = state.clientData.id;
-    } else {
-      // Atomic find-or-create by email
-      const clientsCol = collection(db,'salons',state.salonId,'clients');
-      const existing = await getDocs(query(clientsCol, where('email','==', email)));
-      if (existing.empty) {
-        const ref = await addDoc(clientsCol, {
-          name, email, phone,
-          referralCode: newReferralCode,
-          visits: 0, points: 0, totalSpent: 0,
-          referredBy: state.referralValid ? referralCode : null,
-          discounts: [],
-          createdAt: serverTimestamp()
-        });
-        clientId = ref.id;
-      } else {
-        clientId = existing.docs[0].id;
-      }
-    }
-
-    let finalPrice = Number(s.price) || 0;
-    if (state.referralValid) finalPrice = Math.round(finalPrice * (1 - state.referralDiscount / 100));
-
-    const isPersonal = !!state.personalDiscount;
-    await addDoc(collection(db,'salons',state.salonId,'bookings'), {
-      clientId, clientName: name, clientEmail: email, clientPhone: phone,
-      serviceId: s.id, serviceName: s.name,
-      serviceDuration: s.duration, servicePrice: s.price,
-      finalPrice,
-      staffId:   state.selectedStaff?.id   || null,
-      staffName: state.selectedStaff?.name || 'Sem preferência',
-      date: dateStr, time: state.selectedTime,
-      notes,
-      forSomeone: forSomeone || null,
-      referralCode: (state.referralValid && !isPersonal) ? referralCode : null,
-      referralDiscount: state.referralValid ? state.referralDiscount : 0,
-      discountType: isPersonal ? state.personalDiscount.type : (state.referralValid ? 'referral' : null),
-      discountCode: state.referralValid ? referralCode : null,
-      status: 'pending', paid: false,
-      salonId: state.salonId,
-      createdAt: serverTimestamp()
+    const res = await createBooking({
+      salonId: state.salonId, salon: state.salon, ctx: state.ctx, service: state.selectedService,
+      staff: state.selectedStaff, dateStr: state.selectedDate, startMin: state.selectedStart,
+      client, discount: state.discount, source: 'online',
     });
-
-    // Mark the personal discount as used (loyalty/birthday)
-    if (isPersonal && state.clientData) {
-      const updatedDiscounts = (state.clientData.discounts || []).map(d =>
-        d.code === state.personalDiscount.code ? { ...d, used: true, usedAt: new Date().toISOString() } : d
-      );
-      await updateDoc(doc(db, 'salons', state.salonId, 'clients', state.clientData.id),
-        { discounts: updatedDiscounts });
+    // Personal coupon → mark used (owner may shrink/flag their own coupons)
+    if (state.discount && state.discount.type !== 'referral' && state.clientData) {
+      const updated = (state.clientData.discounts || []).map(d => d.code === state.discount.code ? { ...d, used: true, usedAt: new Date().toISOString() } : d);
+      await updateDoc(doc(db, 'salons', state.salonId, 'clients', state.clientData.id), { discounts: updated }).catch(console.error);
     }
-
     const params = new URLSearchParams({
-      salon: state.salonId, service: s.name,
-      date: formatDateLongPT(state.selectedDate),
-      time: state.selectedTime, price: String(finalPrice), name,
-      refCode: state.authUser ? '' : newReferralCode,
+      salon: state.salonId, id: res.id, service: state.selectedService.name, date: state.selectedDate, time: res.time,
+      duration: String(state.selectedService.duration), price: String(res.finalPrice), name: clampStr(client.name, 80), staff: res.staff.name,
     });
     window.location.href = `success.html?${params.toString()}`;
   } catch (e) {
     console.error(e);
-    $('#screenLoading').hidden = true;
-    $('#screenConfirm').hidden = false;
-    $('#btnConfirm').disabled = false;
-    toastError('Erro ao confirmar marcação. Tenta novamente.');
+    $('#screenLoading').hidden = true; $('#btnConfirm').disabled = false;
+    const code = e?.code || e?.message;
+    toastError(friendlyError(e, 'Não foi possível criar a marcação. Tenta novamente.'));
+    if (['slot-taken', 'no-staff-available', 'too-soon', 'outside-hours', 'break', 'salon-closed', 'salon-closed-date', 'staff-time-off', 'staff-day-off'].includes(code)) {
+      state.selectedStart = null; $('#btnDateNext').disabled = true;
+      setTimeout(() => goTo(3), 600);
+    } else {
+      $('#screenConfirm').hidden = false;
+    }
   }
 }));
 </script>

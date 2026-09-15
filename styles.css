@@ -1748,3 +1748,38 @@ kbd {
 .mono { font-family: var(--font-mono); }
 .serif { font-family: var(--font-serif); }
 .italic { font-style: italic; }
+
+/* ── OFFLINE BANNER (app.js connectivityBanner) ───────────── */
+#offlineBanner {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 9999;
+  padding: 10px 16px; text-align: center; font-size: var(--text-sm); font-weight: 600;
+  background: #7a2e2e; color: #fff;
+}
+
+/* ── PRIVACY NOTE (booking form) ───────────────────────────── */
+.privacy-note { font-size: var(--text-xs); color: var(--fg-3); margin: var(--s-3) 0 0; line-height: 1.5; }
+.privacy-note a { color: var(--fg-2); text-decoration: underline; }
+
+/* ── SLOT PICKER inside admin modals ───────────────────────── */
+.slot-picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 6px; max-height: 220px; overflow: auto; padding: 4px; border: 1px solid var(--border); border-radius: var(--r-md); }
+.slot-picker .timeslot { padding: 8px 4px; }
+.slot-picker__empty { grid-column: 1 / -1; padding: var(--s-4); text-align: center; color: var(--fg-3); font-size: var(--text-sm); }
+
+/* ── CHIPS (closed dates, time-off) ────────────────────────── */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--s-2); }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px 4px 10px; border-radius: 999px; background: var(--bg-2); border: 1px solid var(--border); font-size: var(--text-xs); font-family: var(--font-mono); }
+.chip button { border: 0; background: transparent; cursor: pointer; color: var(--fg-3); font-size: 14px; line-height: 1; padding: 0 2px; }
+.chip button:hover { color: var(--danger, #b42318); }
+
+/* ── TIME ROW extras (breaks) ──────────────────────────────── */
+.time-row__break { display: flex; align-items: center; gap: 6px; font-size: var(--text-xs); color: var(--fg-3); }
+.time-row__break input[type="time"] { max-width: 108px; }
+@media (max-width: 640px) { .time-row { flex-wrap: wrap; } .time-row__break { width: 100%; } }
+
+/* ── HARD GUARANTEE: the `hidden` attribute always wins over display classes ── */
+[hidden] { display: none !important; }
+
+/* App bar subtitle: one line on small screens */
+@media (max-width: 640px) {
+  .appbar__sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 56vw; display: block; }
+}

@@ -3,9 +3,48 @@
    ============================================================ */
 
 import {
-  db, doc, getDoc, updateDoc, increment, serverTimestamp,
+  db, auth, doc, getDoc, getDocs, collection, query, where, limit, increment, serverTimestamp,
   runTransaction, onSnapshot
 } from './firebase.js';
+import {
+  timeToMin, minToTime, isValidDateStr, nowInTimezone, resolveDayWindow, generateSlots, checkSlot,
+  canTransition, clientCanCancel, BLOCKING_STATUSES, occupiedFromAgenda, agendaId,
+  isEmail, isPhone, isHexColor, isSlug, clampStr, validateBookingInput, applyDiscount,
+  buildICS, googleCalendarUrl, addDaysStr, weekdayOf, WEEKDAY_KEYS as CORE_WEEKDAY_KEYS,
+} from './booking-core.js';
+
+// Re-export the pure core so pages import everything from one place.
+export {
+  timeToMin, minToTime, isValidDateStr, nowInTimezone, resolveDayWindow, generateSlots, checkSlot,
+  canTransition, clientCanCancel, BLOCKING_STATUSES, occupiedFromAgenda, agendaId,
+  isEmail, isPhone, isHexColor, isSlug, clampStr, validateBookingInput, applyDiscount,
+  buildICS, googleCalendarUrl, addDaysStr, weekdayOf,
+};
+
+/* ── Salon defaults (single source of truth for tunables) ── */
+export const SALON_DEFAULTS = {
+  timezone: 'Europe/Lisbon',
+  slotInterval: 15,        // minutes between candidate start times
+  bookingLeadMinutes: 30,  // minimum notice for same-day bookings
+  maxAdvanceDays: 90,      // how far ahead clients may book
+  cancellationHours: 24,   // client self-cancel cut-off
+  loyaltyVisits: 5, loyaltyDiscount: 20, referralDiscount: 10, birthdayDiscount: 15,
+  noShowPenalty: 5, pointsPerVisit: 10,
+};
+export const salonSetting = (salon, key) => (salon && salon[key] != null && salon[key] !== '') ? salon[key] : SALON_DEFAULTS[key];
+/** Today's date string in the salon's timezone (use instead of todayISO() in salon-facing screens). */
+export const todayForSalon = (salon) => nowInTimezone(salonSetting(salon, 'timezone')).dateStr;
+/** Is the salon currently allowed to take bookings? Mirrors planActive() in firestore.rules. */
+export function planActive(salon) {
+  const plan = salon?.plan || 'active';
+  if (plan === 'active') return true;
+  if (plan === 'trial') {
+    const t = salon.trialEndsAt;
+    const ms = t?.toMillis ? t.toMillis() : (t?.seconds ? t.seconds * 1000 : Date.parse(t));
+    return Number.isFinite(ms) && Date.now() < ms;
+  }
+  return false;
+}
 
 /* ── DOM ──────────────────────────────────────────────────── */
 export const $  = (sel, root = document) => root.querySelector(sel);
@@ -180,23 +219,26 @@ const handlers = new Map();
 export function on(action, fn) { handlers.set(action, fn); return () => handlers.delete(action); }
 export function callAction(action, ...args) { const fn = handlers.get(action); return fn ? fn(...args) : null; }
 
-document.addEventListener('click', (e) => {
-  const el = e.target.closest('[data-action]');
-  if (!el || el.disabled) return;
-  const action = el.getAttribute('data-action');
-  const fn = handlers.get(action);
-  if (fn) { e.preventDefault(); fn(el, e); }
-});
+const HAS_DOM = typeof document !== 'undefined';
+if (HAS_DOM) {
+  document.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-action]');
+    if (!el || el.disabled) return;
+    const action = el.getAttribute('data-action');
+    const fn = handlers.get(action);
+    if (fn) { e.preventDefault(); fn(el, e); }
+  });
 
-/* Keyboard activation for non-button [role=button] */
-document.addEventListener('keydown', (e) => {
-  if (e.key !== 'Enter' && e.key !== ' ') return;
-  const el = e.target;
-  if (el.getAttribute('role') === 'button' && el.hasAttribute('data-action')) {
-    e.preventDefault();
-    el.click();
-  }
-});
+  /* Keyboard activation for non-button [role=button] */
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const el = e.target;
+    if (el.getAttribute('role') === 'button' && el.hasAttribute('data-action')) {
+      e.preventDefault();
+      el.click();
+    }
+  });
+}
 
 /* ── Fatal error ─────────────────────────────────────────── */
 export function showFatalError(msg) {
@@ -238,16 +280,38 @@ export function clearFieldErrors(root = document) {
   });
 }
 
-/* ── Validation ──────────────────────────────────────────── */
-export const isEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v).trim());
-export const isPhone = (v) => {
-  const digits = String(v).replace(/\D/g, '');
-  return digits.length >= 6 && digits.length <= 15;
-};
-export const isHexColor = (v) => /^#[0-9A-Fa-f]{6}$/.test(v);
-export const isSlug = (v) => /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/.test(v);
-
 /* ── Firebase error mapping ──────────────────────────────── */
+/** Map any thrown error (Firestore / Auth / our own codes) to a message a
+ *  salon owner or client can act on. Never leaks internals. */
+export function friendlyError(e, fallback = 'Ocorreu um erro. Tenta novamente.') {
+  const code = (e && (e.code || e.message)) || '';
+  const map = {
+    'slot-taken':          'Esse horário acabou de ser ocupado. Escolhe outro.',
+    'outside-hours':       'Esse horário está fora do horário de funcionamento.',
+    'too-soon':            'Esse horário já não pode ser marcado com tão pouca antecedência.',
+    'break':               'Esse horário coincide com a pausa do salão.',
+    'salon-closed':        'O salão está fechado nesse dia.',
+    'salon-closed-date':   'O salão está encerrado nessa data.',
+    'staff-time-off':      'O colaborador está de férias/indisponível nessa data.',
+    'staff-day-off':       'O colaborador não trabalha nesse dia.',
+    'no-staff-available':  'Nenhum colaborador disponível nesse horário.',
+    'invalid-transition':  'Esta ação já não é possível para o estado atual da marcação.',
+    'booking-not-found':   'A marcação já não existe.',
+    'booking-cancelled':   'A marcação está cancelada.',
+    'booking-completed':   'A marcação já está concluída.',
+    'booking-noshow':      'A marcação está marcada como não-comparência.',
+    'cancel-too-late':     'Já não é possível cancelar com esta antecedência. Contacta o salão.',
+    'plan-inactive':       'Este salão não está a aceitar marcações online neste momento.',
+    'permission-denied':   'Sem permissão para esta ação. Inicia sessão novamente.',
+    'unavailable':         'Sem ligação ao servidor. Verifica a internet e tenta de novo.',
+    'failed-precondition': 'Operação não concluída. Atualiza a página e tenta de novo.',
+    'deadline-exceeded':   'O pedido demorou demasiado. Tenta de novo.',
+    'resource-exhausted':  'Limite de pedidos atingido. Aguarda um momento.',
+    'aborted':             'Conflito ao guardar. Tenta de novo.',
+  };
+  if (String(code).startsWith('auth/')) return authErrorMessage(code);
+  return map[code] || fallback;
+}
 export function authErrorMessage(code) {
   const map = {
     'auth/email-already-in-use':   'Este email já está registado.',
@@ -309,27 +373,6 @@ export function generateReferralCode(name, salonId) {
   return `${prefix}-${part}${num}`;
 }
 
-/* ── Password hashing (SHA-256) ──────────────────────────── */
-export async function hashPassword(pw) {
-  const enc = new TextEncoder().encode(String(pw));
-  const buf = await crypto.subtle.digest('SHA-256', enc);
-  return Array.from(new Uint8Array(buf))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-export async function verifyPassword(pw, hash) {
-  if (!hash) return false;
-  // Only SHA-256 hashes are accepted. A non-hash value (e.g. a legacy plain-text
-  // password) is rejected outright so credentials are never compared in the clear.
-  if (!/^[a-f0-9]{64}$/.test(String(hash))) return false;
-  const h = await hashPassword(pw);
-  // constant-time-ish compare
-  if (h.length !== hash.length) return false;
-  let diff = 0;
-  for (let i = 0; i < h.length; i++) diff |= h.charCodeAt(i) ^ hash.charCodeAt(i);
-  return diff === 0;
-}
-
 /* ── Debounce / Throttle ─────────────────────────────────── */
 export function debounce(fn, wait = 200) {
   let t;
@@ -343,78 +386,354 @@ export function throttle(fn, wait = 200) {
   };
 }
 
-/* ── Bookings: atomic helpers ────────────────────────────── */
-/** Mark a booking paid + completed + award points + create loyalty discount if reached. Atomic.
- *  CRITICAL: Firestore transactions require ALL reads before ANY writes.
- *  Bug found 2026-05-17 via E2E — never reorder these. */
-export async function markBookingPaid({ salonId, bookingId, method, pointsPerVisit, loyaltyVisits, loyaltyDiscount }) {
+/* ============================================================
+   BOOKINGS — atomic helpers
+   ------------------------------------------------------------
+   Every write that changes *when* something happens goes through a Firestore
+   transaction that also touches the per-staff/per-day AGENDA document
+   (salons/{id}/agenda/{staffId}__{date} → { intervals:[{start,end,bookingId}] }).
+   Transactions serialise on that document, so two people booking the same
+   staff member at overlapping times can never both succeed — regardless of
+   what the UI showed them. Agenda docs carry no personal data, which is what
+   lets the public booking page read availability without exposing clients.
+
+   RULE OF FIRESTORE TRANSACTIONS: all reads before any write.
+   ============================================================ */
+
+const agendaRef = (salonId, staffId, dateStr) => doc(db, 'salons', salonId, 'agenda', agendaId(staffId, dateStr));
+
+function err(code, extra) { const e = new Error(code); e.code = code; Object.assign(e, extra || {}); return e; }
+
+/** Load what the booking engine needs for a salon (schedule + active staff). */
+export async function loadBookingContext(salonId) {
+  const [schedSnap, staffSnap] = await Promise.all([
+    getDoc(doc(db, 'salons', salonId, 'config', 'schedule')),
+    getDocs(query(collection(db, 'salons', salonId, 'staff'), where('active', '==', true))),
+  ]);
+  const staff = staffSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999));
+  return { schedule: schedSnap.exists() ? schedSnap.data() : null, staff };
+}
+
+/** Read the agenda docs for a set of staff on one date → Map(staffId → occupied[]).
+ *  `excludeBookingId` drops that booking's own interval (used when rescheduling). */
+export async function loadOccupied(salonId, staffIds, dateStr, excludeBookingId = null) {
+  const snaps = await Promise.all(staffIds.map(id => getDoc(agendaRef(salonId, id, dateStr))));
+  const out = new Map();
+  snaps.forEach((s, i) => out.set(staffIds[i], s.exists() ? occupiedFromAgenda(s.data(), excludeBookingId) : []));
+  return out;
+}
+
+/**
+ * Compute bookable start times for a date. Handles "no preference" by
+ * unioning every active staff member's free slots.
+ * @returns {{ slots: number[], perStaff: Map<string, number[]>, window: object|null }}
+ */
+export async function computeAvailability({ salonId, salon, ctx, service, staff, dateStr, excludeBookingId = null }) {
+  const tz = salonSetting(salon, 'timezone');
+  const now = nowInTimezone(tz);
+  const lead = salonSetting(salon, 'bookingLeadMinutes');
+  const interval = salonSetting(salon, 'slotInterval');
+  const notBefore = dateStr === now.dateStr ? now.minutes + lead : (dateStr < now.dateStr ? Infinity : null);
+  const candidates = staff ? [staff] : ctx.staff;
+  if (!candidates.length) return { slots: [], perStaff: new Map(), window: null };
+
+  const occ = await loadOccupied(salonId, candidates.map(s => s.id), dateStr, excludeBookingId);
+  const perStaff = new Map();
+  let windowForDisplay = null;
+  for (const s of candidates) {
+    const window = resolveDayWindow({ salonSchedule: ctx.schedule, staff: s, dateStr, closedDates: salon.closedDates || [] });
+    if (window.closed) { perStaff.set(s.id, []); if (!windowForDisplay) windowForDisplay = window; continue; }
+    windowForDisplay = window;
+    perStaff.set(s.id, generateSlots({ ...window, duration: service.duration, interval, occupied: occ.get(s.id) || [], notBefore }));
+  }
+  const union = [...new Set([...perStaff.values()].flat())].sort((a, b) => a - b);
+  return { slots: union, perStaff, window: windowForDisplay };
+}
+
+/**
+ * Create a booking atomically. If `staff` is null ("no preference"), the first
+ * candidate free at that time is assigned — so every booking ends up with a real
+ * staff member and the agenda stays consistent.
+ */
+export async function createBooking({ salonId, salon, ctx, service, staff, dateStr, startMin, client, discount, source = 'online', status = 'pending' }) {
+  if (!isValidDateStr(dateStr)) throw err('invalid-date');
+  if (!(service && service.id && service.duration > 0)) throw err('invalid-service');
+  const duration = Number(service.duration);
+  const tz = salonSetting(salon, 'timezone');
+  const now = nowInTimezone(tz);
+  const lead = source === 'online' ? salonSetting(salon, 'bookingLeadMinutes') : 0;
+  const maxDays = salonSetting(salon, 'maxAdvanceDays');
+  if (dateStr < now.dateStr) throw err('too-soon');
+  if (source === 'online' && dateStr > addDaysStr(now.dateStr, maxDays)) throw err('outside-hours');
+  const notBefore = dateStr === now.dateStr ? now.minutes + lead : null;
+  const candidates = staff ? [staff] : ctx.staff;
+  if (!candidates.length) throw err('no-staff-available');
+
+  const bookingRef = doc(collection(db, 'salons', salonId, 'bookings'));
+  const finalPrice = discount?.percent ? applyDiscount(service.price, discount.percent) : Number(service.price);
+
+  try {
+    return await runCreateTx();
+  } catch (e) {
+    // Race loser on the PUBLIC path: security rules ("+1 interval only") are
+    // evaluated against the winner's fresh state before the version check, so
+    // the SDK surfaces permission-denied instead of retrying. Re-read and, if
+    // the slot is indeed gone, report it honestly as slot-taken.
+    if (e?.code === 'permission-denied' && !auth.currentUser) {
+      const occ = await loadOccupied(salonId, candidates.map(s => s.id), dateStr);
+      const iv = { start: startMin, end: startMin + duration };
+      const allBusy = candidates.every(s => (occ.get(s.id) || []).some(o => o.start < iv.end && iv.start < o.end));
+      if (allBusy) throw err(staff ? 'slot-taken' : 'no-staff-available');
+    }
+    throw e;
+  }
+
+  async function runCreateTx() { return await runTransaction(db, async (tx) => {
+    // ── reads ──
+    const snaps = [];
+    for (const s of candidates) snaps.push(await tx.get(agendaRef(salonId, s.id, dateStr)));
+
+    // ── pick the first staff member free for [start, start+duration) ──
+    let chosen = null, chosenSnap = null; const reasons = [];
+    for (let i = 0; i < candidates.length; i++) {
+      const s = candidates[i];
+      const window = resolveDayWindow({ salonSchedule: ctx.schedule, staff: s, dateStr, closedDates: salon.closedDates || [] });
+      const occupied = snaps[i].exists() ? occupiedFromAgenda(snaps[i].data()) : [];
+      const reason = checkSlot({ window, duration, start: startMin, occupied, notBefore });
+      if (!reason) { chosen = s; chosenSnap = snaps[i]; break; }
+      reasons.push(reason);
+    }
+    if (!chosen) {
+      // Chosen staff → their exact reason. "No preference" → a salon-wide reason
+      // only when every candidate shares it; otherwise "nobody is free".
+      const allSame = reasons.every(r => r === reasons[0]);
+      throw err(staff ? reasons[0] : (allSame && reasons[0] !== 'slot-taken' ? reasons[0] : 'no-staff-available'));
+    }
+
+    // ── writes ──
+    const interval = { start: startMin, end: startMin + duration, bookingId: bookingRef.id };
+    const aRef = agendaRef(salonId, chosen.id, dateStr);
+    if (chosenSnap.exists()) tx.update(aRef, { intervals: [...(chosenSnap.data().intervals || []), interval], updatedAt: serverTimestamp() });
+    else tx.set(aRef, { staffId: chosen.id, date: dateStr, intervals: [interval], updatedAt: serverTimestamp() });
+
+    tx.set(bookingRef, {
+      salonId,
+      clientId: client.id || null,
+      clientName: clampStr(client.name, 80), clientEmail: clampStr(client.email, 120).toLowerCase(), clientPhone: clampStr(client.phone, 20),
+      forSomeone: client.forSomeone ? clampStr(client.forSomeone, 80) : null,
+      notes: clampStr(client.notes, 500),
+      serviceId: service.id, serviceName: service.name, serviceDuration: duration, servicePrice: Number(service.price),
+      finalPrice,
+      discountType: discount?.type || null, discountCode: discount?.code || null,
+      referralCode: discount?.type === 'referral' ? discount.code : null,
+      referralDiscount: discount?.percent || 0,
+      staffId: chosen.id, staffName: chosen.name, staffPreference: staff ? 'chosen' : 'any',
+      date: dateStr, time: minToTime(startMin), startMin, endMin: startMin + duration,
+      status, paid: false, source,
+      createdAt: serverTimestamp(),
+    });
+    return { id: bookingRef.id, staff: chosen, time: minToTime(startMin), finalPrice };
+  }); }
+}
+
+/** Remove a booking's interval from its agenda doc (inside a transaction). */
+function releaseInterval(tx, aSnap, aRef, bookingId) {
+  if (!aSnap.exists()) return;
+  const intervals = (aSnap.data().intervals || []).filter(iv => iv.bookingId !== bookingId);
+  tx.update(aRef, { intervals, updatedAt: serverTimestamp() });
+}
+
+/** Cancel (admin/team/client). Frees the slot atomically. */
+export async function cancelBooking({ salonId, bookingId, by = 'salon', enforcePolicy = null }) {
   const bRef = doc(db, 'salons', salonId, 'bookings', bookingId);
   return await runTransaction(db, async (tx) => {
-    // ── ALL READS FIRST ──
     const bSnap = await tx.get(bRef);
-    if (!bSnap.exists()) throw new Error('booking-not-found');
+    if (!bSnap.exists()) throw err('booking-not-found');
+    const b = bSnap.data();
+    if (!canTransition(b.status, 'cancelled')) throw err('invalid-transition');
+    if (enforcePolicy) {
+      const r = clientCanCancel({ booking: b, cancellationHours: enforcePolicy.cancellationHours, now: enforcePolicy.now });
+      if (!r.ok) throw err(r.reason === 'too-late' ? 'cancel-too-late' : 'invalid-transition');
+    }
+    const aRef = b.staffId ? agendaRef(salonId, b.staffId, b.date) : null;
+    const aSnap = aRef ? await tx.get(aRef) : null;
+    // writes
+    tx.update(bRef, { status: 'cancelled', previousStatus: b.status, cancelledAt: serverTimestamp(), cancelledBy: by });
+    if (aRef) releaseInterval(tx, aSnap, aRef, bookingId);
+    return { ok: true, previousStatus: b.status };
+  });
+}
+
+/** Undo a cancellation. Re-checks the agenda — fails if the slot was taken meanwhile. */
+export async function restoreBooking({ salonId, bookingId, toStatus = null }) {
+  const bRef = doc(db, 'salons', salonId, 'bookings', bookingId);
+  return await runTransaction(db, async (tx) => {
+    const bSnap = await tx.get(bRef);
+    if (!bSnap.exists()) throw err('booking-not-found');
+    const b = bSnap.data();
+    const target = toStatus || b.previousStatus || 'pending';
+    if (b.status !== 'cancelled' || !canTransition('cancelled', target)) throw err('invalid-transition');
+    const start = b.startMin ?? timeToMin(b.time), end = b.endMin ?? (start + (b.serviceDuration || 30));
+    const aRef = agendaRef(salonId, b.staffId, b.date);
+    const aSnap = await tx.get(aRef);
+    const occupied = aSnap.exists() ? occupiedFromAgenda(aSnap.data(), bookingId) : [];
+    if (occupied.some(o => o.start < end && start < o.end)) throw err('slot-taken');
+    const interval = { start, end, bookingId };
+    if (aSnap.exists()) tx.update(aRef, { intervals: [...(aSnap.data().intervals || []).filter(i => i.bookingId !== bookingId), interval], updatedAt: serverTimestamp() });
+    else tx.set(aRef, { staffId: b.staffId, date: b.date, intervals: [interval], updatedAt: serverTimestamp() });
+    tx.update(bRef, { status: target, cancelledAt: null, cancelledBy: null, previousStatus: null, restoredAt: serverTimestamp() });
+    return { ok: true, status: target };
+  });
+}
+
+/** Move a booking to a new date/time (and optionally staff). Atomic across both agenda docs. */
+export async function rescheduleBooking({ salonId, salon, ctx, bookingId, newDate, newStartMin, newStaff = null }) {
+  if (!isValidDateStr(newDate)) throw err('invalid-date');
+  const bRef = doc(db, 'salons', salonId, 'bookings', bookingId);
+  return await runTransaction(db, async (tx) => {
+    const bSnap = await tx.get(bRef);
+    if (!bSnap.exists()) throw err('booking-not-found');
+    const b = bSnap.data();
+    if (!BLOCKING_STATUSES.includes(b.status)) throw err('invalid-transition');
+    const duration = b.serviceDuration || 30;
+    const staff = newStaff || ctx.staff.find(s => s.id === b.staffId) || { id: b.staffId, name: b.staffName };
+    const oldRef = agendaRef(salonId, b.staffId, b.date);
+    const newRef = agendaRef(salonId, staff.id, newDate);
+    const same = oldRef.path === newRef.path;
+    const oldSnap = await tx.get(oldRef);
+    const newSnap = same ? oldSnap : await tx.get(newRef);
+
+    const window = resolveDayWindow({ salonSchedule: ctx.schedule, staff, dateStr: newDate, closedDates: salon.closedDates || [] });
+    const occupied = newSnap.exists() ? occupiedFromAgenda(newSnap.data(), bookingId) : [];
+    const reason = checkSlot({ window, duration, start: newStartMin, occupied, notBefore: null });
+    if (reason) throw err(reason);
+
+    const interval = { start: newStartMin, end: newStartMin + duration, bookingId };
+    if (same) {
+      const rest = (oldSnap.exists() ? oldSnap.data().intervals || [] : []).filter(i => i.bookingId !== bookingId);
+      if (oldSnap.exists()) tx.update(oldRef, { intervals: [...rest, interval], updatedAt: serverTimestamp() });
+      else tx.set(oldRef, { staffId: staff.id, date: newDate, intervals: [interval], updatedAt: serverTimestamp() });
+    } else {
+      releaseInterval(tx, oldSnap, oldRef, bookingId);
+      if (newSnap.exists()) tx.update(newRef, { intervals: [...(newSnap.data().intervals || []), interval], updatedAt: serverTimestamp() });
+      else tx.set(newRef, { staffId: staff.id, date: newDate, intervals: [interval], updatedAt: serverTimestamp() });
+    }
+    tx.update(bRef, {
+      date: newDate, time: minToTime(newStartMin), startMin: newStartMin, endMin: newStartMin + duration,
+      staffId: staff.id, staffName: staff.name,
+      rescheduledFrom: { date: b.date, time: b.time, staffId: b.staffId }, rescheduledAt: serverTimestamp(),
+    });
+    return { ok: true };
+  });
+}
+
+/** pending → confirmed, with transition check. */
+export async function confirmBooking({ salonId, bookingId }) {
+  const bRef = doc(db, 'salons', salonId, 'bookings', bookingId);
+  return await runTransaction(db, async (tx) => {
+    const bSnap = await tx.get(bRef);
+    if (!bSnap.exists()) throw err('booking-not-found');
+    if (!canTransition(bSnap.data().status, 'confirmed')) throw err('invalid-transition');
+    tx.update(bRef, { status: 'confirmed', confirmedAt: serverTimestamp() });
+    return { ok: true };
+  });
+}
+
+/**
+ * Find (by email) or prepare a client record for a guest booking being paid.
+ * Runs OUTSIDE the transaction (queries aren't allowed inside), by admin/team
+ * who have read access. Returns a doc ref + whether it must be created.
+ */
+async function resolveClientForBooking(salonId, b) {
+  if (b.clientId) return { ref: doc(db, 'salons', salonId, 'clients', b.clientId), create: false };
+  const email = (b.clientEmail || '').toLowerCase();
+  if (!email) return null;
+  const q = await getDocs(query(collection(db, 'salons', salonId, 'clients'), where('email', '==', email), limit(1)));
+  if (!q.empty) return { ref: q.docs[0].ref, create: false };
+  return { ref: doc(collection(db, 'salons', salonId, 'clients')), create: true, seed: { name: b.clientName, email, phone: b.clientPhone || '' } };
+}
+
+/** Mark paid + completed, award points, mint loyalty coupon when the target is hit. Atomic. */
+export async function markBookingPaid({ salonId, salon, bookingId, method }) {
+  const bRef = doc(db, 'salons', salonId, 'bookings', bookingId);
+  const pre = await getDoc(bRef);
+  if (!pre.exists()) throw err('booking-not-found');
+  const clientPlan = await resolveClientForBooking(salonId, pre.data());
+  const pts = salonSetting(salon, 'pointsPerVisit');
+  const target = salonSetting(salon, 'loyaltyVisits');
+  const discount = salonSetting(salon, 'loyaltyDiscount');
+
+  return await runTransaction(db, async (tx) => {
+    const bSnap = await tx.get(bRef);
+    if (!bSnap.exists()) throw err('booking-not-found');
     const b = bSnap.data();
     if (b.paid) return { alreadyPaid: true };
-    if (b.status === 'cancelled') throw new Error('booking-cancelled');
-    if (b.status === 'noshow')    throw new Error('booking-noshow');
+    if (!canTransition(b.status, 'completed')) throw err(b.status === 'cancelled' ? 'booking-cancelled' : b.status === 'noshow' ? 'booking-noshow' : 'invalid-transition');
+    const cSnap = clientPlan && !clientPlan.create ? await tx.get(clientPlan.ref) : null;
 
-    const cRef = b.clientId ? doc(db, 'salons', salonId, 'clients', b.clientId) : null;
-    const cSnap = cRef ? await tx.get(cRef) : null;
-
-    // ── THEN ALL WRITES ──
-    const pts = pointsPerVisit || 10;
     tx.update(bRef, {
-      paid: true, status: 'completed',
-      paidAt: serverTimestamp(),
-      paymentMethod: method,
-      pointsAwarded: pts,
+      paid: true, status: 'completed', paidAt: serverTimestamp(), paymentMethod: method || 'balcao', pointsAwarded: pts,
+      ...(clientPlan && !b.clientId ? { clientId: clientPlan.ref.id } : {}),
     });
 
-    if (cSnap?.exists()) {
+    const spentDelta = Number(b.finalPrice) || Number(b.servicePrice) || 0;
+    if (clientPlan?.create) {
+      tx.set(clientPlan.ref, {
+        ...clientPlan.seed, uid: null, birthday: null, referralCode: null,
+        visits: 1, points: pts, totalSpent: spentDelta, referredBy: null, referrals: [], discounts: [],
+        source: 'guest', createdAt: serverTimestamp(),
+      });
+    } else if (cSnap?.exists()) {
       const c = cSnap.data();
       const visits = (c.visits || 0) + 1;
-      const points = (c.points || 0) + pts;
-      const spent  = (c.totalSpent || 0) + (Number(b.finalPrice) || Number(b.servicePrice) || 0);
-      const target = loyaltyVisits || 5;
-      const discount = loyaltyDiscount || 20;
-      const updates = { visits, points, totalSpent: spent };
-      if (visits > 0 && visits % target === 0) {
+      const updates = { visits, points: (c.points || 0) + pts, totalSpent: (c.totalSpent || 0) + spentDelta, lastVisitAt: serverTimestamp() };
+      if (target > 0 && visits % target === 0) {
         updates.discounts = [...(c.discounts || []), {
-          type: 'loyalty',
-          title: '⭐ Desconto de Fidelização',
+          type: 'loyalty', title: '⭐ Desconto de Fidelização',
           description: `${discount}% — ${visits} visitas atingidas`,
-          code: `LOYAL${visits}-${(c.referralCode || '').split('-')[1] || Math.floor(Math.random()*999)}`,
-          discount, expiresAt: null, used: false,
-          createdAt: new Date().toISOString()
+          code: `LOYAL${visits}-${(c.referralCode || '').split('-')[1] || Math.floor(100 + Math.random() * 899)}`,
+          discount, expiresAt: null, used: false, createdAt: new Date().toISOString(),
         }];
       }
-      tx.update(cRef, updates);
+      tx.update(clientPlan.ref, updates);
     }
     return { ok: true };
   });
 }
 
-/** Mark booking as no-show + deduct points. Atomic.
- *  Single read followed by writes — no reordering issue here, but kept the same
- *  shape as markBookingPaid for consistency. */
-export async function markBookingNoShow({ salonId, bookingId, penalty }) {
+/** No-show + penalty. Atomic. The slot is in the past, so the agenda is left as-is. */
+export async function markBookingNoShow({ salonId, salon, bookingId }) {
   const bRef = doc(db, 'salons', salonId, 'bookings', bookingId);
+  const penalty = salonSetting(salon, 'noShowPenalty');
   return await runTransaction(db, async (tx) => {
     const bSnap = await tx.get(bRef);
-    if (!bSnap.exists()) throw new Error('booking-not-found');
+    if (!bSnap.exists()) throw err('booking-not-found');
     const b = bSnap.data();
-    if (b.status === 'noshow')    return { alreadyNoShow: true };
-    if (b.status === 'completed') throw new Error('booking-completed');
-    if (b.status === 'cancelled') throw new Error('booking-cancelled');
-    // All writes
+    if (b.status === 'noshow') return { alreadyNoShow: true };
+    if (!canTransition(b.status, 'noshow')) throw err(b.status === 'completed' ? 'booking-completed' : 'booking-cancelled');
     tx.update(bRef, { status: 'noshow', noShowAt: serverTimestamp() });
-    if (b.clientId && penalty > 0) {
-      const cRef = doc(db, 'salons', salonId, 'clients', b.clientId);
-      tx.update(cRef, { points: increment(-penalty) });
-    }
+    if (b.clientId && penalty > 0) tx.update(doc(db, 'salons', salonId, 'clients', b.clientId), { points: increment(-penalty) });
     return { ok: true };
   });
 }
+
+/* ── Connectivity banner ─────────────────────────────────── */
+function connectivityBanner() {
+  let el = null;
+  const show = () => {
+    if (el) return;
+    el = document.createElement('div');
+    el.id = 'offlineBanner';
+    el.setAttribute('role', 'status');
+    el.textContent = 'Sem ligação à internet. As alterações vão falhar até a ligação voltar.';
+    document.body.appendChild(el);
+  };
+  const hide = () => { if (el) { el.remove(); el = null; } };
+  window.addEventListener('offline', show);
+  window.addEventListener('online', hide);
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) show();
+}
+if (typeof window !== 'undefined') connectivityBanner();
 
 /* ── Theme (light/dark) ──────────────────────────────────── */
 /* Default: LIGHT. We deliberately do NOT honour prefers-color-scheme on first
@@ -422,17 +741,18 @@ export async function markBookingNoShow({ salonId, bookingId, penalty }) {
  * not "system mode" by accident. User can toggle and choice is persisted. */
 const THEME_KEY = 'bookit:theme';
 export function getTheme() {
-  return localStorage.getItem(THEME_KEY) || 'light';
+  try { return localStorage.getItem(THEME_KEY) || 'light'; } catch { return 'light'; }
 }
 export function setTheme(theme) {
+  if (!HAS_DOM) return;
   document.documentElement.setAttribute('data-theme', theme);
-  localStorage.setItem(THEME_KEY, theme);
+  try { localStorage.setItem(THEME_KEY, theme); } catch {}
 }
 export function toggleTheme() {
   setTheme(getTheme() === 'dark' ? 'light' : 'dark');
 }
 // Apply on every page load
-setTheme(getTheme());
+if (HAS_DOM) setTheme(getTheme());
 
 /* ── Render booking row (shared component) ───────────────── */
 export function renderBookingRow(b, ctx = {}) {
