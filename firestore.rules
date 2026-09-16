@@ -148,6 +148,16 @@ service cloud.firestore {
         allow update, delete: if isAdmin(salonId);
       }
 
+      /* ───────────── reactivation log (who we contacted; carries client PII) ───────────── */
+      match /reactivations/{token} {
+        allow read: if isStaff(salonId);
+        allow create, update: if isStaff(salonId)
+          && str(request.resource.data.clientKey, 200)
+          && request.resource.data.kind in ['sent', 'dismissed']
+          && optStr(request.resource.data.get('clientName', null), 80);
+        allow delete: if isStaff(salonId);
+      }
+
       /* ───────────── booking links: PII-free projection behind an unguessable token ───────────── */
       match /bookingLinks/{token} {
         function noPII() { return !request.resource.data.keys().hasAny(['clientName', 'clientEmail', 'clientPhone', 'clientPhoneE164', 'notes', 'forSomeone']); }
@@ -252,6 +262,8 @@ service cloud.firestore {
               && optStr(d().get('clientPhone', null), 30)
               && optStr(d().get('notes', null), 500)
               && optStr(d().get('forSomeone', null), 80)
+              && optStr(d().get('reactivationToken', null), 64)
+              && optStr(d().get('channel', null), 40)
               && validDate(d().date) && validTime(d().time)
               && d().startMin is int && d().endMin is int && d().endMin > d().startMin
               && intIn(d().serviceDuration, 5, 600) && d().endMin - d().startMin == d().serviceDuration

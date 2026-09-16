@@ -59,6 +59,11 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="8" y2="18"/><line x1="13" y1="14" x2="16" y2="14"/></svg>
         <span>Vista de dia</span>
       </button>
+      <button class="sidebar__link" type="button" data-action="show-panel" data-panel="retention">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 10 9 10"/></svg>
+        <span>Reativar</span>
+        <span class="badge badge--amber" id="navRiskCount" hidden style="margin-left:auto"></span>
+      </button>
       <button class="sidebar__link" type="button" data-action="show-panel" data-panel="clients">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         <span>Clientes</span>
@@ -335,6 +340,44 @@
           <div class="dayview__hours" id="dayviewHours"></div>
           <div class="dayview__slots" id="dayviewSlots"></div>
         </div>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-retention">
+      <div class="panel-header">
+        <div class="panel-header__title-row">
+          <h1 class="page-title">Reativar clientes</h1>
+          <p class="page-sub">Quem costumava vir e deixou de aparecer. Uma mensagem pessoal traz de volta parte deles.</p>
+        </div>
+        <div class="cluster">
+          <select id="retFilter" class="input" style="max-width:190px">
+            <option value="actionable" selected>A contactar</option>
+            <option value="risk">Em risco</option>
+            <option value="lost">Perdidos</option>
+            <option value="contacted">Já contactados</option>
+            <option value="healthy">Saudáveis</option>
+          </select>
+          <button class="btn btn--sm" type="button" data-action="ret-refresh">Atualizar</button>
+        </div>
+      </div>
+
+      <div id="retLoading" class="loading-state"><span class="spinner" aria-hidden="true"></span><div class="mt-3">A analisar o histórico…</div></div>
+
+      <div id="retBody" hidden>
+        <div class="stats" id="retStats"></div>
+
+        <div class="card card--accent mb-4" id="retRecovered">
+          <div class="card__head">
+            <div>
+              <div class="card__title">💚 Receita recuperada <span class="text-sm text-muted" style="font-weight:400">(atribuída)</span></div>
+              <div class="card__sub">Só marcações feitas a partir dos links que enviaste. Nada estimado.</div>
+            </div>
+          </div>
+          <div id="retRecoveredBody"></div>
+        </div>
+
+        <p class="text-sm text-muted mb-3" id="retMethod"></p>
+        <div id="retList"></div>
       </div>
     </section>
 
@@ -822,11 +865,13 @@ import {
   markBookingPaid, markBookingNoShow, confirmBooking, cancelBooking, restoreBooking, rescheduleBooking,
   createBooking, computeAvailability, minToTime, timeToMin, isValidDateStr, BLOCKING_STATUSES,
   whatsAppFor, markMessageSent, addDaysStr, formatRelativeTime,
+  loadRetention, logReactivation, deleteReactivation, reactivationLink, whatsAppUrl, randomToken, formatPhonePT,
   downloadCSV, subscribe, trapFocus,
   isEmail, isPhone, isHexColor
 } from './app.js';
 
-import { computeBaseline, pct, eur } from './metrics-core.js';
+import { computeBaseline, computeRecovered, pct, eur } from './metrics-core.js';
+import { buildClientProfiles, reactivationCandidates, retentionSummary, explain, reactivationMessage, RISK } from './retention-core.js';
 
 /** Bookings currently known to this page, by id (dashboard, list, day filter). */
 const bookingIndex = new Map();
@@ -991,6 +1036,7 @@ on('show-panel', (el) => {
   if (id === 'staff')      { loadStaff().then(refreshOnboarding); }
   if (id === 'dayview')    initDayview();
   if (id === 'business')   loadBusiness();
+  if (id === 'retention')  loadRetentionPanel();
   if (id === 'dashboard')  refreshOnboarding();
   if (id === 'settings')   refreshOnboarding();
   if (id === 'schedule')   refreshOnboarding();
@@ -1479,7 +1525,7 @@ async function loadBusiness() {
       statCard('Receita registada', eur(m.revenue.total), `${m.counts.paid} pagamentos · ticket ${eur(m.revenue.avgTicket)}`),
       statCard('Faltas', pct(m.noShow.rate), `${m.noShow.count} em ${m.noShow.resolved} fechadas`),
       statCard('Cancelamentos', pct(m.cancellations.rate), `${m.cancellations.count} · ${m.cancellations.late} em cima da hora`),
-      statCard('Ocupação', pct(m.occupancy.rate), `${Math.round(m.occupancy.bookedMinutes / 60)}h de ${Math.round(m.occupancy.availableMinutes / 60)}h vendáveis`),
+      statCard('Ocupação', pct(m.occupancy.rate, (m.occupancy.rate != null && m.occupancy.rate < 0.1) ? 1 : 0), `${Math.round(m.occupancy.bookedMinutes / 60)}h de ${Math.round(m.occupancy.availableMinutes / 60)}h vendáveis`),
       statCard('Confirmadas', pct(m.confirmation.confirmedRate), `${m.confirmation.byLink} pelo link · ${pct(m.confirmation.requestRate)} com pedido`),
       statCard('Voltaram em 60 dias', pct(m.rebooking.rate), `${m.rebooking.rebooked} de ${m.rebooking.eligible} visitas`),
     ].join('');
@@ -1497,6 +1543,13 @@ async function loadBusiness() {
       </tbody></table>
       <p class="text-xs text-muted mt-2">A diferença entre as duas primeiras linhas é o efeito de confirmar. Quando houver ≥ 100 marcações fechadas passa a ser um número em que se pode confiar.</p>`;
 
+    // Attributed recovery for the same period (reactivation links only)
+    try {
+      const reactSnap = await getDocs(collection(db,'salons',salonId,'reactivations'));
+      const rec = computeRecovered({ bookings, reactivations: reactSnap.docs.map(d => ({ id: d.id, ...d.data() })), from: range.from, to: range.to });
+      $('#bizStats').innerHTML += statCard('Receita recuperada', eur(rec.revenueRealised + rec.revenueUpcoming), `${rec.booked} marcações de ${rec.sent} mensagens`);
+    } catch (e) { console.error('recovered', e); }
+
     $('#bizWeeks').innerHTML = barRows(m.byWeek.map(w => ({ label: `sem. ${formatDatePT(w.key, { short: true })}`, v: w.bookings, extra: `${eur(w.revenue)} · ${w.noshow} faltas` })), 'v');
     $('#bizChannels').innerHTML = barRows(m.byChannel.map(c => ({ label: ({ online: 'online (link direto)', admin: 'admin (balcão/telefone)', staff: 'equipa', guest: 'visitante' })[c.key] || c.key.replace('online:', 'online · '), v: c.bookings, extra: eur(c.revenue) })), 'v');
     $('#bizStaff').innerHTML = barRows(m.byStaff.map(s => ({ label: s.key, v: s.bookings, extra: `${eur(s.revenue)} · ${s.noshow} faltas` })), 'v');
@@ -1508,6 +1561,133 @@ async function loadBusiness() {
     toastError(friendlyError(e, 'Não foi possível calcular as métricas.'));
   } finally { bizBusy = false; }
 }
+
+/* ── REATIVAR (clientes em risco → mensagem → receita atribuída) ── */
+let retState = { profiles: [], summary: null, recovered: null, byKey: new Map(), loaded: false, busy: false };
+
+async function loadRetentionPanel(force = false) {
+  if (!salonId || retState.busy) return;
+  if (retState.loaded && !force) { renderRetention(); return; }
+  retState.busy = true;
+  $('#retLoading').hidden = false; $('#retBody').hidden = true;
+  try {
+    const { today, bookings, reactivations } = await loadRetention({ salonId, salon });
+    const { profiles, salonCadenceDays } = buildClientProfiles({ bookings, today, reactivations });
+    retState.profiles = profiles;
+    retState.summary = retentionSummary(profiles);
+    retState.salonCadenceDays = salonCadenceDays;
+    retState.byKey = new Map(profiles.map(p => [p.key, p]));
+    retState.recovered = computeRecovered({ bookings, reactivations, from: addDaysStr(today, -365), to: addDaysStr(today, 365) });
+    retState.loaded = true;
+    renderRetention();
+  } catch (e) {
+    console.error(e); $('#retLoading').hidden = true;
+    toastError(friendlyError(e, 'Não foi possível analisar o histórico.'));
+  } finally { retState.busy = false; }
+}
+on('ret-refresh', () => loadRetentionPanel(true));
+$('#retFilter').addEventListener('change', renderRetention);
+
+function renderRetention() {
+  const s = retState.summary; if (!s) return;
+  $('#retLoading').hidden = true; $('#retBody').hidden = false;
+
+  $('#retStats').innerHTML = [
+    statCard('Em risco', String(s.atRisk), `${eur(s.atRiskValue)} gastos no último ano`),
+    statCard('Perdidos', String(s.lost), `${eur(s.lostValue)} gastos no último ano`),
+    statCard('A contactar', String(s.contactable), 'com telemóvel e sem contacto recente'),
+    statCard('Saudáveis', String(s.healthy), `${s.scheduled} já com marcação`),
+  ].join('');
+
+  const nav = $('#navRiskCount');
+  if (nav) { nav.hidden = s.contactable === 0; nav.textContent = String(s.contactable); }
+
+  const r = retState.recovered;
+  $('#retRecoveredBody').innerHTML = r ? `
+    <div class="stats" style="margin-bottom:8px">
+      ${statCard('Mensagens enviadas', String(r.sent), 'últimos 12 meses')}
+      ${statCard('Voltaram a marcar', String(r.booked), r.bookingRate != null ? `${pct(r.bookingRate)} de resposta` : '—')}
+      ${statCard('Receita já paga', eur(r.revenueRealised), `${r.realisedCount} visitas concluídas`)}
+      ${statCard('Marcado por cobrar', eur(r.revenueUpcoming), `${r.upcomingCount} marcações futuras`)}
+    </div>
+    <p class="text-sm text-muted" style="margin:0">
+      Horários cancelados que foram reocupados: <strong>${r.refilled.count}</strong> de ${r.refilled.cancelled} (${eur(r.refilled.value)}).
+      Isto é um facto observado, não receita que possamos atribuir ao Book It — por isso não entra na conta acima.
+    </p>` : '';
+
+  $('#retMethod').innerHTML = `Ritmo de cada cliente = mediana do intervalo entre visitas dele. Sem histórico próprio, usamos o ritmo do serviço${retState.salonCadenceDays ? ` ou do salão (${Math.round(retState.salonCadenceDays / 7)} semanas)` : ''}. <strong>Em risco</strong> = passou 1,25× o ritmo; <strong>perdido</strong> = 2,5×. Quem já tem marcação futura nunca aparece aqui.`;
+
+  const filter = $('#retFilter').value;
+  let list;
+  if (filter === 'actionable') list = reactivationCandidates(retState.profiles);
+  else if (filter === 'risk') list = reactivationCandidates(retState.profiles, { statuses: [RISK.AT_RISK], includeSuppressed: true, requirePhone: false });
+  else if (filter === 'lost') list = reactivationCandidates(retState.profiles, { statuses: [RISK.LOST], includeSuppressed: true, requirePhone: false });
+  else if (filter === 'contacted') list = retState.profiles.filter(p => p.lastContactAt).sort((a, b) => b.lastContactAt - a.lastContactAt);
+  else list = retState.profiles.filter(p => [RISK.HEALTHY, RISK.SCHEDULED].includes(p.status)).sort((a, b) => b.spent12m - a.spent12m);
+
+  const el = $('#retList');
+  if (!list.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-state__icon">✅</div><div class="empty-state__title">Nada a fazer aqui</div><div class="empty-state__desc">${filter === 'actionable' ? 'Nenhum cliente em risco por contactar. Volta daqui a uns dias.' : 'Sem clientes nesta lista.'}</div></div>`;
+    return;
+  }
+  el.innerHTML = list.slice(0, 200).map(p => {
+    const tag = { [RISK.AT_RISK]: 'badge--amber', [RISK.LOST]: 'badge--red', [RISK.HEALTHY]: 'badge--green', [RISK.SCHEDULED]: 'badge--blue', [RISK.INACTIVE]: 'badge--gray', [RISK.NEW]: 'badge--gray' }[p.status] || 'badge--gray';
+    const canMessage = !!p.phone && [RISK.AT_RISK, RISK.LOST].includes(p.status);
+    return htmlMix`
+      <div class="row-card">
+        <div class="row-card__main">
+          <div class="row-card__title">
+            <strong>${p.name}</strong>
+            <span class="badge ${raw(tag)}" style="margin-left:6px">${p.status}</span>
+            ${p.suppressed ? raw(`<span class="badge badge--gray" style="margin-left:4px">contactado ${escapeHTML(String(p.daysSinceContact))}d</span>`) : ''}
+          </div>
+          <div class="row-card__meta">${raw(escapeHTML(explain(p)))}</div>
+          <div class="row-card__notes">
+            ${p.visits} visita${raw(p.visits === 1 ? '' : 's')} · ${eur(p.spent12m)} no último ano · ticket ${eur(p.avgTicket)}
+            ${p.lastStaffName ? raw(` · com ${escapeHTML(p.lastStaffName)}`) : ''}
+            ${p.phone ? raw(` · ${escapeHTML(formatPhonePT(p.phone))}`) : raw(' · <span style="color:var(--danger-fg)">sem telemóvel</span>')}
+            ${p.noShows ? raw(` · <span class="badge badge--gray">${p.noShows} falta(s)</span>`) : ''}
+            ${p.upcomingDate ? raw(` · <span class="badge badge--blue">marcação a ${escapeHTML(formatDatePT(p.upcomingDate, { short: true }))}</span>`) : ''}
+          </div>
+        </div>
+        <div class="row-card__side">
+          <div class="row-card__actions">
+            ${canMessage ? raw(htmlMix`<button class="btn btn--sm btn--primary" type="button" data-action="ret-message" data-key="${p.key}">💬 Mensagem</button>`) : ''}
+            ${canMessage && !p.suppressed ? raw(htmlMix`<button class="btn btn--sm" type="button" data-action="ret-dismiss" data-key="${p.key}" title="Não sugerir durante 6 meses">Dispensar</button>`) : ''}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+/* Opens WhatsApp with a personal message + a booking link carrying the attribution token. */
+on('ret-message', withLock('ret-message', async (el) => {
+  const p = retState.byKey.get(el.dataset.key);
+  if (!p || !p.phone) return toastError('Este cliente não tem telemóvel.');
+  const token = randomToken(8);
+  const link = reactivationLink({ salonId, token });
+  const text = reactivationMessage({ profile: p, salonName: salon.name, link });
+  const url = whatsAppUrl(p.phone, text);
+  if (!url) return toastError('Número de telemóvel inválido.');
+  window.open(url, '_blank', 'noopener');
+  try {
+    await logReactivation({ salonId, profile: p, kind: 'sent', token, by: 'admin' });
+    p.suppressed = true; p.daysSinceContact = 0; p.lastContactAt = Date.now(); p.lastContactKind = 'sent';
+    if (retState.recovered) retState.recovered.sent++;
+    renderRetention();
+    toastSuccess('Mensagem aberta no WhatsApp. Se marcar por este link, contamos a receita.');
+  } catch (e) { console.error(e); toastError(friendlyError(e, 'Mensagem aberta, mas não consegui registá-la.')); }
+}));
+
+on('ret-dismiss', withLock('ret-dismiss', async (el) => {
+  const p = retState.byKey.get(el.dataset.key); if (!p) return;
+  try {
+    await logReactivation({ salonId, profile: p, kind: 'dismissed', token: randomToken(8), by: 'admin' });
+    p.suppressed = true; p.daysSinceContact = 0; p.lastContactKind = 'dismissed';
+    renderRetention();
+    toastSuccess(`${p.name} deixa de aparecer durante 6 meses.`);
+  } catch (e) { console.error(e); toastError(friendlyError(e)); }
+}));
 
 /* ── CLIENTS ─────────────────────────────────────────────── */
 const CLIENTS_PAGE = 200;

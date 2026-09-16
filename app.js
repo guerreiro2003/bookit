@@ -4,7 +4,7 @@
 
 import {
   db, auth, doc, getDoc, getDocs, collection, query, where, limit, increment, serverTimestamp,
-  runTransaction, onSnapshot, updateDoc, writeBatch
+  runTransaction, onSnapshot, updateDoc, setDoc, deleteDoc, writeBatch
 } from './firebase.js';
 import {
   timeToMin, minToTime, isValidDateStr, nowInTimezone, resolveDayWindow, generateSlots, checkSlot,
@@ -484,7 +484,7 @@ export async function computeAvailability({ salonId, salon, ctx, service, staff,
  * candidate free at that time is assigned — so every booking ends up with a real
  * staff member and the agenda stays consistent.
  */
-export async function createBooking({ salonId, salon, ctx, service, staff, dateStr, startMin, client, discount, source = 'online', status = 'pending', channel = null }) {
+export async function createBooking({ salonId, salon, ctx, service, staff, dateStr, startMin, client, discount, source = 'online', status = 'pending', channel = null, reactivationToken = null }) {
   if (!isValidDateStr(dateStr)) throw err('invalid-date');
   if (!(service && service.id && service.duration > 0)) throw err('invalid-service');
   const duration = Number(service.duration);
@@ -562,6 +562,8 @@ export async function createBooking({ salonId, salon, ctx, service, staff, dateS
       staffId: chosen.id, staffName: chosen.name, staffPreference: staff ? 'chosen' : 'any',
       date: dateStr, time: minToTime(startMin), startMin, endMin: startMin + duration,
       status, paid: false, source, channel: channel ? clampStr(channel, 40) : null,
+      // Attribution: set when the client arrived through a reactivation link.
+      reactivationToken: reactivationToken ? clampStr(reactivationToken, 64) : null,
       manageToken,
       confirmedAt: status === 'confirmed' ? serverTimestamp() : null, confirmedVia: status === 'confirmed' ? source : null,
       confirmRequestedAt: null, reminderSentAt: null,
@@ -623,6 +625,57 @@ export function whatsAppFor({ salon, booking, kind, baseUrl = APP_BASE_URL }) {
 export async function markMessageSent({ salonId, bookingId, kind }) {
   const field = kind === 'confirmRequest' ? 'confirmRequestedAt' : kind === 'freeSlot' ? 'offerSentAt' : 'reminderSentAt';
   await updateDoc(doc(db, 'salons', salonId, 'bookings', bookingId), { [field]: serverTimestamp(), lastMessageKind: kind });
+}
+
+/* ============================================================
+   RETENTION — clients at risk, reactivation, attributed recovery
+   ============================================================ */
+
+/**
+ * Everything the retention panel needs, in two reads: the booking history
+ * window (cadence + upcoming appointments) and the log of messages already sent.
+ */
+export async function loadRetention({ salonId, salon, historyDays = 540 }) {
+  const today = todayForSalon(salon);
+  const from = addDaysStr(today, -historyDays);
+  const [bookSnap, reactSnap] = await Promise.all([
+    getDocs(query(collection(db, 'salons', salonId, 'bookings'), where('date', '>=', from))),
+    getDocs(collection(db, 'salons', salonId, 'reactivations')),
+  ]);
+  return {
+    today,
+    bookings: bookSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+    reactivations: reactSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+  };
+}
+
+/** Booking link that carries the attribution token. */
+export function reactivationLink({ salonId, token, baseUrl = APP_BASE_URL }) {
+  return `${baseUrl.replace(/\/$/, '')}/?salon=${encodeURIComponent(salonId)}&src=reativacao&rt=${encodeURIComponent(token)}`;
+}
+
+/**
+ * Record that we contacted (or deliberately skipped) a client. One document per
+ * message, so the token is unique and attribution is unambiguous.
+ * `kind`: 'sent' | 'dismissed'
+ */
+export async function logReactivation({ salonId, profile, kind = 'sent', token = randomToken(8), by = 'admin' }) {
+  await setDoc(doc(db, 'salons', salonId, 'reactivations', token), {
+    clientKey: profile.key,
+    clientId: profile.clientId || null,
+    clientName: clampStr(profile.name, 80),
+    clientPhoneE164: profile.phone || null,
+    service: profile.topService || profile.lastService || null,
+    lastVisit: profile.lastVisit || null,
+    cadenceDays: profile.cadenceDays || null,
+    spent12m: profile.spent12m || 0,
+    kind, by,
+    sentAt: serverTimestamp(),
+  });
+  return token;
+}
+export async function deleteReactivation({ salonId, token }) {
+  await deleteDoc(doc(db, 'salons', salonId, 'reactivations', token));
 }
 
 /** Remove a booking's interval from its agenda doc (inside a transaction). */

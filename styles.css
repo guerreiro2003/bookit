@@ -1789,3 +1789,10 @@ kbd {
 .bar__fill { height: 100%; background: var(--brand); border-radius: 999px; }
 .data-table--compact td { padding: 6px 8px; font-size: var(--text-sm); }
 .text-right { text-align: right; }
+
+/* ── TOUCH TARGETS: small buttons stay comfortable on phones ───────────────── */
+@media (max-width: 640px), (pointer: coarse) {
+  .btn--sm { min-height: 40px; padding-top: 8px; padding-bottom: 8px; }
+  .row-card__actions { gap: 8px; flex-wrap: wrap; }
+  .row-card__actions .btn { flex: 1 1 auto; }
+}

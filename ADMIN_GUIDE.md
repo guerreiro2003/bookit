@@ -27,6 +27,8 @@ O cartão de onboarding guia os 4 passos:
 - **Dashboard**: marcações de hoje em tempo real, pendentes, faturação do dia. Botão **＋ Nova marcação** (telefone/walk-in): escolhe serviço, colaborador (ou "sem preferência"), data e um dos **horários realmente livres**.
 - **Marcações**: filtros por estado/data e pesquisa. Ações: Confirmar · Pagamento (atribui pontos; se for visitante cria a ficha de cliente) · **Reagendar** (mostra só horários livres; pode mudar de colaborador) · Não compareceu (penaliza pontos) · Cancelar (liberta o horário; "Anular" nos 6 s seguintes repõe se o horário ainda estiver livre).
 - **Vista de dia**: cronograma visual.
+- **Negócio**: marcações, receita registada, faltas, cancelamentos, ocupação, confirmações, regresso em 60 dias, por semana/origem/colaborador/serviço. Tudo contado nos registos — nada estimado.
+- **Reativar** (rotina semanal, 5 minutos): lista de clientes que costumavam vir e deixaram de aparecer, ordenada pelo que gastaram no último ano. Cada cartão explica porquê (*"Vinha a cada 5 semanas; já passaram 10"*). **💬 Mensagem** abre o WhatsApp com um texto pessoal e um link de marcação; se o cliente marcar por esse link, a receita aparece em **Receita recuperada**. **Dispensar** esconde o cliente 6 meses. Depois de contactado, não volta a ser sugerido durante 30 dias, e quem já tem marcação futura nunca aparece.
 - **Clientes**: visitas, pontos, gasto, progresso de fidelização; exportar CSV.
 - **Promoções / Galeria / Parcerias**: alimentam o site público em tempo real.
 - **Fidelização**: visitas para desconto, %, desconto de referido, penalização de não-comparência.

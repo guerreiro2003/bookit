@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.2.0 — 2026-09-16 · Movimento 2: clientes em risco → reativação → receita atribuída
+
+- **`retention-core.js`** (puro, 11 testes): ritmo de cada cliente = mediana do intervalo entre as visitas dele; sem histórico próprio usa o ritmo do serviço, depois do salão. Estados: *saudável · em risco (1,25×) · perdido (2,5×) · inativo (>1 ano) · agendado*. Quem já tem marcação futura **nunca** é sugerido.
+- **Identidade por telefone** em toda a retenção (bug corrigido: cliente que marcava como visitante e com conta contava como duas pessoas e partia a cadência ao meio).
+- **Painel "Reativar"** no admin: cartões com explicação em português (*"Vinha a cada 5 semanas; já passaram 10 semanas desde julho"*), valor real gasto nos últimos 12 meses, botão **💬 Mensagem** (WhatsApp com texto pessoal + link de marcação com token de atribuição) e **Dispensar** (6 meses). Arrefecimento de 30 dias evita insistência.
+- **Atribuição honesta**: a marcação feita pelo link guarda o token → `computeRecovered` separa *receita já paga* de *marcado por cobrar*, e mostra os *horários cancelados reocupados* como facto observado, **fora** da conta de receita recuperada.
+- Painel **Negócio** ganha o cartão "Receita recuperada"; ocupação com uma casa decimal abaixo de 10%.
+- Regras: coleção `reactivations` (PII, só equipa/admin), `reactivationToken` validado no create.
+- Toque em mobile: botões pequenos passam a 40px de altura.
+- Testes: `retention.e2e.mjs` (21, ciclo completo em produção), unit 33, rules 64, links 18, engine 33.
+
 ## 2.1.0 — 2026-09-15 · Movimento 1 (custo zero): rail de confirmação + origem
 
 - **Links de capacidade** por marcação (`manageToken`, projeção sem PII em `bookingLinks/{token}`): o cliente confirma ou cancela em `m.html` sem conta; as regras validam o token e libertam o horário atomicamente (`getAfter`), respeitando a janela de cancelamento.

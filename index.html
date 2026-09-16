@@ -228,6 +228,8 @@ const state = {
   slotsToken: 0,
   // Acquisition channel: ?src=ig|google|qr|wa|site … recorded on the booking (measure where clients come from)
   channel: (new URLSearchParams(window.location.search).get('src') || '').replace(/[^a-z0-9_-]/gi, '').slice(0, 40) || null,
+  // Attribution token from a reactivation message (?rt=…): proves this booking came from us.
+  reactivationToken: (new URLSearchParams(window.location.search).get('rt') || '').replace(/[^a-f0-9]/gi, '').slice(0, 64) || null,
 };
 
 (async function init() {
@@ -516,7 +518,7 @@ on('submit-booking', withLock('submit-booking', async () => {
     const res = await createBooking({
       salonId: state.salonId, salon: state.salon, ctx: state.ctx, service: state.selectedService,
       staff: state.selectedStaff, dateStr: state.selectedDate, startMin: state.selectedStart,
-      client, discount: state.discount, source: 'online', channel: state.channel,
+      client, discount: state.discount, source: 'online', channel: state.channel, reactivationToken: state.reactivationToken,
     });
     // Personal coupon → mark used (owner may shrink/flag their own coupons)
     if (state.discount && state.discount.type !== 'referral' && state.clientData) {

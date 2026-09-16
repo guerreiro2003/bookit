@@ -129,5 +129,57 @@ export function computeBaseline({ bookings, laterBookings = [], from, to, today,
   };
 }
 
+/* ── Recovered revenue (ATTRIBUTED) ───────────────────────── */
+const toMs = (v) => {
+  if (!v) return null;
+  if (typeof v.toMillis === 'function') return v.toMillis();
+  if (typeof v.seconds === 'number') return v.seconds * 1000;
+  const t = Date.parse(v); return Number.isFinite(t) ? t : null;
+};
+
+/**
+ * What the product actually brought in, counted from records — never estimated.
+ *
+ *  · recovered  → bookings created from a reactivation link (unique token per
+ *                 message). Cause and effect are observable: we sent, they clicked, they booked.
+ *  · refilled   → cancelled slots that were later taken by another booking on the
+ *                 same staff member and overlapping time, created after the cancellation.
+ *                 Reported as an observed fact, NOT as revenue we caused.
+ */
+export function computeRecovered({ bookings, reactivations = [], from, to }) {
+  const inRange = bookings.filter(b => b.date >= from && b.date <= to);
+
+  const tagged = inRange.filter(b => b.reactivationToken);
+  const live = tagged.filter(b => b.status !== 'cancelled');
+  const realised = live.filter(b => b.status === 'completed' && b.paid);
+  const upcoming = live.filter(b => ['pending', 'confirmed'].includes(b.status));
+  const fromMs = Date.parse(from + 'T00:00:00Z'), toMsEnd = Date.parse(to + 'T23:59:59Z');
+  const sent = reactivations.filter(r => r.kind !== 'dismissed' && (() => { const ms = toMs(r.sentAt); return ms == null || (ms >= fromMs && ms <= toMsEnd); })());
+
+  // Cancelled slots that were taken by someone else afterwards.
+  const cancelled = inRange.filter(b => b.status === 'cancelled' && b.staffId && Number.isFinite(b.startMin));
+  const active = inRange.filter(b => ['pending', 'confirmed', 'completed', 'noshow'].includes(b.status));
+  let refilledCount = 0, refilledValue = 0;
+  for (const c of cancelled) {
+    const cMs = toMs(c.cancelledAt);
+    const taker = active.find(x => x.staffId === c.staffId && x.date === c.date
+      && Number.isFinite(x.startMin) && x.startMin < (c.endMin ?? c.startMin) && (c.startMin ?? 0) < (x.endMin ?? x.startMin)
+      && (cMs == null || (toMs(x.createdAt) ?? 0) >= cMs));
+    if (taker) { refilledCount++; refilledValue += Number(taker.finalPrice ?? taker.servicePrice) || 0; }
+  }
+
+  const sum = (list) => Math.round(list.reduce((a, b) => a + (Number(b.finalPrice ?? b.servicePrice) || 0), 0) * 100) / 100;
+  return {
+    sent: sent.length,
+    booked: live.length,
+    bookingRate: sent.length ? live.length / sent.length : null,
+    revenueRealised: sum(realised),      // already paid
+    revenueUpcoming: sum(upcoming),      // booked, not yet paid
+    realisedCount: realised.length, upcomingCount: upcoming.length,
+    refilled: { count: refilledCount, value: Math.round(refilledValue * 100) / 100, cancelled: cancelled.length },
+    bookings: live.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)),
+  };
+}
+
 export const pct = (r, digits = 0) => r == null ? '—' : `${(r * 100).toFixed(digits)}%`;
 export const eur = (n) => n == null ? '—' : `${(Math.round(n * 100) / 100).toLocaleString('pt-PT', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}€`;
