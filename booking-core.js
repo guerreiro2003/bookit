@@ -104,38 +104,109 @@ export function resolveDayWindow({ salonSchedule, staff, dateStr, closedDates = 
   return { closed: false, open, close, breaks };
 }
 
+/* ── Services: active work vs processing gaps ─────────────── */
+/** Hard cap per booking. Also the number of price checks the security rules do. */
+export const MAX_SERVICES_PER_BOOKING = 3;
+
+/**
+ * A service is a sequence of segments. Colour is the classic case:
+ *   aplicar 20min (active) · atuar 30min (gap) · lavar e acabar 25min (active)
+ * During a gap the STAFF MEMBER IS FREE and can serve another client — that is
+ * where a salon gets extra sellable hours out of the same day.
+ * A plain service with no segments is one active block of `duration`.
+ */
+export function normaliseSegments(service) {
+  const raw = Array.isArray(service?.segments) ? service.segments : [];
+  const segs = raw
+    .map(s => ({ type: s?.type === 'gap' ? 'gap' : 'active', minutes: Math.round(Number(s?.minutes) || 0) }))
+    .filter(s => s.minutes > 0);
+  if (segs.length && segs.some(s => s.type === 'active')) return segs;
+  const d = Math.round(Number(service?.duration) || 0);
+  return d > 0 ? [{ type: 'active', minutes: d }] : [];
+}
+export const segmentsDuration = (segs) => segs.reduce((a, s) => a + s.minutes, 0);
+/** Does this service keep the chair busy the whole time? */
+export const hasGap = (service) => normaliseSegments(service).some(s => s.type === 'gap');
+
+/**
+ * Lay out 1..N services back to back for one visit.
+ * @returns {{ span:number, busy:{start,end}[], price:number, duration:number }}
+ *   span  — total wall-clock the client is in the salon
+ *   busy  — blocks (relative to 0) where the staff member is actually occupied
+ */
+export function layoutServices(services) {
+  const list = (services || []).filter(Boolean);
+  const busy = [];
+  let t = 0, price = 0;
+  for (const s of list) {
+    price += Number(s.price) || 0;
+    for (const seg of normaliseSegments(s)) {
+      if (seg.type === 'active') {
+        const last = busy[busy.length - 1];
+        if (last && last.end === t) last.end = t + seg.minutes;   // merge touching active blocks
+        else busy.push({ start: t, end: t + seg.minutes });
+      }
+      t += seg.minutes;
+    }
+  }
+  return { span: t, busy, price: Math.round(price * 100) / 100, duration: t };
+}
+
+/** Normalise the two ways callers describe a visit: a plain duration, or a layout. */
+function asLayout({ duration, span, busy }) {
+  if (Array.isArray(busy) && busy.length) return { span: span ?? duration ?? 0, busy };
+  const d = span ?? duration ?? 0;
+  return { span: d, busy: d > 0 ? [{ start: 0, end: d }] : [] };
+}
+/** Absolute busy blocks for a visit starting at `start`. */
+export const busyAt = (start, layout) => layout.busy.map(b => ({ start: start + b.start, end: start + b.end }));
+
 /* ── Slot generation ──────────────────────────────────────── */
 /**
  * Generate bookable start times (minutes) for one staff member on one day.
+ * Only the ACTIVE blocks must be free: a processing gap may sit on top of a
+ * break or another client's appointment.
  * @param {object} p
  * @param {number} p.open, p.close      working window (minutes)
  * @param {Array}  p.breaks             [{start,end}]
- * @param {number} p.duration           service duration (minutes)
+ * @param {number} [p.duration]         simple service duration (minutes)
+ * @param {number} [p.span]             total wall-clock of the visit
+ * @param {Array}  [p.busy]             relative busy blocks [{start,end}] (from layoutServices)
  * @param {number} p.interval           slot grid (minutes), e.g. 15
- * @param {Array}  p.occupied           existing intervals [{start,end}] (any status that blocks)
- * @param {number|null} p.notBefore     earliest allowed start (minutes) — lead-time cutoff for "today"; null = no cutoff
+ * @param {Array}  p.occupied           blocks already taken [{start,end}]
+ * @param {number|null} p.notBefore     earliest allowed start — lead-time cutoff for "today"
  */
-export function generateSlots({ open, close, breaks = [], duration, interval = 15, occupied = [], notBefore = null }) {
-  const out = [];
-  if (!(duration > 0) || !(interval > 0) || close <= open) return out;
+export function generateSlots({ open, close, breaks = [], duration, span, busy, interval = 15, occupied = [], notBefore = null, alignToGaps = true }) {
+  const layout = asLayout({ duration, span, busy });
+  if (!(layout.span > 0) || !(interval > 0) || close <= open) return [];
   const blocked = [...breaks, ...occupied];
-  for (let s = open; s + duration <= close; s += interval) {
-    if (notBefore != null && s < notBefore) continue;
-    const iv = { start: s, end: s + duration };
-    if (overlapsAny(iv, blocked)) continue;
-    out.push(s);
+
+  const candidates = new Set();
+  for (let s = open; s + layout.span <= close; s += interval) candidates.add(s);
+  // Exact-fit starts: the moment a block ends is a real opportunity. Without
+  // these, a 30-minute hole between two appointments can be unbookable simply
+  // because it does not line up with the 15-minute grid.
+  if (alignToGaps) {
+    for (const b of blocked) {
+      if (b.end >= open && b.end + layout.span <= close) candidates.add(b.end);
+    }
   }
-  return out;
+
+  return [...candidates].sort((a, b) => a - b).filter(s => {
+    if (notBefore != null && s < notBefore) return false;
+    return !busyAt(s, layout).some(iv => overlapsAny(iv, blocked));
+  });
 }
 
-/** Is a specific [start, start+duration) bookable? Returns null if OK or a reason code. */
-export function checkSlot({ window, duration, start, occupied = [], notBefore = null }) {
+/** Is a specific visit starting at `start` bookable? Returns null if OK, else a reason code. */
+export function checkSlot({ window, duration, span, busy, start, occupied = [], notBefore = null }) {
   if (window.closed) return window.reason || 'closed';
-  if (start < window.open || start + duration > window.close) return 'outside-hours';
+  const layout = asLayout({ duration, span, busy });
+  if (start < window.open || start + layout.span > window.close) return 'outside-hours';
   if (notBefore != null && start < notBefore) return 'too-soon';
-  const iv = { start, end: start + duration };
-  if (overlapsAny(iv, window.breaks)) return 'break';
-  if (overlapsAny(iv, occupied)) return 'slot-taken';
+  const abs = busyAt(start, layout);
+  if (abs.some(iv => overlapsAny(iv, window.breaks || []))) return 'break';
+  if (abs.some(iv => overlapsAny(iv, occupied))) return 'slot-taken';
   return null;
 }
 
@@ -229,8 +300,27 @@ export function googleCalendarUrl({ title, details = '', location = '', dateStr,
 
 /* ── Agenda doc helpers ───────────────────────────────────── */
 export const agendaId = (staffId, dateStr) => `${staffId}__${dateStr}`;
+
+/**
+ * Occupied blocks for a staff member on a day.
+ *
+ * The agenda is keyed BY BOOKING — `byBooking: { [bookingId]: { blocks:[…] } }` —
+ * so a security rule can demand that a write touches only its own booking's key.
+ * The old flat `intervals[]` shape is still read (legacy documents).
+ */
 export function occupiedFromAgenda(agendaData, excludeBookingId = null) {
-  return (agendaData?.intervals || [])
+  if (!agendaData) return [];
+  if (agendaData.byBooking && typeof agendaData.byBooking === 'object') {
+    const out = [];
+    for (const [bookingId, entry] of Object.entries(agendaData.byBooking)) {
+      if (bookingId === excludeBookingId) continue;
+      for (const b of (entry?.blocks || [])) {
+        if (Number.isFinite(b?.start) && Number.isFinite(b?.end)) out.push({ start: b.start, end: b.end });
+      }
+    }
+    return out;
+  }
+  return (agendaData.intervals || [])
     .filter(iv => iv && iv.bookingId !== excludeBookingId)
     .map(iv => ({ start: iv.start, end: iv.end }));
 }

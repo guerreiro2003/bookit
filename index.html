@@ -61,10 +61,14 @@
 
       <section id="screenServices" aria-labelledby="title1">
         <p class="eyebrow" style="margin-bottom: var(--s-2)">Passo 1 de 5</p>
-        <h1 class="section-title" id="title1">Escolhe um <em class="serif italic" style="color:var(--brand);font-weight:400">serviço</em></h1>
+        <h1 class="section-title" id="title1">O que queres <em class="serif italic" style="color:var(--brand);font-weight:400">fazer</em>?</h1>
         <p class="section-sub" id="salonTagline">A carregar…</p>
         <div class="select-list" id="servicesList">
           <div class="loading-state"><span class="spinner spinner--lg" aria-hidden="true"></span><div class="mt-3">A carregar serviços…</div></div>
+        </div>
+        <div class="picked-bar" id="pickedBar" hidden>
+          <div class="picked-bar__info" id="pickedInfo"></div>
+          <button class="btn btn--primary" type="button" data-action="go-to" data-step="2">Continuar →</button>
         </div>
       </section>
 
@@ -214,12 +218,13 @@ import {
   salonSetting, planActive, nowInTimezone, addDaysStr, resolveDayWindow,
   loadBookingContext, computeAvailability, createBooking, minToTime,
   validateBookingInput, applyDiscount, clampStr,
+  layoutServices, MAX_SERVICES_PER_BOOKING,
 } from './app.js';
 
 const state = {
   salon: null, salonId: getSalonId(), ctx: { schedule: null, staff: [] },
   services: [], promotions: [],
-  selectedService: null, selectedStaff: null,
+  selectedServices: [], selectedStaff: null,
   selectedDate: null, selectedStart: null,      // 'YYYY-MM-DD', minutes
   calYear: 0, calMonth: 0,                       // month being displayed
   today: null, maxDate: null,
@@ -311,8 +316,9 @@ function renderServices() {
   }
   list.innerHTML = state.services.map(s => {
     const savings = s.isPackage && s.originalPrice ? Math.max(0, Number(s.originalPrice) - Number(s.price)) : 0;
+    const on = state.selectedServices.includes(s.id);
     return htmlMix`
-      <button class="select-item" type="button" data-action="pick-service" data-id="${s.id}">
+      <button class="select-item ${raw(on ? 'selected' : '')}" type="button" data-action="pick-service" data-id="${s.id}" aria-pressed="${raw(String(on))}">
         <div class="select-item__main">
           <div class="select-item__name">${s.name}</div>
           <div class="select-item__desc">${s.duration} min${s.description ? ' · ' + s.description : ''}${s.includes ? ' · Inclui: ' + s.includes : ''}</div>
@@ -326,14 +332,33 @@ function renderServices() {
         </div>
       </button>`;
   }).join('');
+  renderPickedBar();
+}
+
+/** The chosen services, in the order the client picked them. */
+function pickedServices() { return state.selectedServices.map(id => state.services.find(s => s.id === id)).filter(Boolean); }
+
+function renderPickedBar() {
+  const bar = $('#pickedBar'), list = pickedServices();
+  bar.hidden = list.length === 0;
+  if (!list.length) return;
+  const l = layoutServices(list);
+  const names = list.map(s => s.name).join(' + ');
+  $('#pickedInfo').innerHTML = htmlMix`<strong>${names}</strong>${l.span} min · ${formatPrice(l.price)}`;
 }
 
 on('pick-service', (el) => {
   if (!planActive(state.salon)) return toast('Este salão não está a aceitar marcações online.');
-  state.selectedService = state.services.find(s => s.id === el.dataset.id);
+  const id = el.dataset.id;
+  if (state.selectedServices.includes(id)) state.selectedServices = state.selectedServices.filter(x => x !== id);
+  else if (state.selectedServices.length >= MAX_SERVICES_PER_BOOKING) return toast(`Podes escolher no máximo ${MAX_SERVICES_PER_BOOKING} serviços. Para mais, fala com o salão.`);
+  else state.selectedServices.push(id);
+  // Toggle just this card: re-rendering the whole list would drop focus and scroll.
+  const on = state.selectedServices.includes(id);
+  el.classList.toggle('selected', on);
+  el.setAttribute('aria-pressed', String(on));
   state.selectedStart = null; $('#btnDateNext').disabled = true;
-  $$('.select-item').forEach(o => o.classList.toggle('selected', o === el));
-  setTimeout(() => goTo(2), 220);
+  renderPickedBar();
 });
 
 function renderStaff() {
@@ -406,7 +431,7 @@ async function loadTimeslots() {
   list.innerHTML = '<div class="loading-state" style="grid-column:1/-1;padding:var(--s-5) 0"><span class="spinner" aria-hidden="true"></span></div>';
   const token = ++state.slotsToken;
   try {
-    const { slots, window } = await computeAvailability({ salonId: state.salonId, salon: state.salon, ctx: state.ctx, service: state.selectedService, staff: state.selectedStaff, dateStr });
+    const { slots, window } = await computeAvailability({ salonId: state.salonId, salon: state.salon, ctx: state.ctx, services: pickedServices(), staff: state.selectedStaff, dateStr });
     if (token !== state.slotsToken) return; // a newer request superseded this one
     if (window?.closed) {
       const msg = { 'staff-time-off': 'Colaborador de férias neste dia.', 'staff-day-off': 'Colaborador de folga neste dia.', 'salon-closed-date': 'Salão encerrado nesta data.' }[window.reason] || 'Fechado neste dia.';
@@ -434,7 +459,7 @@ on('go-to', (el) => goTo(+el.dataset.step));
 on('back-to', (el) => goTo(+el.dataset.step));
 
 function goTo(step) {
-  if (step === 2 && !state.selectedService) return toast('Escolhe um serviço.');
+  if (step === 2 && !state.selectedServices.length) return toast('Escolhe pelo menos um serviço.');
   if (step === 4 && (!state.selectedDate || state.selectedStart == null)) return toast('Escolhe data e hora.');
   if (step === 5) {
     const v = validateBookingInput({ name: $('#clientName').value, email: $('#clientEmail').value, phone: $('#clientPhone').value, date: state.selectedDate, time: minToTime(state.selectedStart), notes: $('#clientNotes').value, forSomeone: $('#forSomeone').value });
@@ -459,12 +484,13 @@ function updateStepper(current) {
 }
 
 function fillConfirmation() {
-  const s = state.selectedService;
+  const list = pickedServices(), l = layoutServices(list);
   const [y, m, d] = state.selectedDate.split('-').map(Number);
-  $('#confirmService').textContent = s.name;
+  $('#confirmService').textContent = list.map(s => s.name).join(' + ');
   $('#confirmDate').textContent = `${d} de ${MONTHS_FULL[m - 1]} de ${y}`;
   $('#confirmTime').textContent = minToTime(state.selectedStart);
-  $('#confirmDuration').textContent = `${s.duration} min`;
+  const work = l.busy.reduce((a, b) => a + (b.end - b.start), 0);
+  $('#confirmDuration').textContent = `${l.span} min${work < l.span ? ` (inclui ${l.span - work} min de espera)` : ''}`;
   $('#confirmName').textContent = $('#clientName').value.trim();
   const emailVal = $('#clientEmail').value.trim();
   $('#confirmEmailRow').hidden = !emailVal;
@@ -483,7 +509,8 @@ async function checkDiscountCode() {
   const code = $('#referralCode').value.trim().toUpperCase();
   const wrap = $('#discountInfo'), desc = $('#discountDesc'), title = $('#discountTitle');
   state.discount = null;
-  $('#confirmPrice').textContent = formatPrice(state.selectedService.price);
+  const basePrice = layoutServices(pickedServices()).price;
+  $('#confirmPrice').textContent = formatPrice(basePrice);
   if (!code) { wrap.hidden = true; return; }
   wrap.hidden = false; title.textContent = 'Código';
   try {
@@ -502,7 +529,7 @@ async function checkDiscountCode() {
       state.discount = { type: 'referral', code, percent: salonSetting(state.salon, 'referralDiscount'), title: 'Código de amigo' };
       title.textContent = 'Desconto aplicado'; desc.textContent = `Código de amigo válido · ${state.discount.percent}% de desconto`;
     }
-    $('#confirmPrice').textContent = formatPrice(applyDiscount(state.selectedService.price, state.discount.percent));
+    $('#confirmPrice').textContent = formatPrice(applyDiscount(basePrice, state.discount.percent));
   } catch (e) { console.error(e); desc.textContent = 'Não foi possível validar o código agora.'; }
 }
 
@@ -516,7 +543,7 @@ on('submit-booking', withLock('submit-booking', async () => {
   };
   try {
     const res = await createBooking({
-      salonId: state.salonId, salon: state.salon, ctx: state.ctx, service: state.selectedService,
+      salonId: state.salonId, salon: state.salon, ctx: state.ctx, services: pickedServices(),
       staff: state.selectedStaff, dateStr: state.selectedDate, startMin: state.selectedStart,
       client, discount: state.discount, source: 'online', channel: state.channel, reactivationToken: state.reactivationToken,
     });
@@ -526,8 +553,8 @@ on('submit-booking', withLock('submit-booking', async () => {
       await updateDoc(doc(db, 'salons', state.salonId, 'clients', state.clientData.id), { discounts: updated }).catch(console.error);
     }
     const params = new URLSearchParams({
-      salon: state.salonId, id: res.id, service: state.selectedService.name, date: state.selectedDate, time: res.time,
-      duration: String(state.selectedService.duration), price: String(res.finalPrice), name: clampStr(client.name, 80), staff: res.staff.name,
+      salon: state.salonId, id: res.id, service: pickedServices().map(s => s.name).join(' + '), date: state.selectedDate, time: res.time,
+      duration: String(layoutServices(pickedServices()).span), price: String(res.finalPrice), name: clampStr(client.name, 80), staff: res.staff.name,
       t: res.manageToken,
     });
     window.location.href = `success.html?${params.toString()}`;

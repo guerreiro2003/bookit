@@ -104,6 +104,9 @@ service cloud.firestore {
           && request.resource.data.get('active', true) is bool
           && optStr(request.resource.data.get('description', null), 300)
           && optStr(request.resource.data.get('includes', null), 300)
+          // Optional processing segments (e.g. colour: apply · process · finish)
+          && request.resource.data.get('segments', []) is list
+          && request.resource.data.get('segments', []).size() <= 6
         ));
       }
       match /staff/{id} {
@@ -177,37 +180,55 @@ service cloud.firestore {
         allow delete: if isAdmin(salonId);
       }
 
-      /* ───────────── agenda: per staff / per day occupancy (no PII) ───────────── */
+      /* ───────────── agenda: per staff / per day occupancy (no PII) ─────────────
+         Keyed BY BOOKING: byBooking = { <bookingId>: { blocks: [{start,end}…] } }.
+         A booking may hold several blocks (a colour leaves the chair free while
+         it processes). Keying by booking lets a rule demand that a write touches
+         ONLY its own booking — with a flat list, a caller could rewrite the whole
+         day as long as the element count matched.                                */
       match /agenda/{agendaDoc} {
         function validAgenda() {
           return str(request.resource.data.staffId, 128)
               && validDate(request.resource.data.date)
-              && request.resource.data.intervals is list
+              && request.resource.data.byBooking is map
+              && request.resource.data.byBooking.keys().size() <= 60
               && agendaDoc == request.resource.data.staffId + '__' + request.resource.data.date;
         }
-        // A client cancelling through their capability link may remove exactly
-        // their own interval, and only if that booking ends up cancelled in the
-        // same transaction (getAfter). Nothing else on the agenda may change.
+        function oldMap() { return resource.data.get('byBooking', {}); }
+        function newMap() { return request.resource.data.byBooking; }
+        function touched() { return newMap().diff(oldMap()).affectedKeys(); }
+        // Exactly one entry changed AND the entry count grew by one → a pure addition.
+        function addsOneEntry()  { return touched().size() == 1 && newMap().keys().size() == oldMap().keys().size() + 1; }
+        // Exactly that booking's entry changed AND the count dropped by one → a pure removal.
+        function removesOnly(bid) { return touched().hasOnly([bid]) && touched().size() == 1
+                                        && newMap().keys().size() == oldMap().keys().size() - 1; }
+        // The booking being freed must really end up cancelled in this same
+        // request, and the caller must hold that booking's own token.
         function tokenRelease() {
           let bid = request.resource.data.get('viaBookingId', '');
           let bk = get(/databases/$(database)/documents/salons/$(salonId)/bookings/$(bid)).data;
-          let iv = { 'start': bk.startMin, 'end': bk.endMin, 'bookingId': bid };
           return bid != ''
               && bk.get('manageToken', '') != ''
               && request.resource.data.get('viaToken', '') == bk.manageToken
               && getAfter(/databases/$(database)/documents/salons/$(salonId)/bookings/$(bid)).data.status == 'cancelled'
-              && request.resource.data.intervals.size() == resource.data.intervals.size() - 1
-              && resource.data.intervals.hasAny([iv])
-              && !request.resource.data.intervals.hasAny([iv]);
+              && removesOnly(bid);
+        }
+        function ownerRelease() {
+          let bid = request.resource.data.get('viaBookingId', '');
+          return isAuth() && bid != ''
+              && ownsBooking(get(/databases/$(database)/documents/salons/$(salonId)/bookings/$(bid)).data)
+              && getAfter(/databases/$(database)/documents/salons/$(salonId)/bookings/$(bid)).data.status == 'cancelled'
+              && removesOnly(bid);
         }
         allow get: if true;               // availability is computed from direct gets (staffId__date)
         allow list: if isStaff(salonId);
-        allow create: if validAgenda() && (isStaff(salonId) || (planActive(salonId) && request.resource.data.intervals.size() == 1));
+        allow create: if validAgenda() && (isStaff(salonId) || (planActive(salonId) && request.resource.data.byBooking.keys().size() == 1));
         allow update: if validAgenda() && (
              isStaff(salonId)
-          || (planActive(salonId) && request.resource.data.intervals.size() == resource.data.intervals.size() + 1)  // public booking adds one
-          || (isAuth() && request.resource.data.intervals.size() == resource.data.intervals.size() - 1)             // signed-in client cancel frees one
-          || tokenRelease()                                                                                          // link-holder cancel frees their own
+          // A public booking may add exactly its own new entry, nothing else.
+          || ( planActive(salonId) && addsOneEntry() )
+          || tokenRelease()
+          || ownerRelease()
         );
         allow delete: if isAdmin(salonId);
       }
@@ -255,7 +276,7 @@ service cloud.firestore {
       /* ───────────── bookings ───────────── */
       match /bookings/{id} {
         function d() { return request.resource.data; }
-        function svc() { return get(/databases/$(database)/documents/salons/$(salonId)/services/$(d().serviceId)).data; }
+        function svc(id) { return get(/databases/$(database)/documents/salons/$(salonId)/services/$(id)).data; }
         function validShape() {
           return str(d().clientName, 80) && d().clientName.size() >= 2
               && optStr(d().get('clientEmail', null), 120)
@@ -271,18 +292,29 @@ service cloud.firestore {
               && str(d().serviceId, 128) && str(d().serviceName, 80)
               && d().paid == false;
         }
-        // Money is pinned to the catalogue: base price must equal the real
-        // service price, final price within [50%, 100%] of it.
+        // Money is pinned to the catalogue. A visit may combine up to 3 services
+        // (corte + cor + tratamento); price and duration must equal the sum of
+        // the real catalogue entries, and the final price stays within [50%,100%].
         function honestPrice() {
-          return exists(/databases/$(database)/documents/salons/$(salonId)/services/$(d().serviceId))
-              && d().servicePrice == svc().price
-              && svc().get('active', true) == true
+          let ids = d().get('serviceIds', []);
+          let n = ids.size();
+          return ids is list && n >= 1 && n <= 3
+              && d().serviceId == ids[0]
+              && exists(/databases/$(database)/documents/salons/$(salonId)/services/$(ids[0]))
+              && svc(ids[0]).get('active', true) == true
+              && d().servicePrice == (n == 1 ? svc(ids[0]).price
+                                    : n == 2 ? svc(ids[0]).price + svc(ids[1]).price
+                                             : svc(ids[0]).price + svc(ids[1]).price + svc(ids[2]).price)
+              && d().serviceDuration == (n == 1 ? svc(ids[0]).duration
+                                       : n == 2 ? svc(ids[0]).duration + svc(ids[1]).duration
+                                                : svc(ids[0]).duration + svc(ids[1]).duration + svc(ids[2]).duration)
               && d().finalPrice is number
               && d().finalPrice >= d().servicePrice * 0.5
               && d().finalPrice <= d().servicePrice;
         }
         function frozenForStaff() {
           return d().serviceId == resource.data.serviceId
+              && d().get('serviceIds', []) == resource.data.get('serviceIds', [])
               && d().servicePrice == resource.data.servicePrice
               && d().get('clientEmail', '') == resource.data.get('clientEmail', '')
               && (resource.data.get('clientId', null) == null || d().get('clientId', null) == resource.data.get('clientId', null))

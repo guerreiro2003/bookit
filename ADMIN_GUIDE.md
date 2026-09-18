@@ -13,7 +13,9 @@ Público: operador do Book It (quem vende/instala) e dono do salão.
 
 ## B. Primeiro dia no painel (`admin.html`)
 O cartão de onboarding guia os 4 passos:
-1. **Serviços & preços** — nome, preço, duração (a duração é o que bloqueia a agenda). "Pacote" mostra preço original riscado.
+1. **Serviços & preços** — nome, preço e **duração: és tu que decides quanto tempo leva cada coisa**. A duração é o que bloqueia a agenda.
+   - **Tem tempo de espera**: para coloração, permanente e afins, marca a caixa e indica *trabalho inicial · espera · trabalho final* (ex.: 20 · 30 · 25). Durante a espera o colaborador fica livre e o sistema **encaixa lá outra cliente** — é assim que ganhas horas no dia sem trabalhar mais.
+   - "Pacote" mostra preço original riscado.
 2. **Equipa** — adiciona colaboradores (foto opcional). Cada um pode ter **horário próprio** (ex.: só tardes) e **férias/indisponibilidades**.
 3. **Horários** — horário semanal, **pausa** (ex.: almoço) e **datas encerradas** (feriados, férias do salão).
 4. **Configurações** — dados do salão, cor, e as regras das marcações online:
@@ -39,7 +41,7 @@ Entra com a **password da equipa**. Vê o dia, confirma, regista pagamentos, mar
 **Rotina de fim de dia (2 minutos):** no cartão **Por confirmar (hoje e amanhã)** carrega em **💬 WhatsApp** em cada marcação — abre a conversa com a mensagem pronta e um link onde o cliente confirma ou cancela sozinho. Se o cliente confirmar pelo link, a marcação passa a *Confirmada* automaticamente; se responder "1", carrega em **Confirmar**. As marcações não confirmadas até à hora são as que mais faltam: dá-lhes prioridade. O admin pode entrar no mesmo portal com as suas credenciais (aba "Admin") e vê também o separador Clientes.
 
 ## E. O cliente final
-- Marca em `/?salon=<slug>` sem conta: serviço → colaborador → data/hora (só horários livres) → telemóvel (email opcional) → confirmar. Recebe uma página com **.ics / Google Calendar** e o **link de gestão** (`m.html?s=…&t=…`) para confirmar presença ou cancelar dentro da janela do salão. Não há email automático (ver `functions/README.md`); a confirmação faz-se pelo WhatsApp da equipa.
+- Marca em `/?salon=<slug>` sem conta: **um ou mais serviços** (até 3 — corte + cor + tratamento; o tempo e o preço somam-se) → colaborador → data/hora (só horários livres) → telemóvel (email opcional) → confirmar. Recebe uma página com **.ics / Google Calendar** e o **link de gestão** (`m.html?s=…&t=…`) para confirmar presença ou cancelar dentro da janela do salão. Não há email automático (ver `functions/README.md`); a confirmação faz-se pelo WhatsApp da equipa.
 - Para medir de onde vêm os clientes, partilha o link com origem: `/?salon=<slug>&src=ig` (Instagram), `&src=google` (perfil Google), `&src=qr` (balcão), `&src=site`.
 - Com conta (`account.html`): vê estado das marcações, cancela dentro da janela permitida, pontos e cupões, código de amigo, exporta ou apaga os seus dados.
 
@@ -48,4 +50,6 @@ Entra com a **password da equipa**. Vê o dia, confirma, regista pagamentos, mar
 - **Feriado.** Horários → Datas encerradas.
 - **Cliente quer cancelar em cima da hora.** O cliente não consegue online; a equipa cancela no portal.
 - **Alterar a duração de um serviço** afeta apenas marcações futuras; as existentes mantêm a duração com que foram criadas.
+- **A cliente quer corte e coloração.** Escolhe os dois no passo 1 — o sistema soma o tempo e o preço. Não é preciso criar um serviço "corte + coloração".
+- **Emitir faturas.** O Book It não emite faturas (exige software certificado pela AT). Continua a usar o que já tens; ver `FATURACAO.md`.
 - **Ver marcações antigas** (mais de 500): Marcações → filtrar por data.

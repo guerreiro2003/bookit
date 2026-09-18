@@ -4,7 +4,7 @@
 
 import {
   db, auth, doc, getDoc, getDocs, collection, query, where, limit, increment, serverTimestamp,
-  runTransaction, onSnapshot, updateDoc, setDoc, deleteDoc, writeBatch
+  runTransaction, onSnapshot, updateDoc, setDoc, deleteDoc, deleteField, writeBatch
 } from './firebase.js';
 import {
   timeToMin, minToTime, isValidDateStr, nowInTimezone, resolveDayWindow, generateSlots, checkSlot,
@@ -12,6 +12,7 @@ import {
   isEmail, isPhone, isHexColor, isSlug, clampStr, validateBookingInput, applyDiscount,
   buildICS, googleCalendarUrl, addDaysStr, weekdayOf, WEEKDAY_KEYS as CORE_WEEKDAY_KEYS,
   normalizePhone, formatPhonePT, randomToken, manageUrl, whatsAppUrl, firstName, dateLabelPT, messageText,
+  layoutServices, normaliseSegments, segmentsDuration, hasGap, busyAt, MAX_SERVICES_PER_BOOKING,
 } from './booking-core.js';
 
 // Re-export the pure core so pages import everything from one place.
@@ -21,6 +22,7 @@ export {
   isEmail, isPhone, isHexColor, isSlug, clampStr, validateBookingInput, applyDiscount,
   buildICS, googleCalendarUrl, addDaysStr, weekdayOf,
   normalizePhone, formatPhonePT, randomToken, manageUrl, whatsAppUrl, firstName, dateLabelPT, messageText,
+  layoutServices, normaliseSegments, segmentsDuration, hasGap, busyAt, MAX_SERVICES_PER_BOOKING,
 };
 
 /** Public origin of the app (for links sent to clients). */
@@ -457,7 +459,9 @@ export async function loadOccupied(salonId, staffIds, dateStr, excludeBookingId 
  * unioning every active staff member's free slots.
  * @returns {{ slots: number[], perStaff: Map<string, number[]>, window: object|null }}
  */
-export async function computeAvailability({ salonId, salon, ctx, service, staff, dateStr, excludeBookingId = null }) {
+export async function computeAvailability({ salonId, salon, ctx, service, services, staff, dateStr, excludeBookingId = null }) {
+  const layout = layoutServices(services?.length ? services : [service]);
+  if (!(layout.span > 0)) return { slots: [], perStaff: new Map(), window: null };
   const tz = salonSetting(salon, 'timezone');
   const now = nowInTimezone(tz);
   const lead = salonSetting(salon, 'bookingLeadMinutes');
@@ -473,7 +477,7 @@ export async function computeAvailability({ salonId, salon, ctx, service, staff,
     const window = resolveDayWindow({ salonSchedule: ctx.schedule, staff: s, dateStr, closedDates: salon.closedDates || [] });
     if (window.closed) { perStaff.set(s.id, []); if (!windowForDisplay) windowForDisplay = window; continue; }
     windowForDisplay = window;
-    perStaff.set(s.id, generateSlots({ ...window, duration: service.duration, interval, occupied: occ.get(s.id) || [], notBefore }));
+    perStaff.set(s.id, generateSlots({ ...window, span: layout.span, busy: layout.busy, interval, occupied: occ.get(s.id) || [], notBefore }));
   }
   const union = [...new Set([...perStaff.values()].flat())].sort((a, b) => a - b);
   return { slots: union, perStaff, window: windowForDisplay };
@@ -484,10 +488,14 @@ export async function computeAvailability({ salonId, salon, ctx, service, staff,
  * candidate free at that time is assigned — so every booking ends up with a real
  * staff member and the agenda stays consistent.
  */
-export async function createBooking({ salonId, salon, ctx, service, staff, dateStr, startMin, client, discount, source = 'online', status = 'pending', channel = null, reactivationToken = null }) {
+export async function createBooking({ salonId, salon, ctx, service, services, staff, dateStr, startMin, client, discount, source = 'online', status = 'pending', channel = null, reactivationToken = null }) {
   if (!isValidDateStr(dateStr)) throw err('invalid-date');
-  if (!(service && service.id && service.duration > 0)) throw err('invalid-service');
-  const duration = Number(service.duration);
+  const list = (services?.length ? services : (service ? [service] : [])).filter(s => s && s.id);
+  if (!list.length) throw err('invalid-service');
+  if (list.length > MAX_SERVICES_PER_BOOKING) throw err('too-many-services');
+  const layout = layoutServices(list);
+  if (!(layout.span > 0)) throw err('invalid-service');
+  const duration = layout.span;
   const tz = salonSetting(salon, 'timezone');
   const now = nowInTimezone(tz);
   const lead = source === 'online' ? salonSetting(salon, 'bookingLeadMinutes') : 0;
@@ -499,7 +507,7 @@ export async function createBooking({ salonId, salon, ctx, service, staff, dateS
   if (!candidates.length) throw err('no-staff-available');
 
   const bookingRef = doc(collection(db, 'salons', salonId, 'bookings'));
-  const finalPrice = discount?.percent ? applyDiscount(service.price, discount.percent) : Number(service.price);
+  const finalPrice = discount?.percent ? applyDiscount(layout.price, discount.percent) : layout.price;
   const manageToken = randomToken(16);
   const phoneE164 = normalizePhone(client.phone);
 
@@ -512,8 +520,8 @@ export async function createBooking({ salonId, salon, ctx, service, staff, dateS
     // the slot is indeed gone, report it honestly as slot-taken.
     if (e?.code === 'permission-denied' && !auth.currentUser) {
       const occ = await loadOccupied(salonId, candidates.map(s => s.id), dateStr);
-      const iv = { start: startMin, end: startMin + duration };
-      const allBusy = candidates.every(s => (occ.get(s.id) || []).some(o => o.start < iv.end && iv.start < o.end));
+      const mine = busyAt(startMin, layout);
+      const allBusy = candidates.every(s => (occ.get(s.id) || []).some(o => mine.some(iv => o.start < iv.end && iv.start < o.end)));
       if (allBusy) throw err(staff ? 'slot-taken' : 'no-staff-available');
     }
     throw e;
@@ -530,7 +538,7 @@ export async function createBooking({ salonId, salon, ctx, service, staff, dateS
       const s = candidates[i];
       const window = resolveDayWindow({ salonSchedule: ctx.schedule, staff: s, dateStr, closedDates: salon.closedDates || [] });
       const occupied = snaps[i].exists() ? occupiedFromAgenda(snaps[i].data()) : [];
-      const reason = checkSlot({ window, duration, start: startMin, occupied, notBefore });
+      const reason = checkSlot({ window, span: layout.span, busy: layout.busy, start: startMin, occupied, notBefore });
       if (!reason) { chosen = s; chosenSnap = snaps[i]; break; }
       reasons.push(reason);
     }
@@ -542,10 +550,9 @@ export async function createBooking({ salonId, salon, ctx, service, staff, dateS
     }
 
     // ── writes ──
-    const interval = { start: startMin, end: startMin + duration, bookingId: bookingRef.id };
     const aRef = agendaRef(salonId, chosen.id, dateStr);
-    if (chosenSnap.exists()) tx.update(aRef, { intervals: [...(chosenSnap.data().intervals || []), interval], updatedAt: serverTimestamp() });
-    else tx.set(aRef, { staffId: chosen.id, date: dateStr, intervals: [interval], updatedAt: serverTimestamp() });
+    if (chosenSnap.exists()) tx.update(aRef, { [`byBooking.${bookingRef.id}`]: { blocks: busyAt(startMin, layout) }, updatedAt: serverTimestamp() });
+    else tx.set(aRef, { staffId: chosen.id, date: dateStr, byBooking: { [bookingRef.id]: { blocks: busyAt(startMin, layout) } }, updatedAt: serverTimestamp() });
 
     const bookingDoc = {
       salonId,
@@ -554,7 +561,14 @@ export async function createBooking({ salonId, salon, ctx, service, staff, dateS
       clientPhone: clampStr(client.phone, 20), clientPhoneE164: phoneE164,
       forSomeone: client.forSomeone ? clampStr(client.forSomeone, 80) : null,
       notes: clampStr(client.notes, 500),
-      serviceId: service.id, serviceName: service.name, serviceDuration: duration, servicePrice: Number(service.price),
+      // Multi-service visit. The summary fields (serviceId/Name/Price/Duration)
+      // stay for compatibility: id = first service, price/duration = totals.
+      services: list.map(s => ({ id: s.id, name: s.name, price: Number(s.price) || 0, duration: Math.round(Number(s.duration) || 0), segments: normaliseSegments(s) })),
+      serviceIds: list.map(s => s.id),
+      serviceId: list[0].id,
+      serviceName: list.map(s => s.name).join(' + '),
+      serviceDuration: duration, servicePrice: layout.price,
+      busyBlocks: layout.busy,              // relative to the start; used when rescheduling
       finalPrice,
       discountType: discount?.type || null, discountCode: discount?.code || null,
       referralCode: discount?.type === 'referral' ? discount.code : null,
@@ -602,9 +616,9 @@ export async function cancelBookingByToken({ salonId, salon, token }) {
   const aRef = agendaRef(salonId, l.staffId, l.date);
   return await runTransaction(db, async (tx) => {
     const aSnap = await tx.get(aRef);                 // agenda is public-read; the booking itself is not
-    const intervals = (aSnap.exists() ? aSnap.data().intervals || [] : []).filter(iv => iv.bookingId !== l.bookingId);
     tx.update(doc(db, 'salons', salonId, 'bookings', l.bookingId), { status: 'cancelled', cancelledAt: serverTimestamp(), cancelledBy: 'client-link', viaToken: token });
-    if (aSnap.exists()) tx.update(aRef, { intervals, viaToken: token, viaBookingId: l.bookingId, updatedAt: serverTimestamp() });
+    // Delete only this booking's own key — the rules enforce exactly that.
+    if (aSnap.exists()) tx.update(aRef, { [`byBooking.${l.bookingId}`]: deleteField(), viaToken: token, viaBookingId: l.bookingId, updatedAt: serverTimestamp() });
     tx.update(linkRef(salonId, token), { status: 'cancelled', updatedAt: serverTimestamp() });
     return { ok: true };
   });
@@ -678,11 +692,27 @@ export async function deleteReactivation({ salonId, token }) {
   await deleteDoc(doc(db, 'salons', salonId, 'reactivations', token));
 }
 
-/** Remove a booking's interval from its agenda doc (inside a transaction). */
+/** Remove a booking from its agenda doc (inside a transaction). */
 function releaseInterval(tx, aSnap, aRef, bookingId) {
   if (!aSnap.exists()) return;
-  const intervals = (aSnap.data().intervals || []).filter(iv => iv.bookingId !== bookingId);
-  tx.update(aRef, { intervals, updatedAt: serverTimestamp() });
+  const d = aSnap.data();
+  // `viaBookingId` tells the security rules WHICH booking is being freed, so a
+  // client cancelling their own appointment can be allowed without giving anyone
+  // the power to touch the rest of the day.
+  if (d.byBooking && bookingId in d.byBooking) tx.update(aRef, { [`byBooking.${bookingId}`]: deleteField(), viaBookingId: bookingId, updatedAt: serverTimestamp() });
+  else if (Array.isArray(d.intervals)) tx.update(aRef, { intervals: d.intervals.filter(iv => iv.bookingId !== bookingId), viaBookingId: bookingId, updatedAt: serverTimestamp() }); // legacy doc
+}
+/** Write a booking's busy blocks into an agenda doc (creating it if needed). */
+function holdInterval(tx, aSnap, aRef, { staffId, date, bookingId, blocks }) {
+  if (aSnap.exists()) tx.update(aRef, { [`byBooking.${bookingId}`]: { blocks }, updatedAt: serverTimestamp() });
+  else tx.set(aRef, { staffId, date, byBooking: { [bookingId]: { blocks } }, updatedAt: serverTimestamp() });
+}
+/** The busy blocks of an existing booking, relative to its start (legacy-safe). */
+function bookingLayout(b) {
+  const start = b.startMin ?? timeToMin(b.time) ?? 0;
+  const span = (b.endMin != null ? b.endMin - start : null) ?? b.serviceDuration ?? 30;
+  const busy = Array.isArray(b.busyBlocks) && b.busyBlocks.length ? b.busyBlocks : [{ start: 0, end: span }];
+  return { start, span, busy };
 }
 
 /** Cancel (admin/team/client). Frees the slot atomically. */
@@ -716,14 +746,13 @@ export async function restoreBooking({ salonId, bookingId, toStatus = null }) {
     const b = bSnap.data();
     const target = toStatus || b.previousStatus || 'pending';
     if (b.status !== 'cancelled' || !canTransition('cancelled', target)) throw err('invalid-transition');
-    const start = b.startMin ?? timeToMin(b.time), end = b.endMin ?? (start + (b.serviceDuration || 30));
+    const { start, busy } = bookingLayout(b);
+    const mine = busyAt(start, { busy });
     const aRef = agendaRef(salonId, b.staffId, b.date);
     const aSnap = await tx.get(aRef);
     const occupied = aSnap.exists() ? occupiedFromAgenda(aSnap.data(), bookingId) : [];
-    if (occupied.some(o => o.start < end && start < o.end)) throw err('slot-taken');
-    const interval = { start, end, bookingId };
-    if (aSnap.exists()) tx.update(aRef, { intervals: [...(aSnap.data().intervals || []).filter(i => i.bookingId !== bookingId), interval], updatedAt: serverTimestamp() });
-    else tx.set(aRef, { staffId: b.staffId, date: b.date, intervals: [interval], updatedAt: serverTimestamp() });
+    if (occupied.some(o => mine.some(iv => o.start < iv.end && iv.start < o.end))) throw err('slot-taken');
+    holdInterval(tx, aSnap, aRef, { staffId: b.staffId, date: b.date, bookingId, blocks: mine });
     tx.update(bRef, { status: target, cancelledAt: null, cancelledBy: null, previousStatus: null, restoredAt: serverTimestamp() });
     syncLink(tx, salonId, bookingId, b, { status: target });
     return { ok: true, status: target };
@@ -739,7 +768,8 @@ export async function rescheduleBooking({ salonId, salon, ctx, bookingId, newDat
     if (!bSnap.exists()) throw err('booking-not-found');
     const b = bSnap.data();
     if (!BLOCKING_STATUSES.includes(b.status)) throw err('invalid-transition');
-    const duration = b.serviceDuration || 30;
+    const { span, busy } = bookingLayout(b);
+    const duration = span;
     const staff = newStaff || ctx.staff.find(s => s.id === b.staffId) || { id: b.staffId, name: b.staffName };
     const oldRef = agendaRef(salonId, b.staffId, b.date);
     const newRef = agendaRef(salonId, staff.id, newDate);
@@ -749,18 +779,15 @@ export async function rescheduleBooking({ salonId, salon, ctx, bookingId, newDat
 
     const window = resolveDayWindow({ salonSchedule: ctx.schedule, staff, dateStr: newDate, closedDates: salon.closedDates || [] });
     const occupied = newSnap.exists() ? occupiedFromAgenda(newSnap.data(), bookingId) : [];
-    const reason = checkSlot({ window, duration, start: newStartMin, occupied, notBefore: null });
+    const reason = checkSlot({ window, span, busy, start: newStartMin, occupied, notBefore: null });
     if (reason) throw err(reason);
 
-    const interval = { start: newStartMin, end: newStartMin + duration, bookingId };
+    const blocks = busyAt(newStartMin, { busy });
     if (same) {
-      const rest = (oldSnap.exists() ? oldSnap.data().intervals || [] : []).filter(i => i.bookingId !== bookingId);
-      if (oldSnap.exists()) tx.update(oldRef, { intervals: [...rest, interval], updatedAt: serverTimestamp() });
-      else tx.set(oldRef, { staffId: staff.id, date: newDate, intervals: [interval], updatedAt: serverTimestamp() });
+      holdInterval(tx, oldSnap, oldRef, { staffId: staff.id, date: newDate, bookingId, blocks });
     } else {
       releaseInterval(tx, oldSnap, oldRef, bookingId);
-      if (newSnap.exists()) tx.update(newRef, { intervals: [...(newSnap.data().intervals || []), interval], updatedAt: serverTimestamp() });
-      else tx.set(newRef, { staffId: staff.id, date: newDate, intervals: [interval], updatedAt: serverTimestamp() });
+      holdInterval(tx, newSnap, newRef, { staffId: staff.id, date: newDate, bookingId, blocks });
     }
     tx.update(bRef, {
       date: newDate, time: minToTime(newStartMin), startMin: newStartMin, endMin: newStartMin + duration,

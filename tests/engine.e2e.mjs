@@ -10,7 +10,7 @@
  * reschedule (same and different staff), client cancellation policy.
  * Everything it creates is cleaned up. Env vars as in rules.integration.mjs.
  */
-import { db, auth, doc, getDoc, getDocs, updateDoc, deleteDoc, collection, query, where, signInWithEmailAndPassword, signOut } from '../firebase.js';
+import { db, auth, doc, getDoc, getDocs, updateDoc, deleteDoc, deleteField, collection, query, where, signInWithEmailAndPassword, signOut } from '../firebase.js';
 import {
   loadSalon, loadBookingContext, computeAvailability, createBooking, cancelBooking, restoreBooking, rescheduleBooking,
   confirmBooking, markBookingPaid, markBookingNoShow, timeToMin, minToTime, addDaysStr, nowInTimezone, salonSetting, agendaId,
@@ -26,8 +26,16 @@ let pass = 0, fail = 0; const created = new Set();
 const ok = (name, cond, detail = '') => { if (cond) { pass++; console.log(`  ✓ ${name}`); } else { fail++; console.log(`  ✗ ${name} ${detail}`); } };
 const expectErr = async (name, fn, code) => { try { await fn(); ok(name, false, `(expected error ${code}, got success)`); } catch (e) { ok(name, e.code === code || e.message === code, `(expected ${code}, got ${e.code || e.message})`); } };
 const nextOpen = (days) => { let d = new Date(Date.now() + days * 86400000); while (d.getUTCDay() === 0) d = new Date(d.getTime() + 86400000); return d.toISOString().slice(0, 10); };
-const guest = (n) => ({ id: null, name: `E2E-TEST ${n}`, email: `e2e-${n}@example.com`, phone: '912345678', notes: 'teste automático', forSomeone: '' });
-const agendaOf = async (staffId, date) => { const s = await getDoc(doc(db, 'salons', SALON, 'agenda', agendaId(staffId, date))); return s.exists() ? s.data().intervals : []; };
+// A unique phone per guest: identity is the phone number, so sharing one would
+// merge every test guest into a single client record.
+let guestSeq = 0;
+const guest = (n) => ({ id: null, name: `E2E-TEST ${n}`, email: `e2e-${n}@example.com`, phone: `91${String(2000000 + (++guestSeq))}`, notes: 'teste automático', forSomeone: '' });
+/** Flattens the by-booking agenda back into [{start,end,bookingId}] for assertions. */
+const agendaOf = async (staffId, date) => {
+  const s = await getDoc(doc(db, 'salons', SALON, 'agenda', agendaId(staffId, date)));
+  const by = s.exists() ? (s.data().byBooking || {}) : {};
+  return Object.entries(by).flatMap(([bookingId, e]) => (e?.blocks || []).map(b => ({ ...b, bookingId })));
+};
 
 const salon = await loadSalon(SALON);
 const ctx = await loadBookingContext(SALON);
@@ -155,9 +163,13 @@ for (const id of created) {
   try { await cancelBooking({ salonId: SALON, bookingId: id, by: 'admin' }); } catch {}
   await deleteDoc(doc(db, 'salons', SALON, 'bookings', id)).catch(() => {});
 }
+// cancelBooking already frees the agenda; sweep any entry left behind by a failed step.
 for (const s of ctx.staff) for (const d of [D1, D2, D3, addDaysStr(now.dateStr, 1)]) {
   const ref = doc(db, 'salons', SALON, 'agenda', agendaId(s.id, d)); const snap = await getDoc(ref);
-  if (snap.exists()) { const left = (snap.data().intervals || []).filter(iv => !created.has(iv.bookingId)); if (left.length !== (snap.data().intervals || []).length) await updateDoc(ref, { intervals: left }); }
+  if (!snap.exists()) continue;
+  const by = snap.data().byBooking || {};
+  const stale = Object.keys(by).filter(id => created.has(id));
+  if (stale.length) await updateDoc(ref, Object.fromEntries(stale.map(id => [`byBooking.${id}`, deleteField()])));
 }
 await signOut(auth);
 console.log(`\n${pass} passed, ${fail} failed\n`);

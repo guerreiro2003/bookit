@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.3.0 — 2026-09-18 · Vários serviços por marcação e tempo de espera
+
+**O dono define os tempos.** Cada serviço tem a duração que o dono decidir e, opcionalmente, fases: *trabalho inicial · espera · trabalho final* (ex.: coloração 20+30+25).
+
+- **Tempo de espera liberta o colaborador.** Durante a espera da cor, a agenda considera o colaborador livre e **outra cliente cabe lá dentro** — verificado em produção: coloração às 10:00 e corte às 10:20 com o mesmo colaborador.
+- **Encaixe exato**: o gerador de horários passou a oferecer o início de cada buraco (antes, uma pausa de 30 min entre 10:20 e 10:50 era inutilizável porque a grelha só dava 10:15 e 10:30).
+- **Até 3 serviços por marcação** (corte + cor + tratamento): duração e preço somam-se, a agenda bloqueia só os blocos de trabalho. Cliente escolhe vários no passo 1; admin idem na marcação nova.
+- **Agenda reestruturada por marcação** (`byBooking`) — fecha uma falha real: as regras validavam pelo *número* de intervalos, por isso era possível reescrever a agenda do dia inteiro desde que a contagem batesse. Agora uma escrita só pode tocar na sua própria marcação (testado).
+- `scripts/migrate-agenda.mjs` migra o formato antigo (32 documentos migrados no demo).
+- Regras: preço e duração validados contra a soma real do catálogo (1 a 3 serviços); mais de 3 é recusado.
+- Correção: `cancelBooking` não identificava a marcação ao libertar a agenda, o que passou a ser exigido pelas novas regras.
+- Correção: identidade por telefone nos testes (vários visitantes partilhavam o mesmo número).
+- `FATURACAO.md` — posição sobre faturação certificada e caminho de integração.
+- Testes: unit 45, regras 70, motor 33, links 18, retenção 21, concorrência OK.
+
 ## 2.2.0 — 2026-09-16 · Movimento 2: clientes em risco → reativação → receita atribuída
 
 - **`retention-core.js`** (puro, 11 testes): ritmo de cada cliente = mediana do intervalo entre as visitas dele; sem histórico próprio usa o ritmo do serviço, depois do salão. Estados: *saudável · em risco (1,25×) · perdido (2,5×) · inativo (>1 ano) · agendado*. Quem já tem marcação futura **nunca** é sugerido.

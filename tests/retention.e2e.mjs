@@ -41,7 +41,9 @@ for (const back of [140, 105, 70]) {
   const id = `RETTEST-${back}-${Date.now().toString(36)}`;
   await setDoc(doc(db, 'salons', SALON, 'bookings', id), {
     salonId: SALON, clientId: null, clientName: 'RET-TEST Ana', clientEmail: '', clientPhone: '919 000 777', clientPhoneE164: PHONE,
-    serviceId: service.id, serviceName: service.name, serviceDuration: 45, servicePrice: 35, finalPrice: 35,
+    serviceIds: [service.id], serviceId: service.id, serviceName: service.name, serviceDuration: 45, servicePrice: 35, finalPrice: 35,
+    services: [{ id: service.id, name: service.name, price: 35, duration: 45, segments: [{ type: 'active', minutes: 45 }] }],
+    busyBlocks: [{ start: 0, end: 45 }],
     staffId: S.id, staffName: S.name, date, time: '10:00', startMin: 600, endMin: 645,
     status: 'confirmed', paid: false, source: 'admin', manageToken: null, createdAt: new Date(),
   });

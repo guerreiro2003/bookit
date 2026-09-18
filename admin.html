@@ -412,7 +412,7 @@
         <div class="grid-2">
           <div class="field"><label for="svcName">Nome *</label><input type="text" id="svcName" required placeholder="Ex: Corte + Brushing" /></div>
           <div class="field"><label for="svcPrice">Preço (€) *</label><input type="number" id="svcPrice" required min="0" step="0.5" placeholder="35" /></div>
-          <div class="field"><label for="svcDuration">Duração (min) *</label><input type="number" id="svcDuration" required min="5" step="5" placeholder="45" /></div>
+          <div class="field"><label for="svcDuration">Duração total (min) *</label><input type="number" id="svcDuration" required min="5" max="600" step="5" placeholder="45" /><div class="field__hint" id="svcDurationHint">Quanto tempo o cliente fica no salão. És tu que decides.</div></div>
           <div class="field"><label for="svcType">Tipo</label>
             <select id="svcType">
               <option value="single">Serviço individual</option>
@@ -421,6 +421,22 @@
           </div>
         </div>
         <div class="field"><label for="svcDesc">Descrição (opcional)</label><input type="text" id="svcDesc" placeholder="Ex: A partir de" /></div>
+
+        <div class="field" style="border:1px solid var(--border);border-radius:var(--r-md);padding:var(--s-4);background:var(--bg-2)">
+          <label class="flex" style="gap:8px;align-items:flex-start;cursor:pointer;margin:0">
+            <input type="checkbox" id="svcHasGap" style="margin-top:3px" />
+            <span>
+              <strong>Tem tempo de espera</strong> (ex.: coloração, permanente)
+              <span class="field__hint" style="margin-top:2px">Durante a espera o colaborador fica livre e pode atender outra pessoa. É assim que ganhas horas no dia.</span>
+            </span>
+          </label>
+          <div id="svcGapFields" hidden class="grid-3" style="margin-top:var(--s-4)">
+            <div class="field" style="margin-bottom:0"><label for="svcSeg1">Trabalho inicial (min)</label><input type="number" id="svcSeg1" min="5" max="600" step="5" placeholder="20" /><div class="field__hint">Aplicar</div></div>
+            <div class="field" style="margin-bottom:0"><label for="svcSegGap">Espera (min)</label><input type="number" id="svcSegGap" min="5" max="600" step="5" placeholder="30" /><div class="field__hint">Colaborador livre</div></div>
+            <div class="field" style="margin-bottom:0"><label for="svcSeg2">Trabalho final (min)</label><input type="number" id="svcSeg2" min="0" max="600" step="5" placeholder="25" /><div class="field__hint">Lavar e acabar</div></div>
+          </div>
+          <p class="text-sm" id="svcGapSummary" hidden style="margin:var(--s-3) 0 0;color:var(--brand);font-weight:600"></p>
+        </div>
         <div id="packageFields" hidden>
           <div class="grid-2">
             <div class="field"><label for="svcOriginal">Preço original (€)</label><input type="number" id="svcOriginal" min="0" step="0.5" /></div>
@@ -798,10 +814,12 @@
         <div class="field"><label for="nbPhone">Telefone *</label><input type="tel" id="nbPhone" required /></div>
       </div>
       <div class="field"><label for="nbEmail">Email (opcional)</label><input type="email" id="nbEmail" /></div>
-      <div class="grid-2">
-        <div class="field"><label for="nbService">Serviço *</label><select id="nbService" required></select></div>
-        <div class="field"><label for="nbStaff">Colaborador</label><select id="nbStaff"><option value="">Sem preferência</option></select></div>
+      <div class="field">
+        <label>Serviços * <span class="text-muted text-sm" style="font-weight:400">(podes escolher até 3)</span></label>
+        <div id="nbServices" class="service-picker"></div>
+        <div class="field__hint" id="nbServicesSummary">Escolhe um ou mais serviços.</div>
       </div>
+      <div class="field"><label for="nbStaff">Colaborador</label><select id="nbStaff"><option value="">Sem preferência</option></select></div>
       <div class="field"><label for="nbDate">Data *</label><input type="date" id="nbDate" required /></div>
       <div class="field">
         <label>Horário livre *</label>
@@ -866,6 +884,7 @@ import {
   createBooking, computeAvailability, minToTime, timeToMin, isValidDateStr, BLOCKING_STATUSES,
   whatsAppFor, markMessageSent, addDaysStr, formatRelativeTime,
   loadRetention, logReactivation, deleteReactivation, reactivationLink, whatsAppUrl, randomToken, formatPhonePT,
+  layoutServices, normaliseSegments, hasGap, MAX_SERVICES_PER_BOOKING,
   downloadCSV, subscribe, trapFocus,
   isEmail, isPhone, isHexColor
 } from './app.js';
@@ -1333,8 +1352,13 @@ let releaseNbFocus = null;
 on('open-new-booking', () => {
   const o = $('#newBookingModal');
   $('#newBookingForm').reset();
-  $('#nbService').innerHTML = '<option value="">— escolhe —</option>' +
-    allServices.filter(s => s.active !== false).map(s => htmlMix`<option value="${s.id}">${s.name} · ${s.price}€ · ${s.duration}min</option>`).join('');
+  nbPicked = [];
+  $('#nbServices').innerHTML = allServices.filter(s => s.active !== false).map(s => htmlMix`
+    <button type="button" class="service-chip" data-action="nb-service" data-id="${s.id}">
+      <span class="service-chip__name">${s.name}</span>
+      <span class="service-chip__meta">${s.duration} min · ${formatPrice(s.price)}${raw(hasGap(s) ? ' · com espera' : '')}</span>
+    </button>`).join('');
+  renderNbSummary();
   $('#nbStaff').innerHTML = '<option value="">Sem preferência (atribui o primeiro livre)</option>' +
     allStaff.filter(s => s.active !== false).map(s => htmlMix`<option value="${s.id}">${s.name}</option>`).join('');
   $('#nbDate').value = todayForSalon(salon);
@@ -1346,25 +1370,45 @@ on('open-new-booking', () => {
   releaseNbFocus = trapFocus(o.querySelector('.modal'));
 });
 
+/* Several services in one visit: the owner's durations decide the total. */
+let nbPicked = [];
+function nbServices() { return nbPicked.map(id => allServices.find(s => s.id === id)).filter(Boolean); }
+function renderNbSummary() {
+  $$('#nbServices .service-chip').forEach(el => el.classList.toggle('selected', nbPicked.includes(el.dataset.id)));
+  const list = nbServices();
+  const hint = $('#nbServicesSummary');
+  if (!list.length) { hint.textContent = 'Escolhe um ou mais serviços.'; return; }
+  const l = layoutServices(list);
+  const work = l.busy.reduce((a, b) => a + (b.end - b.start), 0);
+  hint.textContent = `${list.length} serviço(s) · ${l.span} min no salão${work < l.span ? ` (${work} min de trabalho, ${l.span - work} min de espera)` : ''} · ${formatPrice(l.price)}`;
+}
+on('nb-service', (el) => {
+  const id = el.dataset.id;
+  if (nbPicked.includes(id)) nbPicked = nbPicked.filter(x => x !== id);
+  else if (nbPicked.length >= MAX_SERVICES_PER_BOOKING) return toast(`No máximo ${MAX_SERVICES_PER_BOOKING} serviços por marcação.`);
+  else nbPicked.push(id);
+  renderNbSummary(); renderNbSlots();
+});
+
 /* Slot picker: the admin sees exactly what is really free (same engine as the public page). */
 let nbSlotsToken = 0;
 async function renderNbSlots() {
   const box = $('#nbSlots'); $('#nbTime').value = '';
-  const serviceId = $('#nbService').value, staffId = $('#nbStaff').value, date = $('#nbDate').value;
-  const service = allServices.find(s => s.id === serviceId);
-  if (!service || !isValidDateStr(date)) { box.innerHTML = '<div class="slot-picker__empty">Escolhe o serviço e a data para ver horários livres.</div>'; return; }
+  const staffId = $('#nbStaff').value, date = $('#nbDate').value;
+  const services = nbServices();
+  if (!services.length || !isValidDateStr(date)) { box.innerHTML = '<div class="slot-picker__empty">Escolhe os serviços e a data para ver horários livres.</div>'; return; }
   box.innerHTML = '<div class="slot-picker__empty"><span class="spinner" aria-hidden="true"></span></div>';
   const token = ++nbSlotsToken;
   try {
     const staff = staffId ? allStaff.find(s => s.id === staffId) : null;
-    const { slots, window } = await computeAvailability({ salonId, salon: { ...salon, bookingLeadMinutes: 0 }, ctx: bookingCtx, service, staff, dateStr: date });
+    const { slots, window } = await computeAvailability({ salonId, salon: { ...salon, bookingLeadMinutes: 0 }, ctx: bookingCtx, services, staff, dateStr: date });
     if (token !== nbSlotsToken) return;
     if (window?.closed) { box.innerHTML = `<div class="slot-picker__empty">${escapeHTML(friendlyError({ code: window.reason }, 'Fechado neste dia.'))}</div>`; return; }
     if (!slots.length) { box.innerHTML = '<div class="slot-picker__empty">Sem horários livres neste dia.</div>'; return; }
     box.innerHTML = slots.map(m => htmlMix`<button type="button" class="timeslot" data-action="nb-pick" data-min="${m}">${minToTime(m)}</button>`).join('');
   } catch (e) { console.error(e); box.innerHTML = `<div class="slot-picker__empty">${escapeHTML(friendlyError(e))}</div>`; }
 }
-['nbService','nbStaff','nbDate'].forEach(id => $('#' + id).addEventListener('change', renderNbSlots));
+['nbStaff','nbDate'].forEach(id => $('#' + id).addEventListener('change', renderNbSlots));
 on('nb-pick', (el) => {
   $('#nbTime').value = el.dataset.min;
   $$('#nbSlots .timeslot').forEach(b => b.classList.toggle('selected', b === el));
@@ -1383,12 +1427,12 @@ $('#newBookingForm').addEventListener('submit', withLock('nb', async (e) => {
   const clientName = $('#nbClient').value.trim();
   const clientPhone = $('#nbPhone').value.trim();
   const clientEmail = $('#nbEmail').value.trim();
-  const serviceId = $('#nbService').value;
+  const services = nbServices();
   const staffId = $('#nbStaff').value;
   const date = $('#nbDate').value;
   const startMin = $('#nbTime').value === '' ? null : Number($('#nbTime').value);
   const notes = $('#nbNotes').value.trim();
-  if (!clientName || !clientPhone || !serviceId || !date || startMin == null) {
+  if (!clientName || !clientPhone || !services.length || !date || startMin == null) {
     err.textContent = 'Preenche os campos obrigatórios e escolhe um horário livre.'; err.classList.add('show'); return;
   }
   if (!isPhone(clientPhone)) { err.textContent = 'Telefone inválido.'; err.classList.add('show'); return; }
@@ -1396,7 +1440,6 @@ $('#newBookingForm').addEventListener('submit', withLock('nb', async (e) => {
 
   $('#nbSubmit').disabled = true;
   try {
-    const s = allServices.find(x => x.id === serviceId);
     const staff = staffId ? allStaff.find(x => x.id === staffId) : null;
     // Link to an existing client record by email (admins can look clients up).
     let clientId = null;
@@ -1406,7 +1449,7 @@ $('#newBookingForm').addEventListener('submit', withLock('nb', async (e) => {
     }
     // Same atomic engine as the public page: the agenda transaction is the arbiter.
     const res = await createBooking({
-      salonId, salon: { ...salon, bookingLeadMinutes: 0 }, ctx: bookingCtx, service: s, staff, dateStr: date, startMin,
+      salonId, salon: { ...salon, bookingLeadMinutes: 0 }, ctx: bookingCtx, services, staff, dateStr: date, startMin,
       client: { id: clientId, name: clientName, email: clientEmail, phone: clientPhone, notes },
       discount: null, source: 'admin', status: 'confirmed',
     });
@@ -1815,8 +1858,8 @@ async function loadServices() {
             ${s.description ? raw(htmlMix`<br><span class="text-xs text-muted">${s.description}</span>`) : ''}
             ${s.includes ? raw(htmlMix`<br><span class="text-xs text-muted">Inclui: ${s.includes}</span>`) : ''}
           </td>
-          <td>${raw(s.isPackage ? '<span class="badge badge--green">Pacote</span>' : '<span class="badge badge--gray">Individual</span>')}</td>
-          <td class="tabular">${s.duration} min</td>
+          <td>${raw(s.isPackage ? '<span class="badge badge--green">Pacote</span>' : '<span class="badge badge--gray">Individual</span>')}${raw(hasGap(s) ? ' <span class="badge badge--blue" title="Liberta o colaborador durante a espera">com espera</span>' : '')}</td>
+          <td class="tabular">${s.duration} min${raw(hasGap(s) ? `<br><span class="text-xs text-muted">${normaliseSegments(s).filter(x => x.type === 'active').reduce((a, x) => a + x.minutes, 0)} min de trabalho</span>` : '')}</td>
           <td class="tabular"><strong>${s.price}€</strong>${s.isPackage && s.originalPrice ? raw(htmlMix`<br><span class="text-xs text-muted" style="text-decoration:line-through">${s.originalPrice}€</span>`) : ''}</td>
           <td>${raw(`<span class="badge ${s.active ? 'badge--green' : 'badge--gray'}">${s.active ? 'Ativo' : 'Inativo'}</span>`)}</td>
           <td class="actions">
@@ -1833,38 +1876,68 @@ async function loadServices() {
 
 $('#svcType').addEventListener('change', e => { $('#packageFields').hidden = e.target.value !== 'package'; });
 
+/* Processing gap: the owner decides the phases; total duration is their sum. */
+function syncGapFields() {
+  const on = $('#svcHasGap').checked;
+  $('#svcGapFields').hidden = !on;
+  $('#svcDuration').readOnly = on;
+  $('#svcDurationHint').textContent = on
+    ? 'Calculado a partir das fases abaixo.'
+    : 'Quanto tempo o cliente fica no salão. És tu que decides.';
+  if (!on) { $('#svcGapSummary').hidden = true; return; }
+  const a = parseInt($('#svcSeg1').value, 10) || 0;
+  const g = parseInt($('#svcSegGap').value, 10) || 0;
+  const b = parseInt($('#svcSeg2').value, 10) || 0;
+  const total = a + g + b;
+  if (total > 0) $('#svcDuration').value = total;
+  const sum = $('#svcGapSummary');
+  sum.hidden = !(a && g);
+  if (a && g) sum.textContent = `O cliente fica ${total} min; o colaborador só está ocupado ${a + b} min. Ficam ${g} min livres para outra pessoa.`;
+}
+['svcHasGap','svcSeg1','svcSegGap','svcSeg2'].forEach(id => $('#' + id).addEventListener('input', syncGapFields));
+$('#svcHasGap').addEventListener('change', syncGapFields);
+
 $('#serviceForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const name     = $('#svcName').value.trim();
   const price    = parseFloat($('#svcPrice').value);
-  const duration = parseInt($('#svcDuration').value, 10);
   const desc     = $('#svcDesc').value.trim();
   const isPackage= $('#svcType').value === 'package';
   const originalPrice = isPackage ? parseFloat($('#svcOriginal').value) || null : null;
   const includes = isPackage ? $('#svcIncludes').value.trim() : '';
-  if (!name || !(price >= 0) || !duration) return toast('Preenche nome, preço e duração.');
+
+  // Phases (optional). Total duration is always the sum the owner defined.
+  let segments = [], duration = parseInt($('#svcDuration').value, 10);
+  if ($('#svcHasGap').checked) {
+    const a = parseInt($('#svcSeg1').value, 10) || 0;
+    const g = parseInt($('#svcSegGap').value, 10) || 0;
+    const b = parseInt($('#svcSeg2').value, 10) || 0;
+    if (!(a > 0) || !(g > 0)) return toast('Indica o trabalho inicial e o tempo de espera.');
+    segments = [{ type: 'active', minutes: a }, { type: 'gap', minutes: g }];
+    if (b > 0) segments.push({ type: 'active', minutes: b });
+    duration = a + g + b;
+  }
+  if (!name || !(price >= 0) || !(duration >= 5)) return toast('Preenche nome, preço e duração (mínimo 5 min).');
+  if (duration > 600) return toast('Duração máxima: 600 minutos.');
+
+  const payload = { name, price, duration, segments, description: desc, isPackage, originalPrice, includes };
   try {
     if (editingServiceId) {
-      await updateDoc(doc(db,'salons',salonId,'services', editingServiceId), {
-        name, price, duration, description: desc, isPackage, originalPrice, includes,
-        updatedAt: serverTimestamp()
-      });
-      toastSuccess('Serviço atualizado.');
+      await updateDoc(doc(db,'salons',salonId,'services', editingServiceId), { ...payload, updatedAt: serverTimestamp() });
+      toastSuccess('Serviço atualizado. Aplica-se às marcações novas.');
     } else {
-      await addDoc(collection(db,'salons',salonId,'services'), {
-        name, price, duration, description: desc, isPackage, originalPrice, includes,
-        active: true, order: allServices.length + 1, createdAt: serverTimestamp()
-      });
+      await addDoc(collection(db,'salons',salonId,'services'), { ...payload, active: true, order: allServices.length + 1, createdAt: serverTimestamp() });
       toastSuccess('Serviço adicionado.');
     }
     resetServiceForm(); loadServices();
-  } catch (e) { console.error(e); toastError('Erro a guardar.'); }
+  } catch (e) { console.error(e); toastError(friendlyError(e, 'Erro a guardar.')); }
 });
 
 function resetServiceForm() {
   editingServiceId = null;
   $('#serviceForm').reset();
   $('#packageFields').hidden = true;
+  $('#svcHasGap').checked = false; syncGapFields();
   $('#svcFormTitle').textContent = 'Novo serviço';
   $('#svcSubmitBtn').textContent = 'Adicionar serviço';
   $('#svcCancelBtn').hidden = true;
@@ -1883,6 +1956,16 @@ on('edit-service', async (el) => {
     $('#svcOriginal').value = s.originalPrice || '';
     $('#svcIncludes').value = s.includes || '';
   }
+  const segs = Array.isArray(s.segments) ? s.segments : [];
+  const gap = segs.find(x => x.type === 'gap');
+  $('#svcHasGap').checked = !!gap;
+  if (gap) {
+    const actives = segs.filter(x => x.type === 'active');
+    $('#svcSeg1').value = actives[0]?.minutes || '';
+    $('#svcSegGap').value = gap.minutes || '';
+    $('#svcSeg2').value = actives[1]?.minutes || '';
+  } else { $('#svcSeg1').value = ''; $('#svcSegGap').value = ''; $('#svcSeg2').value = ''; }
+  syncGapFields();
   $('#svcFormTitle').textContent = 'Editar serviço';
   $('#svcSubmitBtn').textContent = 'Guardar alterações';
   $('#svcCancelBtn').hidden = false;

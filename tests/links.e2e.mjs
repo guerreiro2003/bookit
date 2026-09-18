@@ -16,7 +16,10 @@ let pass = 0, fail = 0; const created = [];
 const ok = (n, c, d = '') => { if (c) { pass++; console.log(`  ✓ ${n}`); } else { fail++; console.log(`  ✗ ${n} ${d}`); } };
 const expectErr = async (n, fn, code) => { try { await fn(); ok(n, false, `(expected ${code}, got success)`); } catch (e) { ok(n, e.code === code, `(expected ${code}, got ${e.code || e.message})`); } };
 const nextOpen = (days) => { let d = new Date(Date.now() + days * 86400000); while (d.getUTCDay() === 0) d = new Date(d.getTime() + 86400000); return d.toISOString().slice(0, 10); };
-const agendaOf = async (staffId, date) => ((await getDoc(doc(db, 'salons', SALON, 'agenda', agendaId(staffId, date)))).data()?.intervals || []);
+const agendaOf = async (staffId, date) => {
+  const by = (await getDoc(doc(db, 'salons', SALON, 'agenda', agendaId(staffId, date)))).data()?.byBooking || {};
+  return Object.entries(by).flatMap(([bookingId, e]) => (e?.blocks || []).map(b => ({ ...b, bookingId })));
+};
 
 const salon = await loadSalon(SALON);
 const ctx = await loadBookingContext(SALON);

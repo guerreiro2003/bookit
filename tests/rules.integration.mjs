@@ -41,12 +41,14 @@ const S1 = staff[0];
 const D1 = nextOpenDate(20), D2 = nextOpenDate(27);
 const booking = (over) => ({
   salonId: SALON, clientId: null, clientName: 'RULES-TEST visitante', clientEmail: 'rules-test@example.com', clientPhone: '912345678', clientPhoneE164: '351912345678',
-  forSomeone: null, notes: '', serviceId: SERVICE_ID, serviceName: service.name, serviceDuration: service.duration, servicePrice: service.price,
+  forSomeone: null, notes: '', serviceIds: [SERVICE_ID], serviceId: SERVICE_ID, serviceName: service.name, serviceDuration: service.duration, servicePrice: service.price,
   finalPrice: service.price, discountType: null, discountCode: null, referralCode: null, referralDiscount: 0,
   staffId: S1.id, staffName: S1.name, staffPreference: 'chosen', date: D1, time: '10:00', startMin: 600, endMin: 600 + service.duration,
   status: 'pending', paid: false, source: 'online', createdAt: new Date(), ...over,
 });
-const agendaDoc = (staffId, date, intervals) => ({ staffId, date, intervals, updatedAt: new Date() });
+const agendaDoc = (staffId, date, byBooking) => ({ staffId, date, byBooking, updatedAt: new Date() });
+const blocks = (s, e) => ({ blocks: [{ start: s, end: e }] });
+const service2 = (await listAll(null, `salons/${SALON}/services`)).find(s => s.id !== SERVICE_ID && s.active !== false);
 
 console.log(`\nRules integration — salon=${SALON} service=${service.name} staff=${S1.name} dates=${D1},${D2}\n`);
 
@@ -58,13 +60,23 @@ await expectStatus('clients NOT readable without auth', () => runQuery(null, `sa
 await expectStatus('referrals NOT listable without auth (codes not enumerable)', () => api('GET', `${FS}/salons/${SALON}/referrals?pageSize=1`, null), 403);
 await expectStatus('bookingLinks NOT listable without auth (tokens not enumerable)', () => api('GET', `${FS}/salons/${SALON}/bookingLinks?pageSize=1`, null), 403);
 
-const agendaId = `${S1.id}__${D1}`;
-await expectStatus('public creates agenda doc with exactly 1 interval', async () => { await createDocument(null, `salons/${SALON}/agenda`, agendaId, agendaDoc(S1.id, D1, [{ start: 600, end: 645, bookingId: 'rt1' }])); created.push(`salons/${SALON}/agenda/${agendaId}`); }, 200);
-await expectStatus('agenda doc GET-able without auth (availability)', () => api('GET', `${FS}/salons/${SALON}/agenda/${agendaId}`, null), 200);
-await expectStatus('public agenda id must match staffId__date', () => createDocument(null, `salons/${SALON}/agenda`, `${S1.id}__${D2}`, agendaDoc(S1.id, D1, [{ start: 600, end: 645, bookingId: 'x' }])), 403);
-await expectStatus('public may add ONE interval', () => patchDocument(null, `salons/${SALON}/agenda/${agendaId}`, agendaDoc(S1.id, D1, [{ start: 600, end: 645, bookingId: 'rt1' }, { start: 660, end: 705, bookingId: 'rt2' }]), { merge: false }), 200);
-await expectStatus('public may NOT add two intervals at once', () => patchDocument(null, `salons/${SALON}/agenda/${agendaId}`, agendaDoc(S1.id, D1, [{ start: 600, end: 645, bookingId: 'rt1' }, { start: 660, end: 705, bookingId: 'rt2' }, { start: 720, end: 765, bookingId: 'a' }, { start: 780, end: 825, bookingId: 'b' }]), { merge: false }), 403);
-await expectStatus('public may NOT remove intervals', () => patchDocument(null, `salons/${SALON}/agenda/${agendaId}`, agendaDoc(S1.id, D1, []), { merge: false }), 403);
+const agId = `${S1.id}__${D1}`;
+await expectStatus('public creates agenda doc with exactly one booking entry', async () => { await createDocument(null, `salons/${SALON}/agenda`, agId, agendaDoc(S1.id, D1, { rt1: blocks(600, 645) })); created.push(`salons/${SALON}/agenda/${agId}`); }, 200);
+await expectStatus('agenda doc GET-able without auth (availability)', () => api('GET', `${FS}/salons/${SALON}/agenda/${agId}`, null), 200);
+await expectStatus('public agenda id must match staffId__date', () => createDocument(null, `salons/${SALON}/agenda`, `${S1.id}__${D2}`, agendaDoc(S1.id, D1, { x: blocks(600, 645) })), 403);
+await expectStatus('public may add ONE booking entry', () => patchDocument(null, `salons/${SALON}/agenda/${agId}`, agendaDoc(S1.id, D1, { rt1: blocks(600, 645), rt2: blocks(660, 705) }), { merge: false }), 200);
+await expectStatus('public may NOT add two entries at once', () => patchDocument(null, `salons/${SALON}/agenda/${agId}`, agendaDoc(S1.id, D1, { rt1: blocks(600, 645), rt2: blocks(660, 705), a: blocks(720, 765), b: blocks(780, 825) }), { merge: false }), 403);
+await expectStatus('public may NOT remove someone else\'s entry', () => patchDocument(null, `salons/${SALON}/agenda/${agId}`, agendaDoc(S1.id, D1, { rt1: blocks(600, 645) }), { merge: false }), 403);
+await expectStatus('public may NOT rewrite another booking while adding its own', () => patchDocument(null, `salons/${SALON}/agenda/${agId}`, agendaDoc(S1.id, D1, { rt1: blocks(0, 1), rt2: blocks(660, 705), rt3: blocks(800, 830) }), { merge: false }), 403);
+await expectStatus('public may NOT wipe the day', () => patchDocument(null, `salons/${SALON}/agenda/${agId}`, agendaDoc(S1.id, D1, {}), { merge: false }), 403);
+// a booking with several services: price and duration must equal the catalogue sum
+const multi = (over) => booking({ serviceIds: [SERVICE_ID, service2.id], serviceName: `${service.name} + ${service2.name}`,
+  servicePrice: service.price + service2.price, serviceDuration: service.duration + service2.duration,
+  finalPrice: service.price + service2.price, endMin: 600 + service.duration + service2.duration, date: D2, time: '12:00', startMin: 720, ...over });
+await expectStatus('two services: correct sum accepted', async () => { const r = await createDocument(null, `salons/${SALON}/bookings`, null, multi({ endMin: 720 + service.duration + service2.duration })); created.push(`salons/${SALON}/bookings/${r.name.split('/').pop()}`); }, 200);
+await expectStatus('two services: inflated price rejected', () => createDocument(null, `salons/${SALON}/bookings`, null, multi({ servicePrice: 999, finalPrice: 999, endMin: 720 + service.duration + service2.duration })), 403);
+await expectStatus('two services: wrong duration rejected', () => createDocument(null, `salons/${SALON}/bookings`, null, multi({ serviceDuration: 15, endMin: 735 })), 403);
+await expectStatus('more than 3 services rejected', () => createDocument(null, `salons/${SALON}/bookings`, null, multi({ serviceIds: [SERVICE_ID, service2.id, SERVICE_ID, service2.id], endMin: 720 + service.duration + service2.duration })), 403);
 
 let b1;
 await expectStatus('public creates a valid online booking', async () => { b1 = (await createDocument(null, `salons/${SALON}/bookings`, null, booking({}))).name.split('/').pop(); created.push(`salons/${SALON}/bookings/${b1}`); }, 200);
