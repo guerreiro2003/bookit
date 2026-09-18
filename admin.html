@@ -100,6 +100,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
         <span>Fidelização</span>
       </button>
+      <button class="sidebar__link" type="button" data-action="show-panel" data-panel="import">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>Importar</span>
+      </button>
       <button class="sidebar__link" type="button" data-action="show-panel" data-panel="settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         <span>Configurações</span>
@@ -683,6 +687,49 @@
       </form>
     </section>
 
+    <section class="panel" id="panel-import">
+      <h1 class="page-title">Importar dados</h1>
+      <p class="page-sub mb-5">Traz os teus clientes e o histórico de visitas do software que usavas. Nada é gravado antes de veres o resultado.</p>
+
+      <div class="card mb-4">
+        <div class="card__head"><div><div class="card__title">1. Escolhe o ficheiro</div><div class="card__sub">CSV exportado do teu software ou do Excel (Ficheiro → Guardar como → CSV).</div></div></div>
+        <div class="flex" style="gap:10px;align-items:center;flex-wrap:wrap">
+          <label class="btn btn--primary" style="cursor:pointer;margin:0">
+            <span>📄 Escolher ficheiro CSV</span>
+            <input type="file" id="impFile" accept=".csv,text/csv,text/plain" hidden />
+          </label>
+          <span class="text-sm text-muted" id="impFileName">Nenhum ficheiro escolhido</span>
+        </div>
+        <details style="margin-top:var(--s-4)">
+          <summary class="text-sm" style="cursor:pointer;color:var(--fg-2)">Que colunas deve ter?</summary>
+          <div class="text-sm text-muted" style="padding-top:var(--s-3);line-height:1.6">
+            <p style="margin:0 0 6px"><strong>Clientes:</strong> <code>Nome · Telemóvel · Email · Aniversário</code></p>
+            <p style="margin:0 0 6px"><strong>Histórico de visitas</strong> (é isto que faz o Book It saber quem desapareceu): <code>Data · Hora · Cliente · Telemóvel · Serviço · Valor · Profissional</code></p>
+            <p style="margin:0">Reconhecemos os nomes das colunas automaticamente. Datas em <code>dd/mm/aaaa</code> e valores com vírgula (<code>35,00 €</code>) funcionam.</p>
+          </div>
+        </details>
+      </div>
+
+      <div id="impResult" hidden>
+        <div class="card mb-4">
+          <div class="card__head"><div><div class="card__title">2. Confere antes de gravar</div><div class="card__sub" id="impKind"></div></div></div>
+          <div class="stats" id="impStats"></div>
+          <div id="impWarnings"></div>
+          <div class="table-scroll" style="max-height:320px;margin-top:var(--s-4)"><table class="data-table data-table--compact" id="impPreview"></table></div>
+        </div>
+        <div class="card">
+          <div class="card__head"><div><div class="card__title">3. Importar</div><div class="card__sub" id="impActionSub"></div></div></div>
+          <div class="flex" style="gap:10px;align-items:center;flex-wrap:wrap">
+            <button class="btn btn--primary" type="button" data-action="imp-run" id="impRunBtn">Importar agora</button>
+            <button class="btn" type="button" data-action="imp-cancel">Cancelar</button>
+            <span class="text-sm text-muted" id="impProgress"></span>
+          </div>
+          <div class="progress mt-3" id="impProgressBar" hidden><div class="progress__fill" id="impProgressFill" style="width:0%"></div></div>
+          <p class="text-sm text-muted mt-3" style="margin-bottom:0">As visitas importadas ficam marcadas como concluídas e não ocupam a agenda — são passado. Se importares o mesmo ficheiro outra vez, os registos são atualizados, não duplicados.</p>
+        </div>
+      </div>
+    </section>
+
     <section class="panel" id="panel-settings">
       <h1 class="page-title">Configurações</h1>
       <p class="page-sub mb-5">Informações gerais do salão</p>
@@ -884,6 +931,7 @@ import {
   createBooking, computeAvailability, minToTime, timeToMin, isValidDateStr, BLOCKING_STATUSES,
   whatsAppFor, markMessageSent, addDaysStr, formatRelativeTime,
   loadRetention, logReactivation, deleteReactivation, reactivationLink, whatsAppUrl, randomToken, formatPhonePT,
+  loadImportContext, runImport,
   layoutServices, normaliseSegments, hasGap, MAX_SERVICES_PER_BOOKING,
   downloadCSV, subscribe, trapFocus,
   isEmail, isPhone, isHexColor
@@ -891,6 +939,7 @@ import {
 
 import { computeBaseline, computeRecovered, pct, eur } from './metrics-core.js';
 import { buildClientProfiles, reactivationCandidates, retentionSummary, explain, reactivationMessage, RISK } from './retention-core.js';
+import { analyseImport } from './import-core.js';
 
 /** Bookings currently known to this page, by id (dashboard, list, day filter). */
 const bookingIndex = new Map();
@@ -1515,6 +1564,102 @@ on('confirm-reschedule', withLock('reschedule', async () => {
     bookingsByDateCache = { date: null, rows: [] };
     document.querySelector('[data-action="close-reschedule"]').click();
   } catch (e) { console.error(e); err.textContent = friendlyError(e, 'Não foi possível reagendar.'); err.classList.add('show'); renderRsSlots(); }
+}));
+
+/* ── IMPORTAR ────────────────────────────────────────────── */
+let impAnalysis = null;
+
+$('#impFile').addEventListener('change', async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  $('#impFileName').textContent = `${file.name} · ${Math.max(1, Math.round(file.size / 1024))} KB`;
+  if (file.size > 8 * 1024 * 1024) return toastError('Ficheiro demasiado grande (máx. 8 MB).');
+  try {
+    const text = await file.text();
+    const { clients, services } = await loadImportContext(salonId);
+    impAnalysis = analyseImport({ text, existingClients: clients, services, today: todayForSalon(salon) });
+    renderImport();
+  } catch (err) { console.error(err); toastError(friendlyError(err, 'Não foi possível ler o ficheiro.')); }
+});
+
+on('imp-cancel', () => { impAnalysis = null; $('#impResult').hidden = true; $('#impFile').value = ''; $('#impFileName').textContent = 'Nenhum ficheiro escolhido'; });
+
+function renderImport() {
+  const a = impAnalysis;
+  if (!a?.ok) {
+    $('#impResult').hidden = true;
+    const msg = a?.error === 'ficheiro-vazio' ? 'O ficheiro está vazio.'
+      : a?.error === 'sem-nome-nem-telefone' ? 'Não encontrei colunas de nome nem de telemóvel. Verifica a primeira linha do ficheiro.'
+      : 'Não foi possível ler o ficheiro.';
+    return toastError(msg);
+  }
+  const s = a.summary;
+  $('#impResult').hidden = false;
+  $('#impKind').textContent = s.kind === 'visits'
+    ? `Detetei histórico de visitas${s.dateRange ? ` de ${formatDatePT(s.dateRange.from, { short: true })} a ${formatDatePT(s.dateRange.to, { short: true })}` : ''}.`
+    : 'Detetei uma lista de clientes.';
+
+  $('#impStats').innerHTML = [
+    statCard('Linhas lidas', String(s.total), `${s.invalid} com problemas`),
+    statCard('Clientes novos', String(s.newClients), `${s.matchedExisting} já existiam`),
+    s.kind === 'visits' ? statCard('Visitas', String(s.visits), `${s.repeatVisitors} de clientes que voltaram`) : statCard('Duplicados no ficheiro', String(s.duplicatesInFile), 'contam uma vez'),
+    s.kind === 'visits' ? statCard('Faturação histórica', eur(s.revenue), 'soma dos valores') : statCard('Aniversários', String(a.rows.filter(r => r.ok && r.client.birthday).length), 'para campanhas'),
+  ].join('');
+
+  const warn = [];
+  if (s.invalid) warn.push(`${s.invalid} linha(s) têm problemas e vão ser ignoradas.`);
+  if (s.unmatchedServices.length) warn.push(`Serviços que não existem no teu catálogo (vão ser guardados na mesma, pelo nome): ${s.unmatchedServices.slice(0, 6).map(escapeHTML).join(', ')}${s.unmatchedServices.length > 6 ? '…' : ''}`);
+  if (s.duplicatesInFile) warn.push(`${s.duplicatesInFile} linha(s) repetem um cliente já presente no ficheiro — vai ficar um só registo.`);
+  $('#impWarnings').innerHTML = warn.length
+    ? `<div class="promo mt-3" style="border-color:var(--danger-border)"><div><div class="promo__title">Antes de avançar</div><div class="promo__desc">${warn.join('<br>')}</div></div></div>` : '';
+
+  const head = s.kind === 'visits'
+    ? '<tr><th>Linha</th><th>Data</th><th>Cliente</th><th>Telemóvel</th><th>Serviço</th><th>Valor</th><th>Estado</th></tr>'
+    : '<tr><th>Linha</th><th>Nome</th><th>Telemóvel</th><th>Email</th><th>Aniversário</th><th>Estado</th></tr>';
+  // In a visit history, seeing the same client again is normal — it is not a
+  // duplicate, and saying so would make the owner think visits get dropped.
+  const badge = (r) => r.errors.length ? `<span class="badge badge--red">${escapeHTML(r.errors.join(' · '))}</span>`
+    : r.existingClientId ? '<span class="badge badge--blue">cliente já existe</span>'
+    : r.duplicateOfLine ? (s.kind === 'visits' ? '<span class="badge badge--gray">mesma cliente</span>' : `<span class="badge badge--gray">repetido (linha ${r.duplicateOfLine})</span>`)
+    : '<span class="badge badge--green">cliente novo</span>';
+  $('#impPreview').innerHTML = `<thead>${head}</thead><tbody>${a.rows.slice(0, 60).map(r => s.kind === 'visits'
+    ? htmlMix`<tr><td class="text-muted">${r.line}</td><td>${raw(r.visit?.date ? escapeHTML(formatDatePT(r.visit.date, { short: true })) : '—')}</td><td>${r.client.name}</td><td class="tabular">${raw(r.client.phoneE164 ? escapeHTML(formatPhonePT(r.client.phoneE164)) : '—')}</td><td>${r.visit?.serviceName || '—'}</td><td class="tabular">${raw(r.visit ? escapeHTML(eur(r.visit.price)) : '—')}</td><td>${raw(badge(r))}</td></tr>`
+    : htmlMix`<tr><td class="text-muted">${r.line}</td><td>${r.client.name}</td><td class="tabular">${raw(r.client.phoneE164 ? escapeHTML(formatPhonePT(r.client.phoneE164)) : '—')}</td><td class="text-muted">${r.client.email || '—'}</td><td>${raw(r.client.birthday ? escapeHTML(formatDatePT(r.client.birthday, { short: true })) : '—')}</td><td>${raw(badge(r))}</td></tr>`
+  ).join('')}</tbody>`;
+
+  $('#impActionSub').textContent = s.kind === 'visits'
+    ? `Vão ser criados ${s.newClients} cliente(s) e ${s.visits} visita(s). A seguir, vê o painel "Reativar".`
+    : `Vão ser criados ${s.newClients} cliente(s) e atualizados ${s.matchedExisting}.`;
+  $('#impRunBtn').disabled = s.valid === 0;
+}
+
+on('imp-run', withLock('import', async () => {
+  if (!impAnalysis?.ok) return;
+  const s = impAnalysis.summary;
+  if (!confirm(`Importar ${s.newClients} cliente(s)${s.kind === 'visits' ? ` e ${s.visits} visita(s)` : ''}?`)) return;
+  $('#impRunBtn').disabled = true;
+  $('#impProgressBar').hidden = false;
+  try {
+    const res = await runImport({
+      salonId, analysis: impAnalysis,
+      defaultStaff: allStaff.find(x => x.active !== false) || null,
+      onProgress: (done, total) => {
+        $('#impProgressFill').style.width = `${Math.round(done / total * 100)}%`;
+        $('#impProgress').textContent = `${done} de ${total}`;
+      },
+    });
+    const parts = [`${res.clientsCreated} clientes criados`, `${res.clientsUpdated} atualizados`];
+    if (res.visitsWritten) parts.push(`${res.visitsWritten} visitas`);
+    if (res.failed.length) parts.push(`${res.failed.length} falharam`);
+    toastSuccess(parts.join(' · '));
+    if (res.failed.length) console.warn('linhas que falharam:', res.failed);
+    $('#impProgress').textContent = res.failed.length ? `Concluído com ${res.failed.length} erro(s) — ver consola.` : 'Concluído.';
+    // the new history changes everything downstream
+    retState.loaded = false; clientsCursor = null;
+    await loadClients(); await loadRetentionPanel(true);
+    toastSuccess('Vê agora o painel "Reativar".');
+  } catch (e) { console.error(e); toastError(friendlyError(e, 'A importação falhou.')); }
+  finally { $('#impRunBtn').disabled = false; }
 }));
 
 /* ── NEGÓCIO (baseline) ──────────────────────────────────── */

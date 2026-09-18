@@ -25,6 +25,18 @@ O cartão de onboarding guia os 4 passos:
    - até quantas horas antes o cliente pode cancelar sozinho (ex.: 24h);
    - **password da equipa** (definir uma nova invalida a anterior — usar quando alguém sai).
 
+### B1. Já trabalhas há anos? Traz os teus clientes (`Importar`)
+Não comeces do zero. Exporta do software que usas hoje (quase todos têm "Exportar" / "Guardar como CSV"; no Excel é *Ficheiro → Guardar como → CSV*) e larga o ficheiro no painel **Importar**.
+
+- Reconhecemos as colunas pelo nome, tanto em português como em inglês. O que interessa:
+  - **Clientes**: `Nome · Telemóvel · Email · Aniversário`
+  - **Histórico de visitas**: `Data · Hora · Cliente · Telemóvel · Serviço · Valor · Profissional`
+- Datas em `dd/mm/aaaa` e valores com vírgula (`35,00 €`) funcionam tal como saem do Excel português.
+- **Vês tudo antes de gravar**: quantos clientes são novos, quantos já tens, que linhas têm problemas e porquê, e que serviços do ficheiro não existem no teu catálogo (esses ficam guardados na mesma, pelo nome).
+- **Importa o histórico, não só a lista.** É o histórico que faz o Book It saber que a Dona Maria vinha de 5 em 5 semanas e já vão 12 — sem ele, o painel **Reativar** não tem nada a dizer.
+- As visitas importadas entram como **concluídas** e **não ocupam a agenda** — são passado.
+- Enganaste-te? Corrige o ficheiro e importa outra vez: os registos são **atualizados, não duplicados**.
+
 ## C. Dia-a-dia
 - **Dashboard**: marcações de hoje em tempo real, pendentes, faturação do dia. Botão **＋ Nova marcação** (telefone/walk-in): escolhe serviço, colaborador (ou "sem preferência"), data e um dos **horários realmente livres**.
 - **Marcações**: filtros por estado/data e pesquisa. Ações: Confirmar · Pagamento (atribui pontos; se for visitante cria a ficha de cliente) · **Reagendar** (mostra só horários livres; pode mudar de colaborador) · Não compareceu (penaliza pontos) · Cancelar (liberta o horário; "Anular" nos 6 s seguintes repõe se o horário ainda estiver livre).

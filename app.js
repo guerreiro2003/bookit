@@ -692,6 +692,109 @@ export async function deleteReactivation({ salonId, token }) {
   await deleteDoc(doc(db, 'salons', salonId, 'reactivations', token));
 }
 
+/* ============================================================
+   IMPORT — bringing a salon's history in from its old software
+   ============================================================ */
+
+/** Everything the import screen needs to match against what already exists. */
+export async function loadImportContext(salonId) {
+  const [cSnap, sSnap] = await Promise.all([
+    getDocs(collection(db, 'salons', salonId, 'clients')),
+    getDocs(collection(db, 'salons', salonId, 'services')),
+  ]);
+  return {
+    clients: cSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+    services: sSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+  };
+}
+
+/**
+ * Write the analysed rows. Clients are merged (never duplicated); visits are
+ * written with a deterministic id so re-importing the same file updates instead
+ * of duplicating. Past visits do NOT touch the agenda — they are history.
+ *
+ * @param {function} onProgress (done, total)
+ * @returns {{ clientsCreated, clientsUpdated, visitsWritten, failed:[{line,error}] }}
+ */
+export async function runImport({ salonId, analysis, defaultStaff = null, onProgress = null }) {
+  const usable = analysis.rows.filter(r => r.ok);
+  const result = { clientsCreated: 0, clientsUpdated: 0, visitsWritten: 0, failed: [] };
+  const clientIdByKey = new Map();
+  for (const r of usable) if (r.existingClientId) clientIdByKey.set(r.key, r.existingClientId);
+
+  // 1) one client document per distinct person in the file
+  const firstByKey = new Map();
+  for (const r of usable) if (!firstByKey.has(r.key)) firstByKey.set(r.key, r);
+
+  let done = 0;
+  const total = firstByKey.size + (analysis.kind === 'visits' ? usable.length : 0);
+  for (const [key, r] of firstByKey) {
+    const base = {
+      name: r.client.name || 'Cliente',
+      phone: r.client.phone || '', phoneE164: r.client.phoneE164 || null,
+      email: r.client.email || '',
+      birthday: r.client.birthday || null,
+    };
+    try {
+      if (r.existingClientId) {
+        // Never overwrite what the salon already has with blanks.
+        const patch = Object.fromEntries(Object.entries(base).filter(([, v]) => v !== '' && v != null));
+        await updateDoc(doc(db, 'salons', salonId, 'clients', r.existingClientId), { ...patch, updatedAt: serverTimestamp() });
+        result.clientsUpdated++;
+      } else {
+        const ref = doc(collection(db, 'salons', salonId, 'clients'));
+        await setDoc(ref, {
+          ...base, uid: null, referralCode: null,
+          visits: 0, points: 0, totalSpent: 0, referredBy: null, referrals: [], discounts: [],
+          source: 'import', importedAt: serverTimestamp(), createdAt: serverTimestamp(),
+        });
+        clientIdByKey.set(key, ref.id);
+        result.clientsCreated++;
+      }
+    } catch (e) { result.failed.push({ line: r.line, error: e.code || e.message }); }
+    if (onProgress) onProgress(++done, total);
+  }
+
+  if (analysis.kind !== 'visits') return result;
+
+  // 2) the visits themselves, plus the loyalty counters they imply
+  const tally = new Map();   // clientId → { visits, spent, last }
+  for (const r of usable) {
+    const clientId = clientIdByKey.get(r.key) || null;
+    const v = r.visit;
+    try {
+      await setDoc(doc(db, 'salons', salonId, 'bookings', r.docId), {
+        salonId, imported: true, source: 'import',
+        clientId, clientName: r.client.name || 'Cliente', clientEmail: r.client.email || '',
+        clientPhone: r.client.phone || '', clientPhoneE164: r.client.phoneE164 || null,
+        serviceIds: v.serviceId ? [v.serviceId] : [], serviceId: v.serviceId || '',
+        serviceName: v.serviceName, serviceDuration: v.duration, servicePrice: v.price, finalPrice: v.price,
+        staffId: defaultStaff?.id || 'importado', staffName: v.staffName || defaultStaff?.name || 'Importado',
+        date: v.date, time: v.time, startMin: v.startMin, endMin: v.endMin,
+        status: 'completed', paid: true, paidAt: null, paymentMethod: 'importado',
+        manageToken: null, createdAt: serverTimestamp(),
+      });
+      result.visitsWritten++;
+      if (clientId) {
+        const t = tally.get(clientId) || { visits: 0, spent: 0, last: '' };
+        t.visits++; t.spent += v.price; if (v.date > t.last) t.last = v.date;
+        tally.set(clientId, t);
+      }
+    } catch (e) { result.failed.push({ line: r.line, error: e.code || e.message }); }
+    if (onProgress) onProgress(++done, total);
+  }
+
+  // 3) counters, so loyalty and "clients at risk" reflect the real history
+  for (const [clientId, t] of tally) {
+    try {
+      await updateDoc(doc(db, 'salons', salonId, 'clients', clientId), {
+        visits: t.visits, totalSpent: Math.round(t.spent * 100) / 100, lastVisitDate: t.last, updatedAt: serverTimestamp(),
+      });
+    } catch (e) { result.failed.push({ line: 0, error: `contadores: ${e.code || e.message}` }); }
+  }
+  return result;
+}
+
 /** Remove a booking from its agenda doc (inside a transaction). */
 function releaseInterval(tx, aSnap, aRef, bookingId) {
   if (!aSnap.exists()) return;

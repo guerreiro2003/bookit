@@ -289,8 +289,19 @@ service cloud.firestore {
               && d().startMin is int && d().endMin is int && d().endMin > d().startMin
               && intIn(d().serviceDuration, 5, 600) && d().endMin - d().startMin == d().serviceDuration
               && str(d().staffId, 128) && str(d().staffName, 80)
-              && str(d().serviceId, 128) && str(d().serviceName, 80)
-              && d().paid == false;
+              && str(d().get('serviceId', ''), 128) && str(d().serviceName, 80);
+        }
+        // Historical data brought in from the salon's previous software. Admin
+        // only, always in the past, explicitly marked — prices are whatever the
+        // salon actually charged back then, so the catalogue check does not apply.
+        function validImport() {
+          return isAdmin(salonId)
+              && d().get('source', '') == 'import'
+              && d().status == 'completed'
+              && apptTs(d().date, d().time) < request.time
+              && numIn(d().servicePrice, 0, 10000)
+              && numIn(d().finalPrice, 0, 10000)
+              && d().get('imported', false) == true;
         }
         // Money is pinned to the catalogue. A visit may combine up to 3 services
         // (corte + cor + tratamento); price and duration must equal the sum of
@@ -299,6 +310,7 @@ service cloud.firestore {
           let ids = d().get('serviceIds', []);
           let n = ids.size();
           return ids is list && n >= 1 && n <= 3
+              && str(d().get('serviceId', ''), 128) && d().get('serviceId', '') != ''
               && d().serviceId == ids[0]
               && exists(/databases/$(database)/documents/salons/$(salonId)/services/$(ids[0]))
               && svc(ids[0]).get('active', true) == true
@@ -331,11 +343,13 @@ service cloud.firestore {
         allow read: if isStaff(salonId) || ownsBooking(resource.data);
 
         // Online bookings identify the client by phone (E.164, ≥ 10 digits); email is optional.
-        allow create: if validShape() && honestPrice() && (
-             ( d().get('source', 'online') == 'online' && planActive(salonId) && d().status == 'pending'
-               && str(d().get('clientPhoneE164', ''), 16) && d().get('clientPhoneE164', '').matches('^[0-9]{10,15}$')
-               && (d().get('clientEmail', '') == '' || validEmail(d().clientEmail)) )
-          || ( isStaff(salonId) && d().status in ['pending', 'confirmed'] )
+        allow create: if validShape() && (
+             ( honestPrice() && d().paid == false
+               && ( ( d().get('source', 'online') == 'online' && planActive(salonId) && d().status == 'pending'
+                      && str(d().get('clientPhoneE164', ''), 16) && d().get('clientPhoneE164', '').matches('^[0-9]{10,15}$')
+                      && (d().get('clientEmail', '') == '' || validEmail(d().clientEmail)) )
+                 || ( isStaff(salonId) && d().status in ['pending', 'confirmed'] ) ) )
+          || validImport()
         );
 
         allow update: if (

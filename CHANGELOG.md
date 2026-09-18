@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.4.0 — 2026-09-18 · Importador: trazer os clientes e o histórico do software antigo
+
+Um salão que já trabalha há anos não começa do zero. O importador lê o ficheiro que ele consegue exportar do software atual (ou do Excel) e transforma-o em clientes e histórico — que é o que dá matéria ao painel *Reativar* logo no primeiro dia.
+
+- **`import-core.js`** (puro, 9 testes): deteção do separador (`;` do Excel português), parser CSV com aspas e quebras de linha, reconhecimento automático das colunas por nome (*Nome · Telemóvel · Email · Aniversário · Data · Hora · Serviço · Valor · Profissional*), datas `dd/mm/aaaa`, valores `35,00 €`, horas `9h30`.
+- **Dois formatos, detetados sozinho**: lista de clientes ou histórico de visitas (tem coluna de data).
+- **Nada é gravado antes de ser visto**: o painel mostra o que vai acontecer — quantos clientes novos, quantos já existem, quantas linhas têm problemas e porquê, que serviços não existem no catálogo, e a faturação histórica que o ficheiro representa.
+- **Reimportar não duplica**: cada visita recebe um id determinístico (`imp_<hash>` de cliente+data+hora+serviço) e os clientes são casados por telemóvel e email. O mesmo ficheiro outra vez atualiza, não duplica (testado).
+- **O histórico não ocupa a agenda** — é passado, não bloqueia horários.
+- Contadores (visitas, total gasto, última visita) reconstruídos a partir do histórico, para a fidelização e o risco refletirem a realidade.
+- Regras: `validImport()` — só admin, só `status: completed` com data **no passado**, preço dentro dos limites e marcado `imported: true`. Um "import" com data futura é recusado (testado), e um visitante não autenticado não importa nada.
+- Correção de rotulagem apanhada na verificação em browser: num histórico, a mesma cliente a repetir-se são visitas dela, não linhas duplicadas.
+- Testes: `import.e2e.mjs` (27, ciclo completo em produção: CSV → clientes → histórico → cadência → candidata a reativação), unit 54, regras 70, motor 33, links 18, retenção 21.
+
 ## 2.3.0 — 2026-09-18 · Vários serviços por marcação e tempo de espera
 
 **O dono define os tempos.** Cada serviço tem a duração que o dono decidir e, opcionalmente, fases: *trabalho inicial · espera · trabalho final* (ex.: coloração 20+30+25).
