@@ -823,6 +823,43 @@
 <div id="sidebarBackdrop" class="modal-overlay" data-action="close-sidebar"></div>
 
 <!-- Payment modal -->
+<div id="accessModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="accessTitle" aria-hidden="true">
+  <div class="modal">
+    <button class="modal__close" type="button" data-action="close-access" aria-label="Fechar">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <h2 class="modal__title" id="accessTitle">Acesso de <span id="accessName">—</span></h2>
+    <input type="hidden" id="accessStaffId" />
+    <input type="hidden" id="accessUid" />
+
+    <div id="accessGrant">
+      <p class="modal__sub">Cada pessoa entra com o seu próprio email e password em <code>staff.html</code>. Fica registado quem confirmou, cancelou ou recebeu cada pagamento — coisa que a password partilhada não permite.</p>
+      <div class="field"><label for="accessEmail">Email desta pessoa *</label><input type="email" id="accessEmail" autocomplete="off" placeholder="ana@exemplo.pt" /></div>
+      <div class="field">
+        <label for="accessPw">Password inicial *</label>
+        <input type="text" id="accessPw" autocomplete="off" minlength="8" />
+        <div class="field__hint">Mínimo 8 caracteres. Entrega-a em mão — ela pode mudá-la depois.</div>
+      </div>
+      <div id="accessErr" class="form-error"></div>
+      <div class="flex" style="gap:10px;flex-wrap:wrap">
+        <button class="btn btn--primary" type="button" data-action="grant-access">Criar acesso</button>
+        <button class="btn" type="button" data-action="gen-access-pw">Gerar password</button>
+        <button class="btn" type="button" data-action="close-access">Cancelar</button>
+      </div>
+    </div>
+
+    <div id="accessManage" hidden>
+      <p class="modal__sub">Entra com <strong id="accessCurrentEmail">—</strong>. <span id="accessState"></span></p>
+      <div class="flex" style="gap:10px;flex-wrap:wrap">
+        <button class="btn" type="button" data-action="toggle-access">Suspender acesso</button>
+        <button class="btn btn--danger" type="button" data-action="revoke-access">Remover acesso</button>
+        <button class="btn" type="button" data-action="close-access">Fechar</button>
+      </div>
+      <p class="text-sm text-muted mt-3" style="margin-bottom:0">Suspender é reversível e é o que deves usar para uma ausência. Remover corta o acesso para sempre — usa quando alguém sai.</p>
+    </div>
+  </div>
+</div>
+
 <div id="svcStaffModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="svcStaffTitle" aria-hidden="true">
   <div class="modal">
     <button class="modal__close" type="button" data-action="close-staff-services" aria-label="Fechar">
@@ -954,6 +991,7 @@ import {
   whatsAppFor, markMessageSent, addDaysStr, formatRelativeTime,
   loadRetention, logReactivation, deleteReactivation, reactivationLink, whatsAppUrl, randomToken, formatPhonePT, firstName,
   loadImportContext, runImport,
+  setActor, resolveActor, loadTeamAccess, grantStaffAccess, revokeStaffAccess, setStaffAccessActive,
   layoutServices, normaliseSegments, hasGap, MAX_SERVICES_PER_BOOKING,
   downloadCSV, subscribe, trapFocus,
   isEmail, isPhone, isHexColor
@@ -1035,6 +1073,8 @@ async function loadSalon(uid) {
   }
   const d = snap.docs[0];
   salonId = d.id; salon = d.data();
+  // Everything this session writes gets stamped with who did it.
+  setActor(await resolveActor(salonId, salon, auth.currentUser));
 
   const brand = (s) => (s.name || 'B').charAt(0).toUpperCase();
   $('#sidebarMark').textContent = brand(salon);
@@ -2575,12 +2615,108 @@ async function loadStaff() {
   if (!salonId) return;
   try {
     // No orderBy in the query: Firestore would silently drop staff without an `order` field.
-    const snap = await getDocs(collection(db,'salons',salonId,'staff'));
+    const [snap, access] = await Promise.all([
+      getDocs(collection(db,'salons',salonId,'staff')),
+      loadTeamAccess(salonId).catch(() => new Map()),
+    ]);
+    teamAccess = access;
     allStaff = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999));
     bookingCtx.staff = allStaff.filter(s => s.active !== false);
     renderStaffList(); renderStaffSelect(); renderTimeOffSelect();
   } catch (e) { console.error(e); toastError(friendlyError(e)); }
 }
+
+/* ── Individual logins ──────────────────────────────────────
+   A shared password means every action reads as "equipa" and nobody can say
+   who cancelled what. Each person gets their own account; the shared one keeps
+   working so no salon is locked out while they migrate. */
+let teamAccess = new Map();   // staffId → { uid, email, active }
+let releaseAccessFocus = null;
+
+function accessBadge(s) {
+  const a = teamAccess.get(s.id);
+  if (!a) return '<span class="badge badge--gray" title="Ainda entra com a password partilhada">Sem acesso próprio</span>';
+  return a.active === false
+    ? '<span class="badge badge--amber">Acesso suspenso</span>'
+    : '<span class="badge badge--green">Acesso próprio</span>';
+}
+
+on('open-access', (el) => {
+  const s = allStaff.find(x => x.id === el.dataset.id);
+  if (!s) return;
+  const a = teamAccess.get(s.id);
+  $('#accessName').textContent = s.name;
+  $('#accessStaffId').value = s.id;
+  $('#accessUid').value = a?.uid || '';
+  $('#accessErr').classList.remove('show'); $('#accessErr').textContent = '';
+  $('#accessGrant').hidden = !!a;
+  $('#accessManage').hidden = !a;
+  if (a) {
+    $('#accessCurrentEmail').textContent = a.email || '—';
+    $('#accessState').textContent = a.active === false ? 'Está suspenso — não consegue entrar.' : '';
+    $('[data-action="toggle-access"]').textContent = a.active === false ? 'Reativar acesso' : 'Suspender acesso';
+  } else {
+    $('#accessEmail').value = s.email || '';
+    $('#accessPw').value = '';
+  }
+  const o = $('#accessModal');
+  o.classList.add('show'); o.setAttribute('aria-hidden', 'false');
+  releaseAccessFocus = trapFocus(o.querySelector('.modal'));
+});
+function closeAccess() {
+  const o = $('#accessModal');
+  o.classList.remove('show'); o.setAttribute('aria-hidden', 'true');
+  if (releaseAccessFocus) { releaseAccessFocus(); releaseAccessFocus = null; }
+}
+on('close-access', closeAccess);
+on('gen-access-pw', () => {
+  // Readable but not guessable: three syllables plus digits beats "Xk9#pQ2!"
+  // when the owner has to say it out loud to the person in front of them.
+  const syl = ['ba','me','ri','to','lu','sa','no','fe','ca','pi','ve','zo'];
+  const w = Array.from({ length: 3 }, () => syl[Math.floor(Math.random() * syl.length)]).join('');
+  $('#accessPw').value = w.charAt(0).toUpperCase() + w.slice(1) + Math.floor(100 + Math.random() * 900);
+});
+on('grant-access', withLock('grant', async () => {
+  const err = $('#accessErr'); err.classList.remove('show');
+  const staffId = $('#accessStaffId').value;
+  const s = allStaff.find(x => x.id === staffId);
+  const email = $('#accessEmail').value.trim(), pw = $('#accessPw').value;
+  const fail = (m) => { err.textContent = m; err.classList.add('show'); };
+  if (!isEmail(email)) return fail('Email inválido.');
+  if (pw.length < 8)   return fail('A password precisa de pelo menos 8 caracteres.');
+  try {
+    await grantStaffAccess({ salonId, staffId, name: s.name, email, password: pw });
+    closeAccess();
+    toastSuccess(`${firstName(s.name)} já entra com o email dela. Dá-lhe a password.`);
+    await loadStaff();
+  } catch (e) {
+    console.error(e);
+    fail(e.code === 'email-in-use' ? 'Esse email já tem conta. Usa outro.'
+       : e.code === 'weak-password' ? 'Password demasiado curta.'
+       : friendlyError(e, 'Não foi possível criar o acesso.'));
+  }
+}));
+on('toggle-access', withLock('togglea', async () => {
+  const staffId = $('#accessStaffId').value, uid = $('#accessUid').value;
+  const a = teamAccess.get(staffId);
+  try {
+    await setStaffAccessActive({ salonId, uid, active: a.active === false });
+    closeAccess();
+    toastSuccess(a.active === false ? 'Acesso reativado.' : 'Acesso suspenso.');
+    await loadStaff();
+  } catch (e) { console.error(e); toastError(friendlyError(e)); }
+}));
+on('revoke-access', withLock('revokea', async () => {
+  const staffId = $('#accessStaffId').value, uid = $('#accessUid').value;
+  const s = allStaff.find(x => x.id === staffId);
+  if (!confirm(`Remover o acesso de ${s?.name || 'esta pessoa'}?\n\nDeixa de conseguir entrar. O histórico do que já fez mantém-se.`)) return;
+  try {
+    await revokeStaffAccess({ salonId, staffId, uid });
+    closeAccess();
+    toastSuccess('Acesso removido.');
+    await loadStaff();
+  } catch (e) { console.error(e); toastError(friendlyError(e)); }
+}));
 
 /** What this person does, in the owner's words — not a list of ids. */
 function staffSvcLabel(s) {
@@ -2614,6 +2750,8 @@ function renderStaffList() {
       </div>
       <div class="cluster">
         ${raw(`<span class="badge ${s.active !== false ? 'badge--green' : 'badge--gray'}">${s.active !== false ? 'Ativo' : 'Inativo'}</span>`)}
+        ${raw(accessBadge(s))}
+        <button class="btn btn--sm" type="button" data-action="open-access" data-id="${s.id}">Acesso</button>
         <button class="btn btn--sm" type="button" data-action="edit-staff-services" data-id="${s.id}">Serviços</button>
         <button class="btn btn--sm" type="button" data-action="edit-staff-photo" data-id="${s.id}">${s.photoUrl ? 'Mudar foto' : '+ Foto'}</button>
         <button class="btn btn--sm" type="button" data-action="toggle-staff" data-id="${s.id}" data-active="${s.active !== false}">${s.active !== false ? 'Desativar' : 'Ativar'}</button>

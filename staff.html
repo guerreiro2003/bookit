@@ -27,6 +27,7 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="themeIcon"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         </button>
         <span class="badge badge--gray" id="modeBadge" hidden>Equipa</span>
+        <span class="text-sm text-muted" id="whoami" hidden></span>
         <button class="btn btn--sm btn--ghost" type="button" data-action="logout" id="btnLogout" hidden>Sair</button>
       </div>
     </div>
@@ -46,13 +47,32 @@
           <p class="auth-card__sub">Entra como colaborador ou como admin.</p>
 
           <div class="tabs" style="margin-bottom:var(--s-4)">
-            <button class="tab active" type="button" role="tab" id="tabTeam"  data-action="switch-mode" data-mode="team"  aria-selected="true">Equipa</button>
+            <button class="tab active" type="button" role="tab" id="tabMe"    data-action="switch-mode" data-mode="me"    aria-selected="true">A minha conta</button>
+            <button class="tab"        type="button" role="tab" id="tabTeam"  data-action="switch-mode" data-mode="team"  aria-selected="false">Password da equipa</button>
             <button class="tab"        type="button" role="tab" id="tabAdmin" data-action="switch-mode" data-mode="admin" aria-selected="false">Admin</button>
           </div>
 
           <div id="loginErr" class="error-msg" role="alert"></div>
 
-          <form id="formTeam" novalidate>
+          <form id="formMe" novalidate>
+            <div class="field">
+              <label for="meEmail">O teu email</label>
+              <input type="email" id="meEmail" required autocomplete="username" placeholder="ana@exemplo.pt" />
+            </div>
+            <div class="field field--password" data-revealed="false">
+              <label for="mePw">A tua password</label>
+              <input type="password" id="mePw" required autocomplete="current-password" />
+              <button type="button" class="pw-toggle" data-action="toggle-pw" aria-label="Mostrar password"></button>
+            </div>
+            <button class="btn btn--primary btn--full" type="submit" id="meBtn">
+              <span class="btn__label">Entrar</span>
+            </button>
+            <p class="text-center text-sm text-muted mt-3">
+              Não tens conta própria? Pede à administração — fica registado quem faz o quê.
+            </p>
+          </form>
+
+          <form id="formTeam" novalidate style="display:none">
             <div class="field field--password" data-revealed="false">
               <label for="teamPw">Password da equipa</label>
               <input type="password" id="teamPw" required autocomplete="current-password" />
@@ -62,7 +82,7 @@
               <span class="btn__label">Entrar</span>
             </button>
             <p class="text-center text-sm text-muted mt-3">
-              A password é definida pela administração em <em>Admin → Configurações</em>.
+              Password partilhada por todos. Com ela não fica registado quem fez o quê — pede à administração uma conta tua.
             </p>
           </form>
 
@@ -199,6 +219,7 @@ import {
   MONTHS_FULL, formatDate, formatDatePT, formatPrice, todayISO, relativeDay,
   getSalonId, loadSalon, applySalonBranding, todayForSalon, addDaysStr, dateLabelPT,
   authErrorMessage, friendlyError, showFatalError, statusBadge,
+  setActor, resolveActor,
   markBookingPaid, markBookingNoShow, confirmBooking, cancelBooking, restoreBooking, withLock,
   whatsAppFor, markMessageSent, formatRelativeTime,
   debounce, toggleTheme, getTheme, trapFocus
@@ -223,8 +244,22 @@ let cachedToday = [];
   // where the salon says so, never across tenants.
   onAuthStateChanged(auth, async (user) => {
     if (unsubToday) { unsubToday(); unsubToday = null; }
-    if (user && user.uid === salon.adminUid) { mode = 'admin'; showApp(); return; }
-    if (user && salon.teamUid && user.uid === salon.teamUid) { mode = 'team'; showApp(); return; }
+    // The salon's own documents decide the role — never anything the client
+    // sends, and never across tenants.
+    const actor = await resolveActor(salonId, salon, user);
+    setActor(actor);
+    if (actor) {
+      mode = actor.role === 'admin' ? 'admin' : 'team';
+      const who = $('#whoami');
+      if (who) { who.textContent = actor.role === 'team' ? 'password partilhada' : actor.name; who.hidden = false; }
+      showApp();
+      return;
+    }
+    if (user) {
+      // Signed in, but not part of THIS salon (a client account, say).
+      try { await signOut(auth); } catch {}
+      setErr('Essa conta não tem acesso a este salão.');
+    }
     mode = 'team'; showLogin();
   });
 })();
@@ -247,12 +282,11 @@ on('toggle-pw', (el) => {
 
 on('switch-mode', (el) => {
   const m = el.dataset.mode;
-  $('#tabTeam').classList.toggle('active', m === 'team');
-  $('#tabAdmin').classList.toggle('active', m === 'admin');
-  $('#tabTeam').setAttribute('aria-selected', String(m === 'team'));
-  $('#tabAdmin').setAttribute('aria-selected', String(m === 'admin'));
-  $('#formTeam').style.display  = m === 'team' ? 'block' : 'none';
-  $('#formAdmin').style.display = m === 'admin' ? 'block' : 'none';
+  for (const [tab, form, key] of [['#tabMe', '#formMe', 'me'], ['#tabTeam', '#formTeam', 'team'], ['#tabAdmin', '#formAdmin', 'admin']]) {
+    $(tab).classList.toggle('active', m === key);
+    $(tab).setAttribute('aria-selected', String(m === key));
+    $(form).style.display = m === key ? 'block' : 'none';
+  }
   setErr('');
 });
 
@@ -261,6 +295,21 @@ function setErr(msg) {
   el.textContent = msg || '';
   el.classList.toggle('show', !!msg);
 }
+
+$('#formMe').addEventListener('submit', withLock('me-login', async (e) => {
+  e.preventDefault();
+  setErr('');
+  const email = $('#meEmail').value.trim(), pw = $('#mePw').value;
+  if (!email || !pw) return setErr('Preenche email e password.');
+  const btn = $('#meBtn'); btn.disabled = true;
+  try {
+    await signInWithEmailAndPassword(auth, email, pw);
+    // onAuthStateChanged decides whether this account belongs to this salon
+  } catch (err) {
+    setErr(err.code === 'auth/too-many-requests' ? authErrorMessage(err.code) : 'Email ou password incorretos.');
+    btn.disabled = false;
+  }
+}));
 
 $('#formTeam').addEventListener('submit', withLock('team-login', async (e) => {
   e.preventDefault();

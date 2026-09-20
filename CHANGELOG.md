@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.7.0 — 2026-09-20 · Cada pessoa com a sua conta, e rasto de quem fez o quê
+
+Até agora um salão inteiro entrava com uma password. Toda a ação ficava registada como "equipa": ninguém sabia quem tinha cancelado uma marcação ou recebido um pagamento, e quando alguém saía era preciso mudar a password a todos. O art. 32.º do RGPD pede controlo de acessos apropriado, e uma password partilhada por cinco pessoas não é.
+
+- **Uma conta por pessoa.** No painel, cada colaborador tem um botão **Acesso**: escreves o email dela, geras uma password legível (`Batori805` — dá para dizer em voz alta, ao contrário de `Xk9#pQ2!`) e está feito. Ela entra em `staff.html` no separador **A minha conta**.
+- **O que cada pessoa faz fica com o nome dela.** Confirmar, cancelar, marcar falta, receber pagamento e reagendar passam a gravar `…ByUid` e `…ByName`. O histórico mantém-se mesmo depois de a pessoa sair.
+- **Suspender e remover.** Suspender é reversível (ausências); remover corta para sempre (quem sai). Verificado: suspensa deixa de ser reconhecida e perde acesso aos dados no mesmo instante.
+- **A autorização é um documento por uid** (`staffAuth/{uid}`), porque uma regra não pode fazer queries — só `exists()`/`get()`. Ninguém consegue listar quem tem acesso (isso entregaria os uids da equipa toda), mas cada pessoa lê a sua própria entrada.
+- **Um colaborador não é o dono:** não muda definições do salão, não apaga clientes, não dá acesso a mais ninguém, não se promove a dono, e não vê nada de outro salão. Tudo testado.
+- **A password partilhada continua a funcionar**, para nenhum salão ficar fechado de fora a meio da migração.
+- `tests/team-access.e2e.mjs` (26): concede → entra → regista quem fez → suspende → reativa → revoga → confirma que o histórico fica.
+
 ## 2.6.0 — 2026-09-20 · Quem faz o quê, e App Check pronto a ligar
 
 ### Serviços por colaborador

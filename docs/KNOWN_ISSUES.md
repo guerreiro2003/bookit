@@ -23,11 +23,9 @@ O salão com os dados reais e o plano ativo é o `demo`; o slug bonito (`zen-org
 
 ---
 
-## KI-002 · Password de equipa partilhada, sem rasto de quem fez o quê
+## ~~KI-002 · Password de equipa partilhada, sem rasto de quem fez o quê~~ ✅ resolvido 2026-09-20
 
-**Gravidade:** alta · **Estado:** em curso
-
-Um salão inteiro entra com uma password. Toda a ação fica registada como "equipa": ninguém sabe quem cancelou uma marcação ou registou um pagamento, e quando um funcionário sai é preciso mudar a password a todos. O art. 32.º do RGPD pede controlo de acessos apropriado, e isto não é.
+Cada pessoa passou a ter a sua conta (`staffAuth/{uid}`), e confirmar/cancelar/falta/pagamento/reagendar gravam quem fez. A password partilhada continua a funcionar para ninguém ficar fechado de fora durante a migração — **remover essa via é um passo a dar quando todos os salões ativos tiverem contas individuais.** Coberto por `tests/team-access.e2e.mjs` (26).
 
 ---
 

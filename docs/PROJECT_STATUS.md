@@ -1,6 +1,6 @@
 # Estado do projeto
 
-**Atualizado:** 2026-09-20 · commit `2048e4d` + limpeza de tenants
+**Atualizado:** 2026-09-20 · contas individuais de equipa
 **Fase atual:** PHASE 3 — PRODUCTION HARDENING (ver [ROADMAP](ROADMAP.md))
 
 ## Em uma frase
@@ -21,7 +21,7 @@ O software funciona e está em produção. O que falta para o vender não é có
 | Retenção / reativação | ✅ Feito | 21 testes E2E, receita atribuída |
 | App Check | 🟡 Código pronto | Falta a chave reCAPTCHA (consola) |
 | Backups | 🟡 Manual funciona | Sem automatização; sem PITR |
-| Contas individuais de equipa | ❌ Em curso | Password partilhada, sem rasto de quem fez o quê |
+| Contas individuais de equipa | ✅ Feito 20/09 | 26 testes E2E; rasto de quem fez o quê |
 | Notificações por email | ❌ Escritas, não lançadas | Exige Blaze |
 | Cobrança a salões | ❌ Não existe | `plan` muda por script |
 | Termos + contrato RGPD | ❌ Não existem | **Bloqueador de venda** |
@@ -29,7 +29,7 @@ O software funciona e está em produção. O que falta para o vender não é có
 
 ## Testes
 
-`npm run test:all` — **267 a passar**, zero a falhar.
+`npm run test:all` — **293 a passar**, zero a falhar.
 
 | Suite | N.º | O que cobre |
 |---|---|---|
@@ -40,6 +40,7 @@ O software funciona e está em produção. O que falta para o vender não é có
 | `links.e2e` | 18 | Confirmar/cancelar por token |
 | `retention.e2e` | 21 | Reativação e atribuição |
 | `import.e2e` | 27 | CSV → clientes → histórico → cadência |
+| `team-access.e2e` | 26 | Conceder, entrar, registar quem fez, revogar |
 | `concurrency.stress` | — | Marcações concorrentes no mesmo horário |
 
 ## Último trabalho
@@ -48,13 +49,15 @@ O software funciona e está em produção. O que falta para o vender não é có
 2. **Correções críticas** (20/09, `0cea10d`) — agenda, email verificado, bookingLinks, aviso de reagendamento, apagar serviços, desconto 50%, guarda nas Functions.
 3. **Serviços por colaborador + App Check** (20/09, `2048e4d`).
 4. **Limpeza de tenants** (20/09) — 7 salões → 2. Ver [KNOWN_ISSUES](KNOWN_ISSUES.md#ki-001).
+5. **Contas individuais de equipa** (20/09) — fecha KI-002 e o último "grave" da auditoria.
 
 ## Próximo trabalho
 
-1. Contas individuais de equipa + rasto de quem fez o quê ← **em curso**
-2. Backups automáticos fora da máquina do Pedro
-3. Tirar `adminEmail`/`teamEmail` do documento público do salão
-4. Termos de Serviço + contrato de subcontratação (precisa de advogado)
+1. Backups automáticos fora da máquina do Pedro ← **a seguir**
+2. Rastreio de erros (Sentry) + monitor de uptime — ambos gratuitos
+3. Tirar `adminEmail`/`teamEmail` do documento público do salão (KI-003)
+4. CI: testes a correr a cada push (KI-011)
+5. Termos de Serviço + contrato de subcontratação (precisa de advogado)
 
 ## Bloqueadores
 

@@ -31,6 +31,22 @@ export {
 export const APP_BASE_URL = (typeof window !== 'undefined' && window.location?.origin && !window.location.origin.startsWith('file:'))
   ? window.location.origin : 'https://bookit-51575.web.app';
 
+/* ── Who is doing this ────────────────────────────────────────────────────
+   With one shared login per salon, every action read as "equipa" and nobody
+   could say who cancelled an appointment or took a payment. Each page sets the
+   signed-in person once; the mutations below stamp it onto what they write.
+   One person is signed in per page, so a module-level value is the honest
+   shape here — threading it through forty call sites would not add truth.    */
+let _actor = null;
+/** @param {{uid:string, name:string, role:'admin'|'team'|'member'}|null} a */
+export function setActor(a) { _actor = a && a.uid ? { uid: a.uid, name: clampStr(a.name || '', 80), role: a.role || 'member' } : null; }
+export function getActor() { return _actor; }
+/** Stamp for an action: `stampedBy('cancelled')` → { cancelledByUid, cancelledByName }. */
+function stampedBy(action) {
+  if (!_actor) return {};
+  return { [`${action}ByUid`]: _actor.uid, [`${action}ByName`]: _actor.name || _actor.role };
+}
+
 /* ── Salon defaults (single source of truth for tunables) ── */
 export const SALON_DEFAULTS = {
   timezone: 'Europe/Lisbon',
@@ -710,6 +726,76 @@ export async function deleteReactivation({ salonId, token }) {
 }
 
 /* ============================================================
+   TEAM ACCESS — one login per person, instead of one per salon
+   ============================================================ */
+
+/**
+ * Who is this signed-in person, for this salon? Decided by the salon's own
+ * documents, never by anything the client sends — so the same uid is only
+ * staff where the salon says so.
+ * @returns {{uid, name, role:'admin'|'team'|'member', staffId?}|null}
+ */
+export async function resolveActor(salonId, salon, user) {
+  if (!user) return null;
+  if (salon?.adminUid === user.uid) return { uid: user.uid, name: 'Administração', role: 'admin' };
+  const s = await getDoc(doc(db, 'salons', salonId, 'staffAuth', user.uid)).catch(() => null);
+  if (s?.exists() && s.data().active !== false) {
+    const d = s.data();
+    return { uid: user.uid, name: d.name || user.email || 'Colaborador', role: 'member', staffId: d.staffId };
+  }
+  if (salon?.teamUid === user.uid) return { uid: user.uid, name: 'Equipa', role: 'team' };
+  return null;
+}
+
+/** Everyone with their own login in this salon, keyed by staffId. */
+export async function loadTeamAccess(salonId) {
+  const snap = await getDocs(collection(db, 'salons', salonId, 'staffAuth'));
+  const byStaffId = new Map();
+  for (const d of snap.docs) byStaffId.set(d.data().staffId, { uid: d.id, ...d.data() });
+  return byStaffId;
+}
+
+/**
+ * Give one staff member their own login. Creates a real Firebase account on a
+ * SECONDARY auth instance so the owner is not signed out of their own session,
+ * then records the uid on both sides: `staffAuth/{uid}` is what the security
+ * rules read, `staff/{staffId}.uid` is what the panel shows.
+ */
+export async function grantStaffAccess({ salonId, staffId, name, email, password }) {
+  const mail = clampStr(email, 120).toLowerCase();
+  if (!isEmail(mail)) throw err('invalid-email');
+  if (!password || password.length < 8) throw err('weak-password');
+  const { getSecondaryAuth, createUserWithEmailAndPassword } = await import('./firebase.js');
+  const secondary = getSecondaryAuth();
+  let uid;
+  try {
+    uid = (await createUserWithEmailAndPassword(secondary, mail, password)).user.uid;
+  } catch (e) {
+    if (e.code === 'auth/email-already-in-use') throw err('email-in-use');
+    throw e;
+  } finally {
+    // Never leave the new account signed in on the secondary instance.
+    try { const { signOut } = await import('./firebase.js'); await signOut(secondary); } catch {}
+  }
+  await setDoc(doc(db, 'salons', salonId, 'staffAuth', uid), {
+    staffId, name: clampStr(name, 80), email: mail, active: true, createdAt: serverTimestamp(),
+  });
+  await updateDoc(doc(db, 'salons', salonId, 'staff', staffId), { uid, email: mail });
+  return { uid, email: mail };
+}
+
+/** Take someone's access away — they can no longer sign in to this salon. */
+export async function revokeStaffAccess({ salonId, staffId, uid }) {
+  await deleteDoc(doc(db, 'salons', salonId, 'staffAuth', uid));
+  await updateDoc(doc(db, 'salons', salonId, 'staff', staffId), { uid: null }).catch(() => {});
+}
+
+/** Suspend or restore access without destroying the account. */
+export async function setStaffAccessActive({ salonId, uid, active }) {
+  await updateDoc(doc(db, 'salons', salonId, 'staffAuth', uid), { active: !!active });
+}
+
+/* ============================================================
    IMPORT — bringing a salon's history in from its old software
    ============================================================ */
 
@@ -850,7 +936,7 @@ export async function cancelBooking({ salonId, bookingId, by = 'salon', enforceP
     const aRef = b.staffId ? agendaRef(salonId, b.staffId, b.date) : null;
     const aSnap = aRef ? await tx.get(aRef) : null;
     // writes
-    tx.update(bRef, { status: 'cancelled', previousStatus: b.status, cancelledAt: serverTimestamp(), cancelledBy: by });
+    tx.update(bRef, { status: 'cancelled', previousStatus: b.status, cancelledAt: serverTimestamp(), cancelledBy: by, ...stampedBy('cancelled') });
     if (aRef) releaseInterval(tx, aSnap, aRef, bookingId);
     syncLink(tx, salonId, bookingId, b, { status: 'cancelled' });
     return { ok: true, previousStatus: b.status };
@@ -918,6 +1004,7 @@ export async function rescheduleBooking({ salonId, salon, ctx, bookingId, newDat
       rescheduledFrom: { date: b.date, time: b.time, staffId: b.staffId }, rescheduledAt: serverTimestamp(),
       status: 'pending', confirmedAt: null, confirmedVia: null,
       confirmRequestedAt: null, reminderSentAt: null, clientNotifiedAt: null,
+      ...stampedBy('rescheduled'),
     });
     syncLink(tx, salonId, bookingId, b, { date: newDate, time: minToTime(newStartMin), startMin: newStartMin, endMin: newStartMin + duration, staffId: staff.id, staffName: staff.name });
     return { ok: true };
@@ -931,7 +1018,7 @@ export async function confirmBooking({ salonId, bookingId }) {
     const bSnap = await tx.get(bRef);
     if (!bSnap.exists()) throw err('booking-not-found');
     if (!canTransition(bSnap.data().status, 'confirmed')) throw err('invalid-transition');
-    tx.update(bRef, { status: 'confirmed', confirmedAt: serverTimestamp(), confirmedVia: 'staff' });
+    tx.update(bRef, { status: 'confirmed', confirmedAt: serverTimestamp(), confirmedVia: 'staff', ...stampedBy('confirmed') });
     syncLink(tx, salonId, bookingId, bSnap.data(), { status: 'confirmed' });
     return { ok: true };
   });
@@ -979,6 +1066,7 @@ export async function markBookingPaid({ salonId, salon, bookingId, method }) {
 
     tx.update(bRef, {
       paid: true, status: 'completed', paidAt: serverTimestamp(), paymentMethod: method || 'balcao', pointsAwarded: pts,
+      ...stampedBy('paid'),
       ...(clientPlan && !b.clientId ? { clientId: clientPlan.ref.id } : {}),
     });
     syncLink(tx, salonId, bookingId, b, { status: 'completed' });
@@ -1018,7 +1106,7 @@ export async function markBookingNoShow({ salonId, salon, bookingId }) {
     const b = bSnap.data();
     if (b.status === 'noshow') return { alreadyNoShow: true };
     if (!canTransition(b.status, 'noshow')) throw err(b.status === 'completed' ? 'booking-completed' : 'booking-cancelled');
-    tx.update(bRef, { status: 'noshow', noShowAt: serverTimestamp() });
+    tx.update(bRef, { status: 'noshow', noShowAt: serverTimestamp(), ...stampedBy('noShow') });
     if (b.clientId && penalty > 0) tx.update(doc(db, 'salons', salonId, 'clients', b.clientId), { points: increment(-penalty) });
     syncLink(tx, salonId, bookingId, b, { status: 'noshow' });
     return { ok: true };

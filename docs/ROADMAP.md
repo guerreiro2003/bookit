@@ -32,7 +32,7 @@ Auditoria completa a 2026-09-18: 4 críticos, 7 graves, 13 médios. Duas falhas 
 | ✅ | Retenção e reativação com receita atribuída | A diferenciação real |
 | ✅ | Aviso ao cliente no reagendamento | |
 | ✅ | Serviços por colaborador | |
-| 🔄 | **Contas individuais de equipa + rasto de quem fez o quê** | Em curso |
+| ✅ | Contas individuais de equipa + rasto de quem fez o quê | 26 testes E2E |
 | ❌ | Vista de calendário semanal | Um dono de salão pensa em semanas |
 | ❌ | Fila de espera por cancelamento | Receita que hoje se perde em silêncio |
 | ❌ | Pesquisa de clientes que procura todos | Hoje filtra só os 200 carregados |

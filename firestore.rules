@@ -7,9 +7,18 @@ service cloud.firestore {
     function salon(salonId) { return get(/databases/$(database)/documents/salons/$(salonId)).data; }
     // Owner/admin of THIS salon (tenant-scoped: a uid is only admin where adminUid matches)
     function isAdmin(salonId) { return isAuth() && salon(salonId).adminUid == request.auth.uid; }
-    // Team account of THIS salon (one shared Firebase account per salon; see staff.html)
+    // Legacy shared team account (one Firebase account per salon). Kept so no
+    // salon is locked out mid-migration; individual accounts are the way now.
     function isTeam(salonId)  { return isAuth() && salon(salonId).get('teamUid', '') == request.auth.uid; }
-    function isStaff(salonId) { return isAdmin(salonId) || isTeam(salonId); }
+    // One document per employee, keyed by their own uid, so a rule can answer
+    // "does this person work here?" with a single lookup — a query is not
+    // available here, and get()/exists() ignore read rules by design.
+    // Revoking access is deleting that document, or flipping active to false.
+    function memberDoc(salonId) { return /databases/$(database)/documents/salons/$(salonId)/staffAuth/$(request.auth.uid); }
+    function isMember(salonId) {
+      return isAuth() && exists(memberDoc(salonId)) && get(memberDoc(salonId)).data.get('active', true) == true;
+    }
+    function isStaff(salonId) { return isAdmin(salonId) || isTeam(salonId) || isMember(salonId); }
     // An email only proves identity once Firebase has confirmed the person can
     // read it. Without this check anyone could register victim@example.com and
     // walk straight into that person's bookings, notes and loyalty.
@@ -96,6 +105,21 @@ service cloud.firestore {
       match /config/{document=**} {
         allow read: if true;
         allow write: if isAdmin(salonId);
+      }
+
+      /* ───────────── who works here (authorization index, keyed by uid) ─────────────
+         Only the owner grants or revokes access. A person may read their own
+         entry so the portal can greet them by name; nobody can list the set,
+         which would hand out the uids of a salon's whole team.              */
+      match /staffAuth/{uid} {
+        allow get: if isAdmin(salonId) || (isAuth() && request.auth.uid == uid);
+        allow list: if isAdmin(salonId);
+        allow write: if isAdmin(salonId)
+          && (request.method == 'delete' || (
+               str(request.resource.data.staffId, 128)
+            && str(request.resource.data.get('name', ''), 80)
+            && request.resource.data.get('active', true) is bool
+          ));
       }
 
       match /users/{uid} {
