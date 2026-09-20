@@ -570,8 +570,25 @@ on('submit-booking', withLock('submit-booking', async () => {
     window.location.href = `success.html?${params.toString()}`;
   } catch (e) {
     console.error(e);
-    $('#screenLoading').hidden = true; $('#btnConfirm').disabled = false;
+    $('#screenLoading').hidden = true;
     const code = e?.code || e?.message;
+    // We waited, then went looking, and still cannot say whether the booking
+    // landed. Re-enabling the button here would invite a second appointment
+    // for the same person — leave it off and point them at the phone.
+    if (code === 'timeout') {
+      $('#screenConfirm').hidden = false;
+      $('#btnConfirm').disabled = true;
+      const box = document.createElement('div');
+      box.className = 'promo';
+      box.style.borderColor = 'var(--danger-border)';
+      box.innerHTML = `<div><div class="promo__title">Não conseguimos confirmar</div>
+        <div class="promo__desc">A ligação está muito lenta e a tua marcação pode ou não ter entrado.
+        <strong>Não marques outra vez</strong> — liga ao salão${state.salon?.phone ? ` (${escapeHTML(state.salon.phone)})` : ''} para confirmar.</div></div>`;
+      $('#screenConfirm').prepend(box);
+      toastError('Não conseguimos confirmar a marcação. Liga ao salão.');
+      return;
+    }
+    $('#btnConfirm').disabled = false;
     toastError(friendlyError(e, 'Não foi possível criar a marcação. Tenta novamente.'));
     if (['slot-taken', 'no-staff-available', 'staff-cannot-do-service', 'too-soon', 'outside-hours', 'break', 'salon-closed', 'salon-closed-date', 'staff-time-off', 'staff-day-off'].includes(code)) {
       state.selectedStart = null; $('#btnDateNext').disabled = true;

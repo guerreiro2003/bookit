@@ -69,6 +69,28 @@ export function overlapsAny(iv, list) {
   return (list || []).some(x => overlaps(iv, x));
 }
 
+/* ── Waiting ──────────────────────────────────────────────── */
+/**
+ * Give a promise a deadline. A booking that never resolves leaves a person
+ * staring at a spinner with no idea whether they have an appointment — and a
+ * spinner is the one outcome that tells them nothing.
+ *
+ * Rejects with `{ code: 'timeout' }`; the underlying promise is NOT cancelled,
+ * because a write already on its way to the server cannot be called back. The
+ * caller has to go and find out what actually happened.
+ *
+ * @param {Promise} promise
+ * @param {number} ms
+ */
+export function withTimeout(promise, ms) {
+  let t;
+  const deadline = new Promise((_, reject) => {
+    t = setTimeout(() => reject(Object.assign(new Error('timeout'), { code: 'timeout' })), ms);
+  });
+  return Promise.race([promise, deadline]).finally(() => clearTimeout(t));
+}
+export const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
 /* ── Who does what ────────────────────────────────────────── */
 /**
  * Can this staff member perform every one of these services?

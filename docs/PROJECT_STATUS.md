@@ -29,11 +29,11 @@ O software funciona e está em produção. O que falta para o vender não é có
 
 ## Testes
 
-`npm run test:all` — **300 a passar**, zero a falhar.
+`npm run test:all` — **305 a passar**, zero a falhar.
 
 | Suite | N.º | O que cobre |
 |---|---|---|
-| unit (`*.test.mjs`) | 60 | Lógica pura: horários, cadência, métricas, CSV, quem-faz-o-quê |
+| unit (`*.test.mjs`) | 65 | Lógica pura: horários, cadência, métricas, CSV, quem-faz-o-quê |
 | `rules.integration` | 74 | Autorização e validação, via REST, contra produção |
 | `engine.e2e` | 38 | Ciclo completo de marcação |
 | `links.e2e` | 18 | Confirmar/cancelar por token |
@@ -54,7 +54,6 @@ O software funciona e está em produção. O que falta para o vender não é có
 ## Próximo trabalho
 
 1. Rastreio de erros (Sentry) + monitor de uptime ← **a seguir**, ambos gratuitos
-2. Falhar depressa quando o cliente está offline (KI-007)
 3. Vista de calendário semanal — um dono de salão pensa em semanas
 4. Fila de espera por cancelamento
 5. Termos de Serviço + contrato de subcontratação (precisa de advogado)

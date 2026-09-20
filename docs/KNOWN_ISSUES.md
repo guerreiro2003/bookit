@@ -69,11 +69,13 @@ Se o site cair às 9h de segunda, ficamos a saber quando o salão ligar. Os erro
 
 ---
 
-## KI-007 · Marcação fica em fila quando o cliente perde a internet
+## ~~KI-007 · Marcação sem resposta quando a ligação é má~~ ✅ resolvido 2026-09-20
 
-**Gravidade:** média · **Estado:** por corrigir
+A marcação passou a ter prazo (20 s). Passado esse tempo o cliente não fica a olhar para um spinner: o código vai **procurar** a marcação, porque o `manageToken` é gerado antes da transação e a projeção `bookingLinks/{token}` é legível publicamente — dá para saber se entrou sem estar autenticado. Se entrou, segue para a página de sucesso como sempre; se ao fim de três tentativas continuar sem se saber, o botão **fica desativado** (marcar outra vez criaria uma segunda marcação à mesma pessoa) e a página manda ligar ao salão.
 
-A persistência offline do Firestore põe a escrita em fila. A marcação pode entrar horas depois, quando o cliente já foi a outro lado. Na criação de marcações queremos falhar depressa, não em silêncio.
+Coberto por `tests/timeout.test.mjs` (5), incluindo o facto de a escrita **não** ser cancelada — é por isso que é preciso ir confirmar em vez de dizer que falhou.
+
+**Nota sobre a descrição original:** falava em "fila offline". As transações do Firestore precisam de ligação e não são postas em fila, ao contrário de um `updateDoc` simples — o problema real era a espera sem fim, não a fila.
 
 ---
 

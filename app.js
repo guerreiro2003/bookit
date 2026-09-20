@@ -13,7 +13,7 @@ import {
   buildICS, googleCalendarUrl, addDaysStr, weekdayOf, WEEKDAY_KEYS as CORE_WEEKDAY_KEYS,
   normalizePhone, formatPhonePT, randomToken, manageUrl, whatsAppUrl, firstName, dateLabelPT, messageText,
   layoutServices, normaliseSegments, segmentsDuration, hasGap, busyAt, MAX_SERVICES_PER_BOOKING,
-  staffCanDo, staffFor,
+  staffCanDo, staffFor, withTimeout, sleep,
 } from './booking-core.js';
 
 // Re-export the pure core so pages import everything from one place.
@@ -24,7 +24,7 @@ export {
   buildICS, googleCalendarUrl, addDaysStr, weekdayOf,
   normalizePhone, formatPhonePT, randomToken, manageUrl, whatsAppUrl, firstName, dateLabelPT, messageText,
   layoutServices, normaliseSegments, segmentsDuration, hasGap, busyAt, MAX_SERVICES_PER_BOOKING,
-  staffCanDo, staffFor,
+  staffCanDo, staffFor, withTimeout, sleep,
 };
 
 /** Public origin of the app (for links sent to clients). */
@@ -58,6 +58,10 @@ export const SALON_DEFAULTS = {
   noShowPenalty: 5, pointsPerVisit: 10,
 };
 export const salonSetting = (salon, key) => (salon && salon[key] != null && salon[key] !== '') ? salon[key] : SALON_DEFAULTS[key];
+/** How long to wait for a booking before going to look for it. Firestore's own
+ *  retries take a while on a bad connection; 20 s is past patience for someone
+ *  standing in the street with one bar of signal. */
+export const BOOKING_TIMEOUT_MS = 20000;
 /** Today's date string in the salon's timezone (use instead of todayISO() in salon-facing screens). */
 export const todayForSalon = (salon) => nowInTimezone(salonSetting(salon, 'timezone')).dateStr;
 /** Is the salon currently allowed to take bookings? Mirrors planActive() in firestore.rules. */
@@ -341,6 +345,7 @@ export function friendlyError(e, fallback = 'Ocorreu um erro. Tenta novamente.')
     'deadline-exceeded':   'O pedido demorou demasiado. Tenta de novo.',
     'resource-exhausted':  'Limite de pedidos atingido. Aguarda um momento.',
     'aborted':             'Conflito ao guardar. Tenta de novo.',
+    'timeout':             'A ligação está muito lenta e não conseguimos confirmar a marcação. Não voltes a marcar já — liga ao salão para confirmar.',
   };
   if (String(code).startsWith('auth/')) return authErrorMessage(code);
   return map[code] || fallback;
@@ -542,8 +547,26 @@ export async function createBooking({ salonId, salon, ctx, service, services, st
   const phoneE164 = normalizePhone(client.phone);
 
   try {
-    return await runCreateTx();
+    // A booking that never resolves is the worst outcome for the person on the
+    // other side: they cannot tell whether they have an appointment. Cap the
+    // wait, and then go and find out.
+    return await withTimeout(runCreateTx(), BOOKING_TIMEOUT_MS);
   } catch (e) {
+    // Timed out. The write may still be travelling — a request already sent
+    // cannot be recalled — so do NOT say it failed until we have looked. The
+    // link projection is publicly readable by token, and we minted that token
+    // before starting, so it answers the question without needing a login.
+    if (e?.code === 'timeout') {
+      for (const wait of [1500, 3000, 5000]) {
+        await sleep(wait);
+        const l = await getDoc(linkRef(salonId, manageToken)).catch(() => null);
+        if (l?.exists()) {
+          const d = l.data();
+          return { id: d.bookingId, staff: candidates.find(s => s.id === d.staffId) || { id: d.staffId, name: d.staffName }, time: d.time, finalPrice, manageToken, slow: true };
+        }
+      }
+      throw err('timeout');
+    }
     // Race loser on the PUBLIC path: security rules ("+1 interval only") are
     // evaluated against the winner's fresh state before the version check, so
     // the SDK surfaces permission-denied instead of retrying. Re-read and, if
