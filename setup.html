@@ -275,15 +275,22 @@ $('#setupForm').addEventListener('submit', withLock('setup', async (e) => {
       bookingLeadMinutes: SALON_DEFAULTS.bookingLeadMinutes, maxAdvanceDays: SALON_DEFAULTS.maxAdvanceDays,
       cancellationHours: SALON_DEFAULTS.cancellationHours, closedDates: [],
       teamUid, teamEmail,
-      adminUid: uid, adminEmail: aEmail,
+      adminUid: uid,
       // Every new salon starts on a trial; the operator activates it (scripts/set-plan.mjs).
-      plan: 'trial', subscriptionStatus: 'trial',
+      // `plan` and `trialEndsAt` stay here because the security rules read them
+      // on every booking; the rest of the commercial relationship does not
+      // belong on a publicly readable document.
+      plan: 'trial',
       trialEndsAt: Timestamp.fromDate(new Date(Date.now() + TRIAL_DAYS * 86400000)),
       createdAt: serverTimestamp()
     });
     await salonBatch.commit();
 
     const batch = writeBatch(db);
+    // Owner-only: never travels with the public salon document.
+    batch.set(doc(db, 'salons', slug, 'private', 'billing'), {
+      adminEmail: aEmail, subscriptionStatus: 'trial', planUpdatedAt: serverTimestamp(),
+    });
     batch.set(doc(db, 'salons', slug, 'config', 'schedule'), schedule);
     batch.set(doc(db, 'salons', slug, 'users', uid), {
       email: aEmail, role: 'admin', createdAt: serverTimestamp()

@@ -20,7 +20,7 @@ O software funciona e está em produção. O que falta para o vender não é có
 | Importador CSV | ✅ Feito | 27 testes E2E, reimportação não duplica |
 | Retenção / reativação | ✅ Feito | 21 testes E2E, receita atribuída |
 | App Check | 🟡 Código pronto | Falta a chave reCAPTCHA (consola) |
-| Backups | 🟡 Manual funciona | Sem automatização; sem PITR |
+| Backups | 🟡 Restauro testado | Workflow pronto; faltam 2 segredos (KI-012) |
 | Contas individuais de equipa | ✅ Feito 20/09 | 26 testes E2E; rasto de quem fez o quê |
 | Notificações por email | ❌ Escritas, não lançadas | Exige Blaze |
 | Cobrança a salões | ❌ Não existe | `plan` muda por script |
@@ -29,18 +29,18 @@ O software funciona e está em produção. O que falta para o vender não é có
 
 ## Testes
 
-`npm run test:all` — **293 a passar**, zero a falhar.
+`npm run test:all` — **300 a passar**, zero a falhar.
 
 | Suite | N.º | O que cobre |
 |---|---|---|
 | unit (`*.test.mjs`) | 60 | Lógica pura: horários, cadência, métricas, CSV, quem-faz-o-quê |
 | `rules.integration` | 74 | Autorização e validação, via REST, contra produção |
-| `abuse.e2e` | 29 | **Ataques**, não o caminho feliz |
 | `engine.e2e` | 38 | Ciclo completo de marcação |
 | `links.e2e` | 18 | Confirmar/cancelar por token |
 | `retention.e2e` | 21 | Reativação e atribuição |
 | `import.e2e` | 27 | CSV → clientes → histórico → cadência |
 | `team-access.e2e` | 26 | Conceder, entrar, registar quem fez, revogar |
+| `abuse.e2e` (atualizada) | 36 | +7 sobre o que o documento público pode levar |
 | `concurrency.stress` | — | Marcações concorrentes no mesmo horário |
 
 ## Último trabalho
@@ -53,10 +53,10 @@ O software funciona e está em produção. O que falta para o vender não é có
 
 ## Próximo trabalho
 
-1. Backups automáticos fora da máquina do Pedro ← **a seguir**
-2. Rastreio de erros (Sentry) + monitor de uptime — ambos gratuitos
-3. Tirar `adminEmail`/`teamEmail` do documento público do salão (KI-003)
-4. CI: testes a correr a cada push (KI-011)
+1. Rastreio de erros (Sentry) + monitor de uptime ← **a seguir**, ambos gratuitos
+2. Falhar depressa quando o cliente está offline (KI-007)
+3. Vista de calendário semanal — um dono de salão pensa em semanas
+4. Fila de espera por cancelamento
 5. Termos de Serviço + contrato de subcontratação (precisa de advogado)
 
 ## Bloqueadores

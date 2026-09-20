@@ -10,7 +10,7 @@ import { ownerToken, listAll } from './_lib.mjs';
 
 const [outDirArg, onlySalon] = process.argv.slice(2);
 const outDir = outDirArg || 'backups';
-const SUBS = ['config', 'users', 'services', 'staff', 'promotions', 'site_gallery', 'site_partners', 'referrals', 'agenda', 'clients', 'bookings'];
+const SUBS = ['config', 'private', 'users', 'services', 'staff', 'promotions', 'site_gallery', 'site_partners', 'referrals', 'reactivations', 'bookingLinks', 'agenda', 'clients', 'bookings'];
 
 const token = await ownerToken();
 const salons = (await listAll(token, 'salons')).filter(s => !onlySalon || s.id === onlySalon);

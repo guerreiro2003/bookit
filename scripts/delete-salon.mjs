@@ -22,7 +22,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ownerToken, listAll, getDocument, deleteDocument, FS, api } from './_lib.mjs';
 
-const SUBS = ['config', 'users', 'services', 'staff', 'promotions', 'site_gallery', 'site_partners',
+const SUBS = ['config', 'private', 'staffAuth', 'users', 'services', 'staff', 'promotions', 'site_gallery', 'site_partners',
               'referrals', 'reactivations', 'bookingLinks', 'agenda', 'clients', 'bookings'];
 
 const args = process.argv.slice(2);

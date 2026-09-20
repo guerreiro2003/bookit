@@ -26,6 +26,11 @@ const refused = (name, r) => {
   if (!r.allowed) { pass++; console.log(`  ✓ recusado · ${name}`); }
   else { fail++; console.log(`  ✗ PERMITIDO · ${name}  ← falha de segurança`); }
 };
+/** A plain assertion, for facts that are not an attempt at anything. */
+const ok = (name, cond, d = '') => {
+  if (cond) { pass++; console.log(`  ✓ ${name}`); }
+  else { fail++; console.log(`  ✗ ${name} ${d}`); }
+};
 /** The legitimate path must still work. */
 const allowed = (name, r) => {
   if (r.allowed) { pass++; console.log(`  ✓ permitido · ${name}`); }
@@ -34,7 +39,12 @@ const allowed = (name, r) => {
 
 const salon = await loadSalon(SALON);
 const today = todayForSalon(salon);
-const FAR = addDaysStr(today, 400);          // far enough out to never collide with real work
+// Far enough out to never collide with real work, and a different day on each
+// run: a crash mid-suite leaves documents behind, and a fixed date would make
+// the NEXT run fail on a slot that is legitimately taken — a flaky test that
+// cries wolf about security is worse than no test.
+const DAY = 400 + (Date.now() % 40);
+const FAR = addDaysStr(today, DAY);
 const tidy = [];
 
 await signInWithEmailAndPassword(auth, ADMIN.email, ADMIN.pw);
@@ -112,7 +122,7 @@ const victimRef = doc(db, 'salons', SALON, 'bookings', `ABUSE-VICTIM-${Date.now(
 tidy.push(victimRef);
 await setDoc(victimRef, bookingFields({
   clientName: 'ABUSE-TEST vítima', clientEmail: VICTIM, clientPhone: '919 000 222',
-  clientPhoneE164: '351919000222', date: addDaysStr(today, 401), time: '10:00',
+  clientPhoneE164: '351919000222', date: addDaysStr(today, DAY + 1), time: '10:00',
   status: 'confirmed', source: 'admin', notes: 'NOTA PRIVADA: alergia a amoníaco',
 }));
 await signOut(auth);
@@ -152,17 +162,17 @@ if (otherSvc) {
   refused(`cliente marca "${otherSvc.name}" com quem só faz "${svc.name}"`, await attempt(() => setDoc(doc(collection(db, 'salons', SALON, 'bookings')), bookingFields({
     serviceIds: [otherSvc.id], serviceId: otherSvc.id, serviceName: otherSvc.name,
     serviceDuration: otherSvc.duration, servicePrice: otherSvc.price, finalPrice: otherSvc.price,
-    date: addDaysStr(today, 403), endMin: 600 + otherSvc.duration,
+    date: addDaysStr(today, DAY + 3), endMin: 600 + otherSvc.duration,
   }))));
   const combo = doc(collection(db, 'salons', SALON, 'bookings'));
   refused('nem numa combinação onde só metade é dela', await attempt(() => setDoc(combo, bookingFields({
     serviceIds: [svc.id, otherSvc.id], serviceId: svc.id, serviceName: `${svc.name} + ${otherSvc.name}`,
     serviceDuration: svc.duration + otherSvc.duration, servicePrice: svc.price + otherSvc.price,
-    finalPrice: svc.price + otherSvc.price, date: addDaysStr(today, 403), endMin: 600 + svc.duration + otherSvc.duration,
+    finalPrice: svc.price + otherSvc.price, date: addDaysStr(today, DAY + 3), endMin: 600 + svc.duration + otherSvc.duration,
   }))));
   const okRef = doc(collection(db, 'salons', SALON, 'bookings'));
   tidy.push(okRef);
-  allowed('mas o serviço que ela faz continua a passar', await attempt(() => setDoc(okRef, bookingFields({ date: addDaysStr(today, 403) }))));
+  allowed('mas o serviço que ela faz continua a passar', await attempt(() => setDoc(okRef, bookingFields({ date: addDaysStr(today, DAY + 3) }))));
   // back to "does everything" and the restriction disappears
   await signInWithEmailAndPassword(auth, ADMIN.email, ADMIN.pw);
   await updateDoc(staffRef, { serviceIds: [] });
@@ -172,19 +182,35 @@ if (otherSvc) {
   allowed('sem lista, volta a fazer tudo', await attempt(() => setDoc(freeRef, bookingFields({
     serviceIds: [otherSvc.id], serviceId: otherSvc.id, serviceName: otherSvc.name,
     serviceDuration: otherSvc.duration, servicePrice: otherSvc.price, finalPrice: otherSvc.price,
-    date: addDaysStr(today, 404), endMin: 600 + otherSvc.duration,
+    date: addDaysStr(today, DAY + 4), endMin: 600 + otherSvc.duration,
   }))));
   await signInWithEmailAndPassword(auth, ADMIN.email, ADMIN.pw);
   await updateDoc(staffRef, savedServiceIds ? { serviceIds: savedServiceIds } : { serviceIds: [] });
 } else console.log('  ⚪ só há um serviço — restrição por colaborador não testável');
 
-/* ══ 5. Money and tenancy — already solid, kept so they stay that way ════ */
+/* ══ 5. What the public salon document is allowed to carry ══════════════
+   It has `allow read: if true` — the booking page needs the name, the colour
+   and the opening rules with nobody signed in. It must not also hand out the
+   owner's email address or the commercial relationship.                    */
+console.log('\nO QUE É PÚBLICO');
+await signOut(auth);
+const pub = (await getDoc(doc(db, 'salons', SALON))).data();
+for (const f of ['adminEmail', 'subscriptionStatus', 'planUpdatedAt']) {
+  ok(`"${f}" não viaja no documento público`, pub[f] === undefined, `(valor: ${JSON.stringify(pub[f])})`);
+}
+ok('mas o que a página de marcação precisa continua lá', !!pub.name && !!pub.timezone && pub.plan !== undefined);
+refused('anónimo não lê a coleção privada', await attempt(() => getDoc(doc(db, 'salons', SALON, 'private', 'billing'))));
+refused('nem a lista', await attempt(() => getDocs(collection(db, 'salons', SALON, 'private'))));
+await signInWithEmailAndPassword(auth, ADMIN.email, ADMIN.pw);
+allowed('o dono lê a sua', await attempt(() => getDoc(doc(db, 'salons', SALON, 'private', 'billing'))));
+
+/* ══ 6. Money and tenancy — already solid, kept so they stay that way ════ */
 console.log('\nDINHEIRO E SEPARAÇÃO ENTRE SALÕES');
 await signOut(auth);
 refused('cliente forja o preço do serviço', await attempt(() => setDoc(doc(collection(db, 'salons', SALON, 'bookings')),
-  bookingFields({ servicePrice: 0.01, finalPrice: 0.01, date: addDaysStr(today, 402) }))));
+  bookingFields({ servicePrice: 0.01, finalPrice: 0.01, date: addDaysStr(today, DAY + 2) }))));
 refused('cliente marca já confirmada e paga', await attempt(() => setDoc(doc(collection(db, 'salons', SALON, 'bookings')),
-  bookingFields({ status: 'confirmed', paid: true, date: addDaysStr(today, 402) }))));
+  bookingFields({ status: 'confirmed', paid: true, date: addDaysStr(today, DAY + 2) }))));
 refused('anónimo lê a lista de clientes', await attempt(() => getDocs(collection(db, 'salons', SALON, 'clients'))));
 refused('anónimo lê a lista de marcações', await attempt(() => getDocs(collection(db, 'salons', SALON, 'bookings'))));
 

@@ -29,13 +29,17 @@ Cada pessoa passou a ter a sua conta (`staffAuth/{uid}`), e confirmar/cancelar/f
 
 ---
 
-## KI-003 · O documento público do salão expõe emails de administração
+## KI-003 · O documento público do salão ainda expõe o email da equipa
 
-**Gravidade:** alta · **Estado:** por corrigir
+**Gravidade:** média (era alta) · **Estado:** parcialmente resolvido 2026-09-20
 
-`salons/{id}` é de leitura pública (a página de marcação precisa). Leva consigo `adminEmail`, `teamEmail`, `adminUid`, `teamUid`, `plan` e `subscriptionStatus`. O `adminEmail` controla toda a carteira de clientes do salão e está à vista de qualquer pessoa.
+`adminEmail`, `subscriptionStatus` e `planUpdatedAt` passaram para `salons/{id}/private/billing`, que só o dono lê. Coberto por 7 testes na suite de abuso.
 
-**Solução:** mover as definições públicas para `salons/{id}/config/public` e fechar o documento do salão a staff.
+**O que falta:** `teamEmail` continua público, porque o login por password partilhada precisa dele **sem ninguém estar autenticado** — é inerente a essa funcionalidade. Vale metade de uma credencial de uma conta partilhada, num domínio que não recebe correio, com limitação de tentativas do Firebase do outro lado.
+
+**A solução é retirar o login partilhado**, agora que existem contas individuais ([KI-002](#ki-002)). Fica por fazer quando todos os salões ativos tiverem migrado.
+
+`adminUid`/`teamUid` continuam públicos e isso é aceitável: um uid não é credencial nem serve para autenticar.
 
 ---
 

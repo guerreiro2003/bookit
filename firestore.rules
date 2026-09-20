@@ -107,6 +107,17 @@ service cloud.firestore {
         allow write: if isAdmin(salonId);
       }
 
+      /* ───────────── owner-only ─────────────
+         The salon document is public — the booking page needs the name, the
+         colour and the opening rules. Anything that must NOT travel with it
+         lives here instead: the owner's own email address, and the commercial
+         relationship. A separate collection rather than a config sub-document
+         because `config/{document=**}` grants public read and Firestore rules
+         cannot carve an exception out of a wildcard.                        */
+      match /private/{document=**} {
+        allow read, write: if isAdmin(salonId);
+      }
+
       /* ───────────── who works here (authorization index, keyed by uid) ─────────────
          Only the owner grants or revokes access. A person may read their own
          entry so the portal can greet them by name; nobody can list the set,
