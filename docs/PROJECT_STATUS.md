@@ -17,6 +17,7 @@ O software funciona e está em produção. O que falta para o vender não é có
 | Agenda à prova de sabotagem | ✅ Corrigido 20/09 | Era explorável; ver [DECISIONS](DECISIONS.md#d-001) |
 | Identidade por email | ✅ Corrigido 20/09 | Exige `email_verified`; ver [DECISIONS](DECISIONS.md#d-002) |
 | Serviços por colaborador | ✅ Feito 20/09 | Verificado em produção no site do cliente |
+| Vista de semana | ✅ Feito 20/09 | Posições verificadas ao pixel em produção |
 | Importador CSV | ✅ Feito | 27 testes E2E, reimportação não duplica |
 | Retenção / reativação | ✅ Feito | 21 testes E2E, receita atribuída |
 | App Check | 🟡 Código pronto | Falta a chave reCAPTCHA (consola) |
@@ -53,9 +54,8 @@ O software funciona e está em produção. O que falta para o vender não é có
 
 ## Próximo trabalho
 
-1. Rastreio de erros (Sentry) + monitor de uptime ← **a seguir**, ambos gratuitos
-3. Vista de calendário semanal — um dono de salão pensa em semanas
-4. Fila de espera por cancelamento
+1. Fila de espera por cancelamento ← **a seguir**
+2. Rastreio de erros (Sentry) + monitor de uptime — ambos gratuitos
 5. Termos de Serviço + contrato de subcontratação (precisa de advogado)
 
 ## Bloqueadores

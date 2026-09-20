@@ -59,6 +59,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="8" y2="18"/><line x1="13" y1="14" x2="16" y2="14"/></svg>
         <span>Vista de dia</span>
       </button>
+      <button class="sidebar__link" type="button" data-action="show-panel" data-panel="week">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="12" y1="14" x2="12" y2="18"/></svg>
+        <span>Semana</span>
+      </button>
       <button class="sidebar__link" type="button" data-action="show-panel" data-panel="retention">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 10 9 10"/></svg>
         <span>Reativar</span>
@@ -345,6 +349,32 @@
           <div class="dayview__slots" id="dayviewSlots"></div>
         </div>
       </div>
+    </section>
+
+    <section class="panel" id="panel-week">
+      <div class="panel-header">
+        <div class="panel-header__title-row">
+          <h1 class="page-title">Semana</h1>
+          <p class="page-sub">Onde estão os buracos e quanto vale cada dia</p>
+        </div>
+        <div class="cluster">
+          <button class="btn btn--sm" type="button" data-action="week-prev" aria-label="Semana anterior">‹</button>
+          <span class="text-sm" id="weekLabel" style="min-width:11rem;text-align:center">—</span>
+          <button class="btn btn--sm" type="button" data-action="week-next" aria-label="Semana seguinte">›</button>
+          <button class="btn btn--sm" type="button" data-action="week-today">Esta semana</button>
+        </div>
+      </div>
+
+      <div class="stats mb-4" id="weekStats"></div>
+
+      <div class="week">
+        <div class="week__scroll">
+          <div class="week__grid" id="weekGrid">
+            <div class="week__hours" id="weekHours" aria-hidden="true"></div>
+          </div>
+        </div>
+      </div>
+      <p class="text-sm text-muted mt-3" id="weekHint"></p>
     </section>
 
     <section class="panel" id="panel-retention">
@@ -987,7 +1017,7 @@ import {
   STATUS_LABELS, statusBadge, withLock, friendlyError, salonSetting, SALON_DEFAULTS, planActive,
   debounce, toggleTheme, getTheme, setTheme,
   markBookingPaid, markBookingNoShow, confirmBooking, cancelBooking, restoreBooking, rescheduleBooking,
-  createBooking, computeAvailability, minToTime, timeToMin, isValidDateStr, BLOCKING_STATUSES,
+  createBooking, computeAvailability, minToTime, timeToMin, isValidDateStr, BLOCKING_STATUSES, resolveDayWindow,
   whatsAppFor, markMessageSent, addDaysStr, formatRelativeTime,
   loadRetention, logReactivation, deleteReactivation, reactivationLink, whatsAppUrl, randomToken, formatPhonePT, firstName,
   loadImportContext, runImport,
@@ -997,7 +1027,7 @@ import {
   isEmail, isPhone, isHexColor
 } from './app.js';
 
-import { computeBaseline, computeRecovered, pct, eur } from './metrics-core.js';
+import { computeBaseline, computeRecovered, availableMinutes, pct, eur } from './metrics-core.js';
 import { buildClientProfiles, reactivationCandidates, retentionSummary, explain, reactivationMessage, RISK } from './retention-core.js';
 import { analyseImport } from './import-core.js';
 
@@ -1165,6 +1195,7 @@ on('show-panel', (el) => {
   if (id === 'partners')   loadPartners();
   if (id === 'staff')      { loadStaff().then(refreshOnboarding); }
   if (id === 'dayview')    initDayview();
+  if (id === 'week')       initWeek();
   if (id === 'business')   loadBusiness();
   if (id === 'retention')  loadRetentionPanel();
   if (id === 'dashboard')  refreshOnboarding();
@@ -3030,17 +3061,26 @@ on('remove-time-off', async (el) => {
 });
 
 /* ── DAY VIEW ────────────────────────────────────────────── */
-function initDayview() {
-  const today = todayISO();
-  if (!$('#dayviewDate').value) $('#dayviewDate').value = today;
-  renderDayviewHours();
-  renderDayview();
+/* The hours a timetable needs to show, taken from the salon's real schedule
+   rather than a guess. A fixed 08:00–20:00 hid every booking at a salon that
+   opens at seven — the early ones were dropped and the late ones overflowed. */
+function hourWindow(dates) {
+  let open = null, close = null;
+  for (const d of dates) {
+    const w = resolveDayWindow({ salonSchedule: bookingCtx.schedule, staff: null, dateStr: d, closedDates: salon.closedDates || [] });
+    if (w.closed) continue;
+    open = open == null ? w.open : Math.min(open, w.open);
+    close = close == null ? w.close : Math.max(close, w.close);
+  }
+  // Every day closed (holiday week, or no schedule yet) — show a sane day.
+  if (open == null) { open = 9 * 60; close = 19 * 60; }
+  return { from: Math.floor(open / 60), to: Math.ceil(close / 60) };
 }
-function renderDayviewHours() {
-  $('#dayviewHours').innerHTML = Array.from({length: 12}, (_, i) => {
-    const h = 8 + i;
-    return `<div class="dayview__hour">${String(h).padStart(2,'0')}:00</div>`;
-  }).join('');
+
+function initDayview() {
+  const today = todayForSalon(salon);
+  if (!$('#dayviewDate').value) $('#dayviewDate').value = today;
+  renderDayview();
 }
 on('dayview-prev', () => {
   const d = new Date($('#dayviewDate').value); d.setDate(d.getDate() - 1);
@@ -3054,15 +3094,20 @@ on('dayview-today', () => { $('#dayviewDate').value = todayISO(); renderDayview(
 on('dayview-change', renderDayview);
 
 function renderDayview() {
-  const date = $('#dayviewDate').value || todayISO();
+  const date = $('#dayviewDate').value || todayForSalon(salon);
   const d = new Date(date);
   $('#dayviewTitle').textContent = `${d.getDate()} ${MONTHS_FULL[d.getMonth()]} ${d.getFullYear()}`;
   const bookings = cachedBookings.filter(b => b.date === date && b.status !== 'cancelled');
   $('#dayviewCount').textContent = `${bookings.length} marcação${bookings.length !== 1 ? 'es' : ''}`;
 
+  const { from: HOUR_START, to: HOUR_END } = hourWindow([date]);
+  const hours = Math.max(1, HOUR_END - HOUR_START);
+  $('#dayviewHours').innerHTML = Array.from({ length: hours }, (_, i) =>
+    `<div class="dayview__hour">${String(HOUR_START + i).padStart(2, '0')}:00</div>`).join('');
+
   const slots = $('#dayviewSlots');
-  slots.style.height = `${12 * 64}px`;
-  const HOUR_START = 8, PX_PER_MIN = 64 / 60;
+  slots.style.height = `${hours * 64}px`;
+  const PX_PER_MIN = 64 / 60;
   slots.innerHTML = bookings.map(b => {
     const [h, m] = b.time.split(':').map(Number);
     const top = ((h - HOUR_START) * 60 + m) * PX_PER_MIN;
@@ -3081,6 +3126,142 @@ function renderDayview() {
       </div>`;
   }).join('');
 }
+
+/* ── SEMANA ──────────────────────────────────────────────────
+   A lista diz o que há; a semana diz onde estão os buracos. É assim que um
+   dono de salão pensa — "a quinta está fraca" — e não marcação a marcação. */
+let weekStart = null;                         // Monday of the week being shown
+let weekCache = { from: null, rows: [] };
+
+/** Monday of the week containing `dateStr`, as a date string. */
+function mondayOf(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');   // midday: immune to DST edges
+  const back = (d.getDay() + 6) % 7;           // Sunday=0 → 6 days back
+  return formatDate(new Date(d.getTime() - back * 86400000));
+}
+
+on('week-prev',  () => { weekStart = addDaysStr(weekStart, -7); loadWeek(); });
+on('week-next',  () => { weekStart = addDaysStr(weekStart, 7);  loadWeek(); });
+on('week-today', () => { weekStart = mondayOf(todayForSalon(salon)); loadWeek(); });
+
+async function initWeek() {
+  if (!weekStart) weekStart = mondayOf(todayForSalon(salon));
+  await loadWeek();
+}
+
+async function loadWeek() {
+  const days = Array.from({ length: 7 }, (_, i) => addDaysStr(weekStart, i));
+  const to = days[6];
+  $('#weekLabel').textContent = weekRangeLabel(days[0], to);
+  try {
+    // Query the week itself. Filtering the 500-booking cache would silently
+    // lose anything older or further out than that window.
+    if (weekCache.from !== weekStart) {
+      const snap = await getDocs(query(collection(db, 'salons', salonId, 'bookings'),
+        where('date', '>=', weekStart), where('date', '<=', to)));
+      weekCache = { from: weekStart, rows: snap.docs.map(d => ({ id: d.id, ...d.data() })) };
+    }
+    renderWeek(days);
+  } catch (e) { console.error(e); toastError(friendlyError(e, 'Não foi possível carregar a semana.')); }
+}
+
+function weekRangeLabel(from, to) {
+  const a = new Date(from + 'T12:00:00'), b = new Date(to + 'T12:00:00');
+  const sameMonth = a.getMonth() === b.getMonth();
+  return sameMonth
+    ? `${a.getDate()}–${b.getDate()} ${MONTHS_FULL[b.getMonth()]}`
+    : `${a.getDate()} ${MONTHS_FULL[a.getMonth()].slice(0, 3)} – ${b.getDate()} ${MONTHS_FULL[b.getMonth()].slice(0, 3)}`;
+}
+
+const WEEK_DAY_NAMES = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+
+function renderWeek(days) {
+  const today = todayForSalon(salon);
+  const live = weekCache.rows.filter(b => b.status !== 'cancelled');
+  const { from: H0, to: H1 } = hourWindow(days);
+  const hours = Math.max(1, H1 - H0);
+  const PX_PER_MIN = 56 / 60;
+  const height = hours * 56;
+
+  const hoursCol = `<div class="week__hours" id="weekHours" aria-hidden="true">` +
+    `<div class="week__dayhead"></div>` +
+    `<div class="week__hourcol" style="height:${height}px">` +
+    Array.from({ length: hours }, (_, i) =>
+      `<div class="week__hour" style="height:56px">${String(H0 + i).padStart(2, '0')}:00</div>`).join('') +
+    `</div></div>`;
+
+  const cols = days.map((date, i) => {
+    const w = resolveDayWindow({ salonSchedule: bookingCtx.schedule, staff: null, dateStr: date, closedDates: salon.closedDates || [] });
+    const dayRows = live.filter(b => b.date === date).sort((a, b) => a.time.localeCompare(b.time));
+    const money = dayRows.reduce((a, b) => a + (Number(b.finalPrice ?? b.servicePrice) || 0), 0);
+    const d = new Date(date + 'T12:00:00');
+    const isToday = date === today;
+    const isPast = date < today;
+
+    const head = htmlMix`<div class="week__dayhead ${raw(isToday ? 'is-today' : '')} ${raw(isPast ? 'is-past' : '')}">
+      <div class="week__dayname">${WEEK_DAY_NAMES[i]}</div>
+      <div class="week__daynum">${d.getDate()}</div>
+      <div class="week__daymeta">${raw(w.closed ? 'fechado' : `${dayRows.length} · ${escapeHTML(eur(money))}`)}</div>
+    </div>`;
+
+    if (w.closed) {
+      return `<div class="week__col">${head}<div class="week__day week__day--closed" style="height:${height}px"></div></div>`;
+    }
+
+    // Breaks drawn behind the bookings, so lunch does not read as a free hole.
+    const shade = (w.breaks || []).map(br => {
+      const top = (br.start - H0 * 60) * PX_PER_MIN;
+      const h = (br.end - br.start) * PX_PER_MIN;
+      return `<div class="week__break" style="top:${Math.max(0, top)}px;height:${Math.max(0, h)}px"></div>`;
+    }).join('');
+
+    const events = dayRows.map(b => {
+      const start = b.startMin ?? timeToMin(b.time) ?? 0;
+      const top = (start - H0 * 60) * PX_PER_MIN;
+      const h = Math.max(18, (b.serviceDuration || 30) * PX_PER_MIN);
+      if (top < -h) return '';
+      const canPay = !b.paid && !['cancelled', 'noshow', 'completed'].includes(b.status);
+      const act = canPay
+        ? htmlMix`data-action="open-pay" data-id="${b.id}" data-client="${b.clientName}" data-amount="${b.finalPrice ?? b.servicePrice}"`
+        : raw('');
+      return htmlMix`<div class="week__event week__event--${raw(b.status)}" style="top:${raw(Math.max(0, top))}px;height:${raw(h)}px"
+        title="${b.time} · ${b.clientName} · ${b.serviceName}${b.staffName ? ' · ' + b.staffName : ''}" ${act}>
+        <span class="week__event-time">${b.time}</span> ${firstName(b.clientName) || b.clientName}</div>`;
+    }).join('');
+
+    return `<div class="week__col">${head}<div class="week__day" style="height:${height}px" data-action="week-open-day" data-date="${date}">${shade}${events}</div></div>`;
+  }).join('');
+
+  $('#weekGrid').innerHTML = hoursCol + cols;
+
+  /* ── the numbers that make the week worth opening ── */
+  const total = live.length;
+  const money = live.reduce((a, b) => a + (Number(b.finalPrice ?? b.servicePrice) || 0), 0);
+  const openDays = days.filter(d => !resolveDayWindow({ salonSchedule: bookingCtx.schedule, staff: null, dateStr: d, closedDates: salon.closedDates || [] }).closed);
+  const sellable = availableMinutes({ from: days[0], to: days[6], schedule: bookingCtx.schedule, staff: bookingCtx.staff, closedDates: salon.closedDates || [] }).total;
+  const booked = live.reduce((a, b) => a + (Number(b.serviceDuration) || 0), 0);
+  const pending = live.filter(b => b.status === 'pending').length;
+  const busiest = openDays.map(d => ({ d, n: live.filter(b => b.date === d).length })).sort((a, b) => b.n - a.n)[0];
+  const quietest = openDays.map(d => ({ d, n: live.filter(b => b.date === d).length })).sort((a, b) => a.n - b.n)[0];
+
+  $('#weekStats').innerHTML = [
+    statCard('Marcações', String(total), `${pending} por confirmar`),
+    statCard('Valor da semana', eur(money), total ? `ticket ${eur(money / total)}` : 'sem marcações'),
+    statCard('Ocupação', sellable ? pct(booked / sellable) : '—', `${Math.round(booked / 60)}h de ${Math.round(sellable / 60)}h vendáveis`),
+    statCard('Dia mais fraco', quietest ? WEEK_DAY_NAMES[days.indexOf(quietest.d)] : '—', quietest ? `${quietest.n} marcação(ões)` : ''),
+  ].join('');
+
+  $('#weekHint').textContent = !total
+    ? 'Semana vazia. Carrega num dia para marcar.'
+    : busiest && quietest && busiest.n - quietest.n >= 3
+      ? `${WEEK_DAY_NAMES[days.indexOf(quietest.d)]} está com ${quietest.n} e ${WEEK_DAY_NAMES[days.indexOf(busiest.d)]} com ${busiest.n} — o painel Reativar é o sítio para encher o dia fraco.`
+      : 'Carrega numa marcação para registar o pagamento, ou num dia para o abrir.';
+}
+
+on('week-open-day', (el) => {
+  $('#dayviewDate').value = el.dataset.date;
+  document.querySelector('.sidebar__link[data-panel="dayview"]').click();
+});
 
 /* ── COMMAND PALETTE (Cmd+K) ─────────────────────────────── */
 const cmdkOverlay = $('#cmdkOverlay'), cmdkInput = $('#cmdkInput'), cmdkList = $('#cmdkList');

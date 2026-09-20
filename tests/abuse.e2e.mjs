@@ -241,7 +241,13 @@ if (attacker) {
 await signOut(auth);
 await signInWithEmailAndPassword(auth, ADMIN.email, ADMIN.pw);
 for (const ref of tidy) await deleteDoc(ref).catch(() => {});
-for (const d of (await getDocs(query(collection(db, 'salons', SALON, 'bookings'), where('clientName', '==', 'ABUSE-TEST visitante')))).docs) await deleteDoc(d.ref).catch(() => {});
+// Sweep by name as well as by reference: a run that crashes before this point
+// leaves documents behind, and they were showing up weeks later in the week view.
+for (const name of ['ABUSE-TEST visitante', 'ABUSE-TEST vítima']) {
+  for (const d of (await getDocs(query(collection(db, 'salons', SALON, 'bookings'), where('clientName', '==', name)))).docs) {
+    await deleteDoc(d.ref).catch(() => {});
+  }
+}
 await signOut(auth);
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
