@@ -18,7 +18,15 @@ Um cancelamento às quatro da tarde deixa o dia seguinte às dez vazio, e ningu�
 
 ### Vista de semana
 
-Ver a entrada 2.7.1 abaixo.
+A lista diz o que há; a semana diz onde estão os buracos. É assim que um dono de salão pensa — *"a quinta está fraca"* — e não marcação a marcação.
+
+- Sete colunas, dias fechados às riscas, pausas sombreadas para o almoço não parecer um buraco livre, hoje destacado, passado esbatido. Carregar numa marcação abre o pagamento; num dia abre o dia.
+- Números que fazem valer a pena abrir: marcações, valor, ocupação sobre minutos vendáveis reais, e qual é o dia mais fraco — com uma frase a mandar ao painel Reativar quando a diferença entre o melhor e o pior dia chega a 3 marcações.
+- Consulta a semana diretamente em vez de filtrar a cache de 500 marcações, que perderia em silêncio tudo o que caísse fora dela.
+
+**Bug corrigido de caminho:** a vista de dia assumia 08:00–20:00 fixo. Num salão que abrisse às 7h, as marcações da primeira hora eram simplesmente descartadas e as do fim transbordavam. Agora a janela vem do horário real.
+
+**E no CSS:** `--fg-3` era usado 8 vezes e nunca tinha sido definido; `--bg-1` e `--bg-2` idem. Passavam despercebidos porque um `var()` sem alternativa herda em silêncio. Auditei os tokens todos — agora resolvem todos.
 
 ## 2.7.0 — 2026-09-20 · Cada pessoa com a sua conta, e rasto de quem fez o quê
 
