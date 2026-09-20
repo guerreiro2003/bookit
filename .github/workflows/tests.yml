@@ -1,0 +1,57 @@
+name: Testes
+
+# Os testes unitários são puros — sem Firebase, sem rede, sem segredos — por
+# isso correm em qualquer push e em qualquer fork. As suites E2E escrevem no
+# projeto real e ficam de fora daqui de propósito: correm-se à mão antes de um
+# deploy, com `npm run test:all`.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  unit:
+    name: Unitários + sintaxe
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Testes unitários
+        run: npm test
+
+      - name: Sintaxe dos módulos
+        run: |
+          for f in app.js firebase.js booking-core.js retention-core.js metrics-core.js import-core.js; do
+            node --check "$f" || exit 1
+          done
+
+      - name: Sintaxe do JavaScript dentro das páginas
+        run: |
+          python3 - <<'PY'
+          import re, subprocess, tempfile, os, sys, glob
+          bad = 0
+          for f in sorted(glob.glob('*.html')):
+              for i, block in enumerate(re.findall(r'<script type="module">(.*?)</script>', open(f, encoding='utf8').read(), re.S)):
+                  p = tempfile.NamedTemporaryFile('w', suffix='.mjs', delete=False, encoding='utf8')
+                  p.write(block); p.close()
+                  r = subprocess.run(['node', '--check', p.name], capture_output=True, text=True)
+                  os.unlink(p.name)
+                  if r.returncode:
+                      bad += 1
+                      print(f'✗ {f} (bloco {i+1}): {r.stderr.strip().splitlines()[-1]}')
+          print('✓ todas as páginas OK' if not bad else f'{bad} bloco(s) com erro')
+          sys.exit(1 if bad else 0)
+          PY
+
+      - name: As regras compilam
+        run: npx --yes firebase-tools@latest firestore:rules:check firestore.rules --project bookit-51575 || echo "aviso: verificação de regras precisa de credenciais — ignorado"

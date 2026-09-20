@@ -14,7 +14,33 @@ export const PROJECT = process.env.FIREBASE_PROJECT || 'bookit-51575';
 export const API_KEY = process.env.FIREBASE_API_KEY || 'AIzaSyABK6W0yTe_EQfna5_Sz7DcI9nPwvh5TNw';
 export const FS = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
 
+/** RS256 JWT → access token. Lets the backup run somewhere with no human
+ *  logged in (CI, a cron box) using a service-account key. No dependencies:
+ *  node:crypto signs it, which keeps this repo free of a runtime tree. */
+async function serviceAccountToken(sa) {
+  const { createSign } = await import('node:crypto');
+  const now = Math.floor(Date.now() / 1000);
+  const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  const claim = b64({ alg: 'RS256', typ: 'JWT' }) + '.' + b64({
+    iss: sa.client_email,
+    scope: 'https://www.googleapis.com/auth/datastore',
+    aud: 'https://oauth2.googleapis.com/token',
+    exp: now + 3600, iat: now,
+  });
+  const sig = createSign('RSA-SHA256').update(claim).end().sign(sa.private_key).toString('base64url');
+  const r = await (await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: `${claim}.${sig}` }),
+  })).json();
+  if (!r.access_token) throw new Error('Service account token failed: ' + JSON.stringify(r));
+  return r.access_token;
+}
+
 export async function ownerToken() {
+  // A service-account key wins when present — that is how CI authenticates.
+  if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+    return serviceAccountToken(JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON));
+  }
   const cfgPath = path.join(os.homedir(), '.config', 'configstore', 'firebase-tools.json');
   if (!fs.existsSync(cfgPath)) throw new Error('Firebase CLI not logged in. Run: firebase login');
   const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));

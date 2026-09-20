@@ -97,8 +97,27 @@ Todo o código vive em `<script type="module">` dentro do HTML, por isso a CSP t
 
 ---
 
-## KI-011 · Sem CI
+## KI-011 · CI parcial
 
-**Gravidade:** média · **Estado:** por corrigir
+**Gravidade:** baixa · **Estado:** parcialmente resolvido 2026-09-20
 
-Não há `.github/workflows`. Os testes correm quando alguém se lembra, e o deploy é manual a partir do portátil.
+Os testes unitários e a verificação de sintaxe passaram a correr a cada push (`.github/workflows/tests.yml`). **As suites E2E continuam de fora**, porque escrevem no projeto real — correm-se à mão com `npm run test:all` antes de um deploy. O deploy também continua manual.
+
+
+---
+
+## KI-012 · Backup automático à espera de dois segredos
+
+**Gravidade:** alta · **Estado:** código pronto, falta configuração
+
+`.github/workflows/backup.yml` está escrito, cifra os dados antes de os guardar e confirma que o ficheiro volta a abrir. Falta o Pedro criar `GOOGLE_SERVICE_ACCOUNT_JSON` e `BACKUP_PASSPHRASE` nos segredos do repositório — instruções no cabeçalho do workflow e em `DISASTER_RECOVERY.md`.
+
+Até lá, o único backup é o que se corre à mão, e só existe no portátil dele.
+
+---
+
+## KI-013 · Sem PITR nem proteção contra apagar a base de dados
+
+**Gravidade:** média · **Estado:** decisão de negócio ([D-004](DECISIONS.md#d-004))
+
+Ambos exigem plano Blaze. Sem PITR, a granularidade de recuperação é o último backup — perde-se até 24 horas. Sem proteção contra apagar, alguém com acesso ao projeto pode destruir o Firestore inteiro de uma vez.

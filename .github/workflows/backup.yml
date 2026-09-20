@@ -1,0 +1,87 @@
+name: Backup diário
+
+# Um backup que só existe no portátil de uma pessoa não é um backup. Este corre
+# todos os dias às 03:00 de Lisboa, cifra o ficheiro antes de o guardar — os
+# dados de clientes NUNCA ficam em claro fora da Google — e mantém 90 dias.
+#
+# Para ligar, dois segredos em Settings → Secrets → Actions:
+#
+#   GOOGLE_SERVICE_ACCOUNT_JSON   o JSON de uma service account do projeto
+#                                 bookit-51575 com o papel "Cloud Datastore
+#                                 Viewer" (Console → IAM → Contas de serviço →
+#                                 Criar → Chaves → Adicionar chave → JSON).
+#                                 Viewer chega: este workflow só lê.
+#
+#   BACKUP_PASSPHRASE             uma frase longa que só tu tens. SEM ELA O
+#                                 BACKUP É INÚTIL — guarda-a no gestor de
+#                                 passwords, não neste repositório.
+#
+# Restaurar:
+#   BACKUP_PASSPHRASE="<a tua frase>" node scripts/crypt.mjs dec bookit-….json.enc
+#   node scripts/backup-restore.mjs bookit-….json
+
+on:
+  schedule:
+    - cron: '0 2 * * *'      # 02:00 UTC = 03:00 em Lisboa no verão
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Exportar
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$GOOGLE_SERVICE_ACCOUNT_JSON" ]; then
+            echo "::error::Falta o segredo GOOGLE_SERVICE_ACCOUNT_JSON — ver o cabeçalho deste ficheiro."
+            exit 1
+          fi
+          node scripts/backup-export.mjs backups
+
+      - name: Cifrar
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          if [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "::error::Falta o segredo BACKUP_PASSPHRASE. Sem cifra os dados dos clientes ficariam em claro no GitHub — recusado."
+            exit 1
+          fi
+          for f in backups/*.json; do
+            node scripts/crypt.mjs enc "$f"
+            rm -f "$f"          # nunca guardar a versão em claro
+          done
+          ls -lh backups/
+
+      - name: Confirmar que o backup abre mesmo
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          # Um backup que não se consegue abrir não é um backup. Decifra-o de
+          # volta e confirma que traz mesmo salões, antes de o guardar.
+          for f in backups/*.enc; do
+            node scripts/crypt.mjs dec "$f"
+            node scripts/verify-backup.mjs "${f%.enc}"
+            rm -f "${f%.enc}"
+          done
+
+      - name: Guardar
+        uses: actions/upload-artifact@v4
+        with:
+          name: bookit-backup-${{ github.run_number }}
+          path: backups/*.enc
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Resumo
+        run: |
+          echo "### Backup concluído" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Ficheiro cifrado guardado por 90 dias. Sem a \`BACKUP_PASSPHRASE\` não é possível lê-lo — nem por mim, nem pelo GitHub." >> $GITHUB_STEP_SUMMARY

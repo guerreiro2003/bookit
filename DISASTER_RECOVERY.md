@@ -1,51 +1,124 @@
-# Disaster recovery
+# Recuperação de desastre
 
-Cenário: "o projeto Firebase desapareceu / foi corrompido / alguém apagou dados". O que existe e como se recupera.
+O que fazer quando correr mal. Escrito para ser seguido às 9h de uma segunda-feira com um salão ao telefone.
 
-## O que tem de estar guardado fora do projeto
-| Item | Onde | Como recuperar |
+**O ensaio completo foi corrido a 2026-09-20** — backup → cifrar → decifrar → verificar → restaurar → verificar → limpar. Funcionou e está coberto pelos comandos abaixo. Volta a correr o ensaio de três em três meses; um plano que ninguém executa é uma esperança, não um plano.
+
+---
+
+## O que existe
+
+| Camada | Estado | Cobre |
 |---|---|---|
-| Código (todas as páginas, regras, índices, scripts) | Repositório Git (`github.com/guerreiro2003/bookit`, `…/zenorganic`) | `git clone` + `firebase deploy` |
-| Dados (salões, serviços, equipa, clientes, marcações, agenda…) | **Backups** — ver abaixo | `scripts/backup-restore.mjs` ou Firestore import |
-| Contas de autenticação (emails/passwords hash) | Não são exportadas pelos backups lógicos | `firebase auth:export users.json` (Firebase CLI) — agendar junto com o backup |
-| Configuração do projeto (Auth providers, domínios autorizados, API key restrictions) | Este documento + `PRODUCTION_CHECKLIST.md` | Refazer manualmente na consola (≈15 min) |
+| Backup lógico diário, cifrado (GitHub Actions) | Pronto — falta ligar os dois segredos | Apagamento acidental, escrita má, salão perdido |
+| Backup manual (`npm run backup`) | A funcionar | O mesmo, quando te lembras |
+| Point-in-time recovery do Firestore | **Não existe** — exige Blaze | Voltar a um instante exato das últimas 24h/7 dias |
+| Proteção contra apagar a base de dados | **Desativada** — exige Blaze | Alguém apagar o Firestore inteiro |
+| Histórico de versões do Hosting | A funcionar | Deploy mau do site |
 
-## Backups
+Enquanto o PITR não existir, a granularidade é a do último backup: **perde-se até 24 horas**.
 
-### Opção A — Backup lógico (funciona no plano gratuito)
+---
+
+## Fazer um backup agora
+
 ```bash
-node scripts/backup-export.mjs backups            # todos os salões → backups/bookit-<timestamp>.json
-node scripts/backup-export.mjs backups demo       # só um salão
-firebase auth:export backups/auth-$(date +%F).json --format=json
+npm run backup
 ```
-Agendar (cron diário numa máquina do operador ou GitHub Actions com um token de CI — `firebase login:ci`). Guardar os ficheiros **fora** do Google Cloud (ex.: disco cifrado + armazenamento de objetos noutro fornecedor). Retenção sugerida: diários 30 dias, mensais 12 meses. Os ficheiros contêm dados pessoais → cifrar em repouso e restringir acesso.
 
-### Opção B — Backups geridos do Firestore (recomendado em produção; plano Blaze)
-Consola Firebase → Firestore → *Disaster recovery*: ativar **Point-in-time recovery (7 dias)** e **Scheduled backups** (diários, retenção até 14 semanas). Restauro para uma base nova via `gcloud firestore restore`.
+Escreve `backups/bookit-<data>.json` com todos os salões e subcoleções. Corre isto **antes de qualquer operação destrutiva** — o `delete-salon.mjs` recusa-se a correr sem um backup do próprio dia.
 
-## Restauro
+Verificar que presta:
 
-### Um salão, a partir do backup lógico
 ```bash
-node scripts/backup-restore.mjs backups/bookit-2026-09-15.json demo        # dry-run: mostra contagens
-node scripts/backup-restore.mjs backups/bookit-2026-09-15.json demo --yes  # escreve (sobrepõe docs com o mesmo id)
+npm run backup:verify backups/bookit-<data>.json
 ```
-Depois: `node scripts/set-plan.mjs demo active` se necessário e verificar o login do admin e da equipa (`firebase auth:import` se as contas também se perderam).
 
-### Projeto inteiro perdido
-1. Criar projeto Firebase novo (região UE); ativar Auth Email/Password; criar site(s) de Hosting.
-2. Atualizar `firebase.js` (config), `.firebaserc` (projeto/targets) e `firebase.json` (site).
-3. `npm run deploy` (regras + índices + hosting). Esperar os índices ficarem *Enabled*.
-4. `firebase auth:import backups/auth-<data>.json --hash-algo=SCRYPT …` (parâmetros de hash vêm de Authentication → Users → ⋮ → *Password hash parameters* do projeto antigo — **guardar esses parâmetros junto do backup**).
-5. Restaurar cada salão com `backup-restore.mjs`.
-6. Reconfigurar: domínios autorizados, restrições da API key, App Check, extensão de email.
-7. Testar o fluxo completo (checklist secção 3).
+Um export vazio parece ter corrido bem e não serve para nada. O verificador apanha isso, e apanha leituras incompletas.
 
-## RPO / RTO indicativos
-- Backup lógico diário: perda máxima de 24h de dados; restauro de um salão ≈ 10 min; projeto inteiro ≈ 1–2 h.
-- PITR: perda máxima de ~1 min; restauro ≈ 30 min.
+---
 
-## Segredos e acessos necessários para recuperar
-- Conta Google dona do projeto (com 2FA e recuperação configuradas) — **guardar códigos de recuperação offline**.
-- `firebase login` de um operador com papel *Owner/Editor*.
-- Parâmetros de hash das passwords (ver ponto 4) e os ficheiros de backup cifrados.
+## Cenários
+
+### 1. Alguém apagou marcações ou clientes por engano
+
+```bash
+npm run backup                                            # preserva o estado atual primeiro
+npm run restore backups/<ficheiro>.json <salonId> --as ensaio-restauro --yes
+```
+
+Restaura **ao lado** do salão vivo, num id descartável. Confirma no painel que os dados estão certos, e só então escreve por cima:
+
+```bash
+npm run restore backups/<ficheiro>.json <salonId> --yes
+node scripts/delete-salon.mjs ensaio-restauro --yes
+```
+
+Sem `--yes` qualquer um destes comandos só mostra o que faria.
+
+### 2. Um salão inteiro desapareceu
+
+Igual ao cenário 1, mas o `--as` é escusado: não há nada por cima do que escrever.
+
+```bash
+npm run restore backups/<ficheiro>.json <salonId> --yes
+```
+
+### 3. Um deploy partiu o site
+
+Consola do Firebase → Hosting → Versões → **Repor** a anterior. Não toca nos dados.
+
+### 4. As regras de segurança ficaram demasiado abertas ou demasiado fechadas
+
+```bash
+git log --oneline -- firestore.rules      # encontra a última versão boa
+git checkout <commit> -- firestore.rules
+npm run deploy:rules
+npm run test:abuse                        # confirma que os ataques continuam a ser recusados
+```
+
+### 5. Um backup do GitHub Actions
+
+Actions → **Backup diário** → a corrida que queres → descarregar o artefacto.
+
+```bash
+BACKUP_PASSPHRASE="<a tua frase>" npm run backup:decrypt bookit-<data>.json.enc
+npm run backup:verify bookit-<data>.json
+```
+
+**Sem a frase, o ficheiro é inútil** — nem para ti, nem para o GitHub. Guarda-a no gestor de passwords, nunca no repositório.
+
+---
+
+## Ligar o backup automático
+
+Dois segredos em **Settings → Secrets and variables → Actions**:
+
+| Segredo | Onde obter |
+|---|---|
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | Consola Google Cloud → IAM → Contas de serviço → Criar. Papel **Cloud Datastore Viewer** (só leitura, é quanto basta). Chaves → Adicionar chave → JSON → cola o conteúdo todo. |
+| `BACKUP_PASSPHRASE` | Inventa uma frase longa. Guarda-a no gestor de passwords. |
+
+O workflow corre às 03:00 de Lisboa, cifra antes de guardar, **decifra outra vez para confirmar que o ficheiro abre**, e mantém 90 dias. Sem qualquer dos segredos, falha em vez de guardar dados em claro.
+
+---
+
+## Ensaio trimestral
+
+```bash
+npm run backup
+npm run backup:verify backups/<o-mais-recente>.json
+npm run restore backups/<o-mais-recente>.json <salonId> --as ensaio-$(date +%s) --yes
+# confere no painel, depois:
+node scripts/delete-salon.mjs ensaio-<…> --yes
+```
+
+Anota a data do último ensaio em [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md).
+
+---
+
+## O que isto ainda não cobre
+
+- **Contas de autenticação.** Os backups levam os dados do Firestore, não os utilizadores do Firebase Auth. Perder o projeto significa que admins, equipa e clientes têm de recriar conta. Os dados sobrevivem; os logins não.
+- **Menos de 24 horas.** Sem PITR, a granularidade é o último backup.
+- **O projeto Firebase em si.** Se a conta Google for perdida ou suspensa, os backups em GitHub são o que resta — e não trazem o Auth de volta.

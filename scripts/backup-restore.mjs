@@ -1,26 +1,69 @@
-/* Operator-only: restore one salon from a backup-export JSON file into the
- * project (same or a fresh one). Writes documents with their original IDs;
- * existing documents are overwritten. Bypasses security rules.
+/* Operator-only: restore one salon from a backup-export JSON into the project.
+ * Writes documents with their original ids; existing documents are overwritten.
+ * Bypasses security rules.
  *
- *   node scripts/backup-restore.mjs <backup.json> <salonId> [--yes]
+ *   node scripts/backup-restore.mjs <backup.json> <salonId>                 # dry run
+ *   node scripts/backup-restore.mjs <backup.json> <salonId> --yes           # over the live salon
+ *   node scripts/backup-restore.mjs <backup.json> <salonId> --as novo --yes # into a fresh id
+ *
+ * `--as` exists so a restore can be rehearsed without touching anything live —
+ * restore beside the real salon, look at it, then delete it. A recovery plan
+ * nobody has ever run is a hope, not a plan.
  */
 import fs from 'node:fs';
-import { ownerToken, api, FS, toValue } from './_lib.mjs';
+import { ownerToken, api, listAll, FS, toValue } from './_lib.mjs';
 
-const [file, salonId, flag] = process.argv.slice(2);
-if (!file || !salonId) { console.error('usage: node scripts/backup-restore.mjs <backup.json> <salonId> [--yes]'); process.exit(1); }
+const args = process.argv.slice(2);
+const apply = args.includes('--yes');
+const asIdx = args.indexOf('--as');
+const target = asIdx !== -1 ? args[asIdx + 1] : null;
+const [file, salonId] = args.filter((a, i) => !a.startsWith('--') && i !== asIdx + 1);
+
+if (!file || !salonId) {
+  console.error('usage: node scripts/backup-restore.mjs <backup.json> <salonId> [--as <novoId>] [--yes]');
+  process.exit(1);
+}
+if (target && !/^[a-z0-9][a-z0-9-]{1,62}$/.test(target)) {
+  console.error('✗ --as tem de ser um slug válido (minúsculas, números e hífenes)');
+  process.exit(1);
+}
+
 const dump = JSON.parse(fs.readFileSync(file, 'utf8'));
 const salon = dump.salons.find(s => s.id === salonId);
-if (!salon) throw new Error(`salon ${salonId} not in backup`);
-if (flag !== '--yes') { console.log(`Would restore "${salon.name}" (${salonId}) with`, Object.fromEntries(Object.entries(salon.collections).map(([k, v]) => [k, v.length])), '\nRe-run with --yes to write.'); process.exit(0); }
+if (!salon) throw new Error(`salão ${salonId} não está neste backup`);
+const dest = target || salonId;
+const counts = Object.fromEntries(Object.entries(salon.collections).map(([k, v]) => [k, v.length]));
+const expected = 1 + Object.values(counts).reduce((a, b) => a + b, 0);
+
+console.log(`\n${apply ? 'A restaurar' : 'SIMULAÇÃO'}: “${salon.name}” (${salonId}) → salons/${dest}`);
+console.log(`  backup de ${(dump.exportedAt || '').slice(0, 16).replace('T', ' ')} · ${expected} documentos`);
+console.log(`  ${Object.entries(counts).filter(([, v]) => v).map(([k, v]) => `${k}=${v}`).join(' ')}`);
+if (dest === salonId && apply) console.log(`  ⚠  escreve POR CIMA do salão vivo — usa --as para ensaiar primeiro`);
+if (!apply) { console.log('\nNada foi escrito. Junta --yes para avançar.\n'); process.exit(0); }
 
 const token = await ownerToken();
 const strip = ({ id, path, collections, ...fields }) => fields;
 const write = (docPath, fields) => api('PATCH', `${FS}/${docPath}`, token, { fields: Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, toValue(v)])) });
 
-await write(`salons/${salonId}`, strip(salon));
+await write(`salons/${dest}`, { ...strip(salon), ...(target ? { slug: dest, restoredFrom: salonId, restoredAt: new Date().toISOString() } : {}) });
 let n = 1;
 for (const [col, docs] of Object.entries(salon.collections)) {
-  for (const d of docs) { await write(`salons/${salonId}/${col}/${d.id}`, strip(d)); n++; }
+  for (const d of docs) { await write(`salons/${dest}/${col}/${d.id}`, strip(d)); n++; }
 }
-console.log(`✓ restored ${n} documents into salons/${salonId}`);
+
+/* ── verify: what landed must match what we meant to write ──────────────── */
+let back = 1;
+const missing = [];
+for (const [col, docs] of Object.entries(salon.collections)) {
+  if (!docs.length) continue;
+  const live = await listAll(token, `salons/${dest}/${col}`);
+  back += live.length;
+  if (live.length !== docs.length) missing.push(`${col}: escrevi ${docs.length}, encontrei ${live.length}`);
+}
+console.log(`\n✓ ${n} documentos escritos em salons/${dest}`);
+if (missing.length) {
+  console.error('✗ verificação falhou:');
+  for (const m of missing) console.error('   · ' + m);
+  process.exit(1);
+}
+console.log(`✓ verificado: ${back} documentos estão lá, tudo bate certo\n`);

@@ -18,7 +18,10 @@
     "deploy": "firebase deploy --only hosting:bookit-51575,firestore:rules,firestore:indexes",
     "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes",
     "deploy:hosting": "firebase deploy --only hosting:bookit-51575",
-    "backup:export": "node scripts/backup-export.mjs"
+    "backup:verify": "node scripts/verify-backup.mjs",
+    "backup:encrypt": "node scripts/crypt.mjs enc",
+    "backup:decrypt": "node scripts/crypt.mjs dec",
+    "restore": "node scripts/backup-restore.mjs"
   },
   "devDependencies": {
     "firebase": "^10.14.1"
