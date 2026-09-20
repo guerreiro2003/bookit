@@ -209,10 +209,44 @@
     </div>
   </main>
 
+  <div id="waitlistModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="wlTitle" aria-hidden="true">
+    <div class="modal">
+      <button class="modal__close" type="button" data-action="close-waitlist" aria-label="Fechar">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+      <h2 class="modal__title" id="wlTitle">Avisa-me se abrir vaga</h2>
+      <p class="modal__sub">Para <strong id="wlService">—</strong><span id="wlStaff"></span>. Se alguém desmarcar, o salão contacta-te. Não fica nada reservado.</p>
+
+      <div class="grid-2">
+        <div class="field"><label for="wlName">Nome *</label><input type="text" id="wlName" maxlength="80" autocomplete="name" /></div>
+        <div class="field"><label for="wlPhone">Telemóvel *</label><input type="tel" id="wlPhone" maxlength="20" inputmode="tel" autocomplete="tel" placeholder="912 345 678" /></div>
+      </div>
+      <div class="grid-2">
+        <div class="field"><label for="wlFrom">A partir de</label><input type="date" id="wlFrom" /></div>
+        <div class="field"><label for="wlTo">Até</label><input type="date" id="wlTo" /></div>
+      </div>
+      <div class="field">
+        <label for="wlPart">Quando te dá jeito</label>
+        <select id="wlPart">
+          <option value="any">A qualquer hora</option>
+          <option value="morning">Só de manhã</option>
+          <option value="afternoon">Só à tarde</option>
+        </select>
+      </div>
+      <div class="field"><label for="wlNotes">Alguma nota (opcional)</label><input type="text" id="wlNotes" maxlength="300" placeholder="Ex.: depois das 17h dá-me mais jeito" /></div>
+      <div id="wlErr" class="error-msg" role="alert"></div>
+      <div class="flex" style="gap:10px;flex-wrap:wrap">
+        <button class="btn btn--primary" type="button" data-action="join-waitlist">Entrar na lista</button>
+        <button class="btn" type="button" data-action="close-waitlist">Cancelar</button>
+      </div>
+      <p class="privacy-note">Guardamos o teu nome e telemóvel só para te avisar desta vaga. <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a>.</p>
+    </div>
+  </div>
+
 <script type="module">
 import { db, auth, collection, doc, getDoc, getDocs, updateDoc, query, where, onAuthStateChanged } from './firebase.js';
 import {
-  $, $$, on, toast, toastError, escapeHTML, htmlMix, raw,
+  $, $$, on, toast, toastError, toastSuccess, escapeHTML, htmlMix, raw, isPhone, joinWaitlist,
   MONTHS_FULL, WEEKDAYS_SHORT, formatPrice,
   getSalonId, loadSalon, applySalonBranding, showFatalError, withLock, friendlyError,
   salonSetting, planActive, nowInTimezone, addDaysStr, resolveDayWindow,
@@ -449,7 +483,10 @@ async function loadTimeslots() {
       return;
     }
     if (!slots.length) {
-      list.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-state__icon">⏰</div><div class="empty-state__title">Sem horários livres neste dia</div><div class="empty-state__desc">Escolhe outro dia${state.selectedStaff ? ' ou outro colaborador' : ''}.</div></div>`;
+      // A full day is the moment someone gives up and calls another salon.
+      // Offer the queue here instead of letting them leave.
+      list.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-state__icon">⏰</div><div class="empty-state__title">Sem horários livres neste dia</div><div class="empty-state__desc">Escolhe outro dia${state.selectedStaff ? ' ou outro colaborador' : ''} — ou avisamos-te se abrir vaga.</div>
+        <button class="btn btn--primary btn--sm mt-4" type="button" data-action="open-waitlist">🔔 Avisa-me se abrir vaga</button></div>`;
       return;
     }
     list.innerHTML = slots.map(min => htmlMix`<button class="timeslot" type="button" data-action="pick-time" data-min="${min}" role="option" aria-selected="false">${minToTime(min)}</button>`).join('');
@@ -542,6 +579,51 @@ async function checkDiscountCode() {
     $('#confirmPrice').textContent = formatPrice(applyDiscount(basePrice, state.discount.percent));
   } catch (e) { console.error(e); desc.textContent = 'Não foi possível validar o código agora.'; }
 }
+
+/* ── waitlist ────────────────────────────────────────────────
+   A full day is where someone gives up and calls the salon down the road.
+   Taking a name here turns a lost booking into a callback. */
+on('open-waitlist', () => {
+  const picked = pickedServices();
+  if (!picked.length) return toastError('Escolhe primeiro o serviço.');
+  $('#wlService').textContent = picked.map(s => s.name).join(' + ');
+  $('#wlStaff').textContent = state.selectedStaff ? ` com ${state.selectedStaff.name}` : '';
+  $('#wlFrom').value = state.selectedDate;
+  $('#wlTo').value = addDaysStr(state.selectedDate, 14);
+  $('#wlName').value = $('#clientName')?.value || state.clientData?.name || '';
+  $('#wlPhone').value = $('#clientPhone')?.value || state.clientData?.phone || '';
+  $('#wlErr').classList.remove('show');
+  const o = $('#waitlistModal');
+  o.classList.add('show'); o.setAttribute('aria-hidden', 'false');
+});
+on('close-waitlist', () => {
+  const o = $('#waitlistModal');
+  o.classList.remove('show'); o.setAttribute('aria-hidden', 'true');
+});
+on('join-waitlist', withLock('waitlist', async () => {
+  const err = $('#wlErr');
+  const fail = (m) => { err.textContent = m; err.classList.add('show'); };
+  err.classList.remove('show');
+  const name = $('#wlName').value.trim(), phone = $('#wlPhone').value.trim();
+  const from = $('#wlFrom').value, to = $('#wlTo').value;
+  if (name.length < 2) return fail('Escreve o teu nome.');
+  if (!isPhone(phone))  return fail('Telemóvel inválido.');
+  if (!from || !to || from > to) return fail('As datas não fazem sentido.');
+  try {
+    await joinWaitlist({
+      salonId: state.salonId, salon: state.salon, services: pickedServices(),
+      staff: state.selectedStaff,
+      client: { name, phone, email: $('#clientEmail')?.value || '', notes: $('#wlNotes').value },
+      fromDate: from, toDate: to, partOfDay: $('#wlPart').value,
+    });
+    $('#waitlistModal').classList.remove('show');
+    $('#waitlistModal').setAttribute('aria-hidden', 'true');
+    toastSuccess('Ficaste na lista. Se abrir vaga, o salão avisa-te.');
+  } catch (e) {
+    console.error(e);
+    fail(friendlyError(e, 'Não foi possível entrar na lista. Tenta de novo.'));
+  }
+}));
 
 /* ── submit (atomic; the server decides, not the UI) ── */
 on('submit-booking', withLock('submit-booking', async () => {

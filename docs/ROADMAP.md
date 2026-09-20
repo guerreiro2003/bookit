@@ -34,7 +34,7 @@ Auditoria completa a 2026-09-18: 4 críticos, 7 graves, 13 médios. Duas falhas 
 | ✅ | Serviços por colaborador | |
 | ✅ | Contas individuais de equipa + rasto de quem fez o quê | 26 testes E2E |
 | ✅ | Vista de calendário semanal | Horas vêm do horário real, não de 8–20 fixo |
-| ❌ | Fila de espera por cancelamento | Receita que hoje se perde em silêncio |
+| ✅ | Fila de espera por cancelamento | 38 testes; ciclo completo verificado em produção |
 | ❌ | Pesquisa de clientes que procura todos | Hoje filtra só os 200 carregados |
 
 ---

@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.8.0 — 2026-09-20 · Vista de semana e lista de espera
+
+### Lista de espera
+
+Um cancelamento às quatro da tarde deixa o dia seguinte às dez vazio, e ninguém sabe. O salão perde o dinheiro em silêncio. Hoje um dono atento lembra-se de que "a Dona Maria queria quinta de manhã" e pega no telefone — isto é a parte que se lembra por ele.
+
+- **Na página de marcação**, quando um dia está cheio: *"Avisa-me se abrir vaga"*. Nome, telemóvel, intervalo de dias e se prefere manhã ou tarde.
+- **Quando alguém desmarca**, o painel mostra quem queria aquele horário, por ordem: primeiro quem pediu aquela pessoa em concreto, depois quem espera há mais tempo — uma fila que ignora o tempo de espera deixa de ser uma fila. Mensagem de WhatsApp pronta, com link para o dia certo.
+- **Só é oferecido o que faz sentido:** o serviço tem de caber no buraco, o dia tem de estar na janela que a pessoa deu, e quem pediu manhã não recebe uma chamada sobre as quatro e meia.
+- **Ninguém é chateado de dois em dois dias** — arrefecimento de 3 dias por pessoa.
+- **A mensagem é honesta:** diz que é por ordem de chegada e que avisámos mais alguém. Não promete que o horário fica reservado, porque não fica.
+- **A oferta espera pela janela de "Anular"** — oferecer um horário que o dono está prestes a repor seria pior do que não oferecer.
+- Painel próprio com quem está à espera, há quanto tempo, e quem já passou do prazo que deu.
+- A fila leva nome e telemóvel, por isso **só o salão a lê**. Qualquer pessoa entra; ninguém mais vê, altera ou apaga.
+- `waitlist-core.js` (14 testes puros) + `tests/waitlist.e2e.mjs` (24 contra produção).
+
+### Vista de semana
+
+Ver a entrada 2.7.1 abaixo.
+
 ## 2.7.0 — 2026-09-20 · Cada pessoa com a sua conta, e rasto de quem fez o quê
 
 Até agora um salão inteiro entrava com uma password. Toda a ação ficava registada como "equipa": ninguém sabia quem tinha cancelado uma marcação ou recebido um pagamento, e quando alguém saía era preciso mudar a password a todos. O art. 32.º do RGPD pede controlo de acessos apropriado, e uma password partilhada por cinco pessoas não é.

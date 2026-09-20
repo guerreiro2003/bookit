@@ -59,6 +59,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="8" y2="18"/><line x1="13" y1="14" x2="16" y2="14"/></svg>
         <span>Vista de dia</span>
       </button>
+      <button class="sidebar__link" type="button" data-action="show-panel" data-panel="waitlist">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span>Lista de espera</span>
+      </button>
       <button class="sidebar__link" type="button" data-action="show-panel" data-panel="week">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="12" y1="14" x2="12" y2="18"/></svg>
         <span>Semana</span>
@@ -349,6 +353,19 @@
           <div class="dayview__slots" id="dayviewSlots"></div>
         </div>
       </div>
+    </section>
+
+    <section class="panel" id="panel-waitlist">
+      <div class="panel-header">
+        <div class="panel-header__title-row">
+          <h1 class="page-title">Lista de espera</h1>
+          <p class="page-sub">Quem quis marcar e não encontrou vaga. Quando alguém desmarca, é a estas pessoas que ligas.</p>
+        </div>
+        <button class="btn btn--sm" type="button" data-action="wl-reload">Atualizar</button>
+      </div>
+      <div class="stats mb-4" id="wlStats"></div>
+      <div id="wlStale"></div>
+      <div id="wlList"></div>
     </section>
 
     <section class="panel" id="panel-week">
@@ -853,6 +870,19 @@
 <div id="sidebarBackdrop" class="modal-overlay" data-action="close-sidebar"></div>
 
 <!-- Payment modal -->
+<div id="freedModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="freedTitle" aria-hidden="true">
+  <div class="modal">
+    <button class="modal__close" type="button" data-action="close-freed" aria-label="Fechar">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <h2 class="modal__title" id="freedTitle">Quem queria este horário</h2>
+    <p class="modal__sub">Ficou livre <strong id="freedWhen">—</strong>. Estas pessoas estão à espera de uma vaga assim.</p>
+    <div id="freedList" class="stack"></div>
+    <p class="text-sm text-muted mt-4" style="margin-bottom:var(--s-3)">Avisa por ordem. A mensagem diz que é por ordem de chegada, por isso podes avisar mais do que uma.</p>
+    <button class="btn" type="button" data-action="close-freed">Fechar</button>
+  </div>
+</div>
+
 <div id="accessModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="accessTitle" aria-hidden="true">
   <div class="modal">
     <button class="modal__close" type="button" data-action="close-access" aria-label="Fechar">
@@ -1022,12 +1052,14 @@ import {
   loadRetention, logReactivation, deleteReactivation, reactivationLink, whatsAppUrl, randomToken, formatPhonePT, firstName,
   loadImportContext, runImport,
   setActor, resolveActor, loadTeamAccess, grantStaffAccess, revokeStaffAccess, setStaffAccessActive,
+  loadWaitlist, freedSlotFrom, markWaitlistOffered, setWaitlistStatus, removeWaitlistEntry, waitlistBookingLink,
   layoutServices, normaliseSegments, hasGap, MAX_SERVICES_PER_BOOKING,
   downloadCSV, subscribe, trapFocus,
   isEmail, isPhone, isHexColor
 } from './app.js';
 
 import { computeBaseline, computeRecovered, availableMinutes, pct, eur } from './metrics-core.js';
+import { rankCandidates, describeWant, offerMessage, waitlistSummary, staleEntries } from './waitlist-core.js';
 import { buildClientProfiles, reactivationCandidates, retentionSummary, explain, reactivationMessage, RISK } from './retention-core.js';
 import { analyseImport } from './import-core.js';
 
@@ -1196,6 +1228,7 @@ on('show-panel', (el) => {
   if (id === 'staff')      { loadStaff().then(refreshOnboarding); }
   if (id === 'dayview')    initDayview();
   if (id === 'week')       initWeek();
+  if (id === 'waitlist')   loadWaitlistPanel();
   if (id === 'business')   loadBusiness();
   if (id === 'retention')  loadRetentionPanel();
   if (id === 'dashboard')  refreshOnboarding();
@@ -1429,14 +1462,144 @@ function renderConfirmations() {
     </div>`).join('');
 }
 
+/* ── LISTA DE ESPERA ─────────────────────────────────────── */
+let waitlistCache = null;
+
+on('wl-reload', () => loadWaitlistPanel(true));
+
+async function loadWaitlistPanel(force = false) {
+  const el = $('#wlList');
+  if (!waitlistCache || force) {
+    el.innerHTML = '<div class="loading-state"><span class="spinner" aria-hidden="true"></span></div>';
+    try { waitlistCache = await loadWaitlist(salonId); }
+    catch (e) { console.error(e); el.innerHTML = '<div class="error-state"><div class="error-state__icon">⚠️</div><div class="error-state__title">Erro a carregar</div></div>'; return; }
+  }
+  renderWaitlistPanel();
+}
+
+function renderWaitlistPanel() {
+  const today = todayForSalon(salon);
+  const s = waitlistSummary(waitlistCache, today);
+  $('#wlStats').innerHTML = [
+    statCard('À espera', String(s.waiting), `${s.reachable} com telemóvel`),
+    statCard('Valor à espera', eur(s.value), 'se todas marcassem'),
+    statCard('Já avisadas', String(s.offered), `${s.booked} marcaram`),
+    statCard('Fora de prazo', String(s.stale), s.stale ? 'a janela delas já passou' : 'nenhuma'),
+  ].join('');
+
+  const stale = staleEntries(waitlistCache, today);
+  $('#wlStale').innerHTML = stale.length
+    ? htmlMix`<div class="promo mb-4" style="border-color:var(--danger-border)"><div>
+        <div class="promo__title">${stale.length} pessoa(s) fora de prazo</div>
+        <div class="promo__desc">A janela de datas que deram já passou. Tira-as da lista ou liga-lhes a perguntar se ainda querem.</div>
+      </div></div>` : '';
+
+  const waiting = (waitlistCache || []).filter(e => (e.status || 'waiting') === 'waiting')
+    .sort((a, b) => String(a.createdDate || '').localeCompare(String(b.createdDate || '')));
+
+  if (!waiting.length) {
+    $('#wlList').innerHTML = `<div class="empty-state"><div class="empty-state__icon">🔔</div>
+      <div class="empty-state__title">Ninguém à espera</div>
+      <div class="empty-state__desc">Quando um cliente não encontrar vaga na página de marcação, pode pedir para ser avisado — e aparece aqui.</div></div>`;
+    return;
+  }
+
+  $('#wlList').innerHTML = waiting.map(e => {
+    const late = e.toDate && e.toDate < today;
+    const waited = e.createdDate ? Math.max(0, Math.round((Date.parse(today) - Date.parse(e.createdDate)) / 86400000)) : 0;
+    return htmlMix`
+      <div class="row-card">
+        <div>
+          <div class="row-card__title">${e.name}${raw(late ? ' <span class="badge badge--red">fora de prazo</span>' : '')}${raw(e.lastOfferedDate ? ' <span class="badge badge--gray">já avisada</span>' : '')}</div>
+          <div class="row-card__meta">${describeWant(e)}</div>
+          <div class="row-card__meta tabular">${raw(escapeHTML(formatPhonePT(e.phoneE164)))}${raw(waited ? ` · na lista há ${waited} dia(s)` : ' · hoje')}${raw(e.notes ? ` · “${escapeHTML(e.notes)}”` : '')}</div>
+        </div>
+        <div class="row-card__side"><div class="row-card__actions">
+          <button class="btn btn--sm" type="button" data-action="wl-booked" data-id="${e.id}">Já marcou</button>
+          <button class="btn btn--sm btn--danger" type="button" data-action="wl-remove" data-id="${e.id}">Tirar</button>
+        </div></div>
+      </div>`;
+  }).join('');
+}
+
+on('wl-booked', async (el) => {
+  try {
+    await setWaitlistStatus({ salonId, entryId: el.dataset.id, status: 'booked' });
+    waitlistCache = (waitlistCache || []).map(x => x.id === el.dataset.id ? { ...x, status: 'booked' } : x);
+    renderWaitlistPanel();
+    toastSuccess('Marcada como resolvida.');
+  } catch (e) { console.error(e); toastError(friendlyError(e)); }
+});
+
+/* ── quem queria este horário ─────────────────────────────────
+   O momento em que alguém desmarca é o momento em que o buraco existe. Se a
+   pergunta não for feita agora, não é feita — e o horário fica vazio. */
+async function offerFreedSlot(booking) {
+  let list;
+  try { list = await loadWaitlist(salonId); } catch (e) { console.error(e); return; }
+  const slot = freedSlotFrom(booking);
+  const today = todayForSalon(salon);
+  const candidates = rankCandidates(list, slot, today);
+  if (!candidates.length) return;
+
+  freedContext = { slot, candidates };
+  $('#freedWhen').textContent = `${formatDatePT(slot.date, { short: true })} às ${slot.time}${slot.staffName ? ` · ${slot.staffName}` : ''}`;
+  $('#freedList').innerHTML = candidates.map((c, i) => htmlMix`
+    <div class="row-card">
+      <div>
+        <div class="row-card__title">${c.name}${raw(i === 0 ? ' <span class="badge badge--green">primeiro</span>' : '')}</div>
+        <div class="row-card__meta">${describeWant(c)}</div>
+        <div class="row-card__meta tabular">${raw(escapeHTML(formatPhonePT(c.phoneE164)))}${raw(c._waited ? ` · espera há ${c._waited} dia(s)` : '')}${raw(c._exactStaff ? ' · pediu esta pessoa' : '')}</div>
+      </div>
+      <div class="row-card__side"><div class="row-card__actions">
+        <button class="btn btn--sm btn--primary" type="button" data-action="offer-slot" data-id="${c.id}">💬 Avisar</button>
+        <button class="btn btn--sm" type="button" data-action="wl-remove" data-id="${c.id}">Tirar da lista</button>
+      </div></div>
+    </div>`).join('');
+  const o = $('#freedModal');
+  o.classList.add('show'); o.setAttribute('aria-hidden', 'false');
+}
+let freedContext = null;
+on('close-freed', () => {
+  const o = $('#freedModal');
+  o.classList.remove('show'); o.setAttribute('aria-hidden', 'true');
+  freedContext = null;
+});
+on('offer-slot', async (el) => {
+  if (!freedContext) return;
+  const c = freedContext.candidates.find(x => x.id === el.dataset.id);
+  if (!c) return;
+  const slot = freedContext.slot;
+  const text = offerMessage({ entry: c, slot, salonName: salon.name, link: waitlistBookingLink({ salonId, slot }) });
+  const url = whatsAppUrl(c.phoneE164, text);
+  if (!url) return toastError('Sem número de telemóvel válido.');
+  window.open(url, '_blank', 'noopener');
+  try {
+    await markWaitlistOffered({ salonId, entryId: c.id, slot, today: todayForSalon(salon) });
+    el.textContent = '✓ Avisada'; el.disabled = true;
+  } catch (e) { console.error(e); toastError(friendlyError(e)); }
+});
+on('wl-remove', async (el) => {
+  try {
+    await removeWaitlistEntry({ salonId, entryId: el.dataset.id });
+    el.closest('.row-card')?.remove();
+    toastSuccess('Tirada da lista.');
+    if (waitlistCache) waitlistCache = waitlistCache.filter(x => x.id !== el.dataset.id);
+  } catch (e) { console.error(e); toastError(friendlyError(e)); }
+});
+
 on('cancel-booking', withLock('cancel', async (el) => {
   const id = el.dataset.id;
+  const booking = bookingIndex.get(id);
   try {
     await cancelBooking({ salonId, bookingId: id, by: 'admin' });
     toastSuccess('Cancelada. O horário ficou livre.', { undo: async () => {
       try { await restoreBooking({ salonId, bookingId: id }); toastSuccess('Cancelamento anulado.'); }
       catch (e) { toastError(friendlyError(e, 'Não foi possível anular: o horário já foi ocupado.')); }
     }});
+    // Wait out the undo window: offering a slot the owner is about to take
+    // back would be worse than not offering it at all.
+    if (booking) setTimeout(() => offerFreedSlot(booking), 7000);
   } catch (e) { console.error(e); toastError(friendlyError(e)); }
 }));
 

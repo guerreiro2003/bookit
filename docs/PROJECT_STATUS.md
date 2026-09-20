@@ -18,6 +18,7 @@ O software funciona e está em produção. O que falta para o vender não é có
 | Identidade por email | ✅ Corrigido 20/09 | Exige `email_verified`; ver [DECISIONS](DECISIONS.md#d-002) |
 | Serviços por colaborador | ✅ Feito 20/09 | Verificado em produção no site do cliente |
 | Vista de semana | ✅ Feito 20/09 | Posições verificadas ao pixel em produção |
+| Lista de espera | ✅ Feito 20/09 | Ciclo completo verificado em produção |
 | Importador CSV | ✅ Feito | 27 testes E2E, reimportação não duplica |
 | Retenção / reativação | ✅ Feito | 21 testes E2E, receita atribuída |
 | App Check | 🟡 Código pronto | Falta a chave reCAPTCHA (consola) |
@@ -30,17 +31,18 @@ O software funciona e está em produção. O que falta para o vender não é có
 
 ## Testes
 
-`npm run test:all` — **305 a passar**, zero a falhar.
+`npm run test:all` — **343 a passar**, zero a falhar.
 
 | Suite | N.º | O que cobre |
 |---|---|---|
-| unit (`*.test.mjs`) | 65 | Lógica pura: horários, cadência, métricas, CSV, quem-faz-o-quê |
+| unit (`*.test.mjs`) | 79 | Lógica pura: horários, cadência, métricas, CSV, quem-faz-o-quê |
 | `rules.integration` | 74 | Autorização e validação, via REST, contra produção |
 | `engine.e2e` | 38 | Ciclo completo de marcação |
 | `links.e2e` | 18 | Confirmar/cancelar por token |
 | `retention.e2e` | 21 | Reativação e atribuição |
 | `import.e2e` | 27 | CSV → clientes → histórico → cadência |
 | `team-access.e2e` | 26 | Conceder, entrar, registar quem fez, revogar |
+| `waitlist.e2e` | 24 | Entrar na fila → cancelar → quem aparece |
 | `abuse.e2e` (atualizada) | 36 | +7 sobre o que o documento público pode levar |
 | `concurrency.stress` | — | Marcações concorrentes no mesmo horário |
 
@@ -54,8 +56,8 @@ O software funciona e está em produção. O que falta para o vender não é có
 
 ## Próximo trabalho
 
-1. Fila de espera por cancelamento ← **a seguir**
-2. Rastreio de erros (Sentry) + monitor de uptime — ambos gratuitos
+1. Rastreio de erros (Sentry) + monitor de uptime ← **a seguir**, ambos gratuitos
+2. Pesquisa de clientes que procure todos, não só os 200 carregados
 5. Termos de Serviço + contrato de subcontratação (precisa de advogado)
 
 ## Bloqueadores

@@ -198,6 +198,32 @@ service cloud.firestore {
         allow update, delete: if isAdmin(salonId);
       }
 
+      /* ───────────── waitlist: who wanted a slot that was full ─────────────
+         Carries a name and a phone, so it is staff-read only. Anyone may join
+         from the booking page — the same door as a booking, with the same
+         phone-is-the-identity rule — but only the salon can read the queue,
+         change it, or take someone off it.                                  */
+      match /waitlist/{id} {
+        function w() { return request.resource.data; }
+        allow read: if isStaff(salonId);
+        allow create: if ( isStaff(salonId) || planActive(salonId) )
+          && str(w().name, 80) && w().name.size() >= 2
+          && str(w().get('phoneE164', ''), 16) && w().get('phoneE164', '').matches('^[0-9]{10,15}$')
+          && optStr(w().get('phone', null), 30)
+          && optStr(w().get('email', null), 120)
+          && optStr(w().get('notes', null), 300)
+          && str(w().serviceName, 120)
+          && (w().get('serviceIds', []) is list) && w().get('serviceIds', []).size() <= 3
+          && intIn(w().duration, 5, 600)
+          && numIn(w().get('price', 0), 0, 10000)
+          && optStr(w().get('staffId', null), 128)
+          && optStr(w().get('staffName', null), 80)
+          && validDate(w().fromDate) && validDate(w().toDate) && w().fromDate <= w().toDate
+          && w().get('partOfDay', 'any') in ['any', 'morning', 'afternoon']
+          && w().status == 'waiting';
+        allow update, delete: if isStaff(salonId);
+      }
+
       /* ───────────── reactivation log (who we contacted; carries client PII) ───────────── */
       match /reactivations/{token} {
         allow read: if isStaff(salonId);

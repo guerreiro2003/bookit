@@ -749,6 +749,80 @@ export async function deleteReactivation({ salonId, token }) {
 }
 
 /* ============================================================
+   WAITLIST — who wanted the slot that just opened up
+   ============================================================ */
+
+/** Join the queue. Public: the same door as a booking, same identity rule. */
+export async function joinWaitlist({ salonId, salon, services, staff, client, fromDate, toDate, partOfDay = 'any' }) {
+  const list = (services || []).filter(s => s && s.id);
+  if (!list.length) throw err('invalid-service');
+  const layout = layoutServices(list);
+  const phoneE164 = normalizePhone(client.phone);
+  if (!phoneE164) throw err('invalid-phone');
+  if (!isValidDateStr(fromDate) || !isValidDateStr(toDate) || fromDate > toDate) throw err('invalid-date');
+  const maxDays = salonSetting(salon, 'maxAdvanceDays');
+  const today = todayForSalon(salon);
+  if (toDate > addDaysStr(today, maxDays)) throw err('outside-hours');
+
+  const ref = doc(collection(db, 'salons', salonId, 'waitlist'));
+  await setDoc(ref, {
+    salonId,
+    name: clampStr(client.name, 80),
+    phone: clampStr(client.phone, 30), phoneE164,
+    email: clampStr(client.email, 120).toLowerCase(),
+    notes: clampStr(client.notes, 300),
+    serviceIds: list.map(s => s.id),
+    serviceName: clampStr(list.map(s => s.name).join(' + '), 120),
+    duration: layout.span, price: layout.price,
+    staffId: staff?.id || null, staffName: staff?.name || null,
+    fromDate, toDate, partOfDay,
+    status: 'waiting',
+    createdDate: today,               // a plain date, so the queue can be ordered without a clock
+    createdAt: serverTimestamp(),
+  });
+  return { id: ref.id };
+}
+
+/** The whole queue for this salon. Small by nature — a salon is not a call centre. */
+export async function loadWaitlist(salonId) {
+  const snap = await getDocs(collection(db, 'salons', salonId, 'waitlist'));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+/** Record that we offered a freed slot to someone, so we do not do it again tomorrow. */
+export async function markWaitlistOffered({ salonId, entryId, slot, today }) {
+  await updateDoc(doc(db, 'salons', salonId, 'waitlist', entryId), {
+    lastOfferedDate: today,
+    lastOfferedFor: { date: slot.date, time: slot.time, staffId: slot.staffId || null },
+    offerCount: increment(1),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/** They took it, gave up, or the salon is tidying the queue. */
+export async function setWaitlistStatus({ salonId, entryId, status }) {
+  await updateDoc(doc(db, 'salons', salonId, 'waitlist', entryId), { status, updatedAt: serverTimestamp() });
+}
+export async function removeWaitlistEntry({ salonId, entryId }) {
+  await deleteDoc(doc(db, 'salons', salonId, 'waitlist', entryId));
+}
+
+/** The slot a cancelled booking leaves behind. */
+export function freedSlotFrom(booking) {
+  const start = booking.startMin ?? timeToMin(booking.time) ?? 0;
+  return {
+    date: booking.date, time: booking.time,
+    startMin: start, endMin: booking.endMin ?? start + (booking.serviceDuration || 30),
+    staffId: booking.staffId, staffName: booking.staffName,
+  };
+}
+
+/** Booking link that lands the person on the right day, ready to pick the time. */
+export function waitlistBookingLink({ salonId, slot, baseUrl = APP_BASE_URL }) {
+  return `${baseUrl.replace(/\/$/, '')}/?salon=${encodeURIComponent(salonId)}&src=lista-espera&date=${encodeURIComponent(slot.date)}`;
+}
+
+/* ============================================================
    TEAM ACCESS — one login per person, instead of one per salon
    ============================================================ */
 
