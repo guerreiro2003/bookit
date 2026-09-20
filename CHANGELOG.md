@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.6.0 — 2026-09-20 · Quem faz o quê, e App Check pronto a ligar
+
+### Serviços por colaborador
+
+Até agora o motor assumia que toda a gente fazia tudo — e marcava coloração a quem nunca tinha feito uma. Agora cada colaborador tem a sua lista.
+
+- **Sem nada marcado, faz tudo.** É o que é verdade na maioria dos salões pequenos e o que todos os registos existentes já significam, por isso nada muda até o dono decidir restringir alguém.
+- **No painel:** chips no formulário de colaborador e um botão **Serviços** em cada linha da lista. A lista mostra "Faz todos os serviços" ou "Só 2 · Corte Masculino · Barba".
+- **No site do cliente:** o passo 2 só mostra quem faz o que foi escolhido. Verificado em produção — restringi o João (barbeiro) e ele desapareceu da coloração e manteve-se no corte masculino. Se ninguém fizer a combinação pedida, a página diz isso em vez de mostrar um calendário vazio.
+- **Numa visita combinada é preciso fazer *todos* os serviços**, não só um: quem faz o corte mas não a cor não aparece em "corte + cor".
+- **As regras fecham o caminho pelas traseiras.** O id de cada colaborador é público (a lista de equipa tem de ser), por isso um cliente podia forjar o pedido. `staffDoesTheWork()` valida contra o catálogo na criação online. O dono continua a poder atribuir quem quiser — cobrir um turno é legítimo, e o painel já o guia.
+- `tests/staff-services.test.mjs` (6) e 4 testes novos na suite de abuso.
+
+### App Check
+
+O código está escrito e a CSP já permite o reCAPTCHA — falta **só colar a chave** em `firebase.js` (`RECAPTCHA_SITE_KEY`). Enquanto estiver vazia, não faz nada e a app corre como agora. Os três passos da consola estão comentados no ficheiro. `tests/_register.mjs` aceita `APPCHECK_DEBUG_TOKEN` para os testes continuarem a correr depois de ligares a imposição.
+
+Testes: 60 unit · 74 regras · 29 abuso · 38 motor · 18 links · 21 retenção · 27 importação — **267, todos verdes**.
+
 ## 2.5.0 — 2026-09-20 · Fechar as falhas que a auditoria encontrou
 
 A auditoria de 18 de setembro explorou duas falhas reais contra o projeto em produção. Estão fechadas, e agora há uma suite de testes que tenta atacá-las a cada corrida.

@@ -17,6 +17,7 @@ O cartão de onboarding guia os 4 passos:
    - **Tem tempo de espera**: para coloração, permanente e afins, marca a caixa e indica *trabalho inicial · espera · trabalho final* (ex.: 20 · 30 · 25). Durante a espera o colaborador fica livre e o sistema **encaixa lá outra cliente** — é assim que ganhas horas no dia sem trabalhar mais.
    - "Pacote" mostra preço original riscado.
 2. **Equipa** — adiciona colaboradores (foto opcional). Cada um pode ter **horário próprio** (ex.: só tardes) e **férias/indisponibilidades**.
+   - **Serviços que faz** — por omissão cada pessoa faz tudo. Se alguém não fizer todos (o barbeiro que não faz coloração, por exemplo), carrega em **Serviços** na linha dela e marca só o que faz. A partir daí os clientes deixam de a ver nos serviços que não faz, e o sistema não lhe marca esse trabalho. Numa marcação com vários serviços só aparece quem faz **todos**.
 3. **Horários** — horário semanal, **pausa** (ex.: almoço) e **datas encerradas** (feriados, férias do salão).
 4. **Configurações** — dados do salão, cor, e as regras das marcações online:
    - fuso horário;

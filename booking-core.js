@@ -69,6 +69,28 @@ export function overlapsAny(iv, list) {
   return (list || []).some(x => overlaps(iv, x));
 }
 
+/* ── Who does what ────────────────────────────────────────── */
+/**
+ * Can this staff member perform every one of these services?
+ *
+ * An empty or missing `serviceIds` means "does everything" — which is true of
+ * most people in a small salon, and keeps every existing record working. The
+ * list only matters once the owner deliberately restricts someone: then the
+ * engine stops offering that person for work they don't do, instead of booking
+ * a colour with someone who has never done one.
+ *
+ * @param {object} staff       staff doc, may carry .serviceIds
+ * @param {string[]} serviceIds
+ */
+export function staffCanDo(staff, serviceIds = []) {
+  const allowed = Array.isArray(staff?.serviceIds) ? staff.serviceIds.filter(Boolean) : [];
+  if (!allowed.length) return true;
+  return serviceIds.filter(Boolean).every(id => allowed.includes(id));
+}
+
+/** The staff members who can perform all of these services, order preserved. */
+export const staffFor = (staff, serviceIds = []) => (staff || []).filter(s => staffCanDo(s, serviceIds));
+
 /* ── Opening hours resolution ─────────────────────────────── */
 /**
  * Resolve the effective working window for a given date.

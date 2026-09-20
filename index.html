@@ -216,7 +216,7 @@ import {
   MONTHS_FULL, WEEKDAYS_SHORT, formatPrice,
   getSalonId, loadSalon, applySalonBranding, showFatalError, withLock, friendlyError,
   salonSetting, planActive, nowInTimezone, addDaysStr, resolveDayWindow,
-  loadBookingContext, computeAvailability, createBooking, minToTime,
+  loadBookingContext, computeAvailability, createBooking, minToTime, staffFor,
   validateBookingInput, applyDiscount, clampStr,
   layoutServices, MAX_SERVICES_PER_BOOKING,
 } from './app.js';
@@ -362,12 +362,22 @@ on('pick-service', (el) => {
 });
 
 function renderStaff() {
+  // Only the people who actually do what was chosen. Someone who no longer
+  // qualifies after the client changed service must not stay selected.
+  const wanted = pickedServices().map(s => s.id);
+  const able = staffFor(state.ctx.staff, wanted);
+  if (state.selectedStaff && !able.some(s => s.id === state.selectedStaff.id)) state.selectedStaff = null;
+
+  if (!able.length) {
+    $('#staffList').innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-state__icon">🤔</div><div class="empty-state__title">Ninguém faz esta combinação</div><div class="empty-state__desc">Tenta escolher os serviços separadamente, ou liga-nos.</div></div>`;
+    return;
+  }
   const items = [htmlMix`
     <button class="select-item ${raw(!state.selectedStaff ? 'selected' : '')}" type="button" data-action="pick-staff" data-id="">
       <div class="select-item__avatar" aria-hidden="true">✦</div>
       <div class="select-item__main"><div class="select-item__name">Sem preferência</div><div class="select-item__desc">Primeiro colaborador disponível</div></div>
     </button>`];
-  for (const s of state.ctx.staff) {
+  for (const s of able) {
     items.push(htmlMix`
       <button class="select-item ${raw(state.selectedStaff?.id === s.id ? 'selected' : '')}" type="button" data-action="pick-staff" data-id="${s.id}">
         <div class="select-item__avatar" aria-hidden="true">${(s.name || '?').charAt(0)}</div>
@@ -377,7 +387,7 @@ function renderStaff() {
   $('#staffList').innerHTML = items.join('');
 }
 on('pick-staff', (el) => {
-  state.selectedStaff = el.dataset.id ? state.ctx.staff.find(s => s.id === el.dataset.id) : null;
+  state.selectedStaff = el.dataset.id ? (state.ctx.staff.find(s => s.id === el.dataset.id) || null) : null;
   state.selectedStart = null; $('#btnDateNext').disabled = true;
   $$('#staffList .select-item').forEach(o => o.classList.toggle('selected', o === el));
   setTimeout(() => goTo(3), 220);
@@ -563,7 +573,7 @@ on('submit-booking', withLock('submit-booking', async () => {
     $('#screenLoading').hidden = true; $('#btnConfirm').disabled = false;
     const code = e?.code || e?.message;
     toastError(friendlyError(e, 'Não foi possível criar a marcação. Tenta novamente.'));
-    if (['slot-taken', 'no-staff-available', 'too-soon', 'outside-hours', 'break', 'salon-closed', 'salon-closed-date', 'staff-time-off', 'staff-day-off'].includes(code)) {
+    if (['slot-taken', 'no-staff-available', 'staff-cannot-do-service', 'too-soon', 'outside-hours', 'break', 'salon-closed', 'salon-closed-date', 'staff-time-off', 'staff-day-off'].includes(code)) {
       state.selectedStart = null; $('#btnDateNext').disabled = true;
       setTimeout(() => goTo(3), 600);
     } else {

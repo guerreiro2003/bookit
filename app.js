@@ -13,6 +13,7 @@ import {
   buildICS, googleCalendarUrl, addDaysStr, weekdayOf, WEEKDAY_KEYS as CORE_WEEKDAY_KEYS,
   normalizePhone, formatPhonePT, randomToken, manageUrl, whatsAppUrl, firstName, dateLabelPT, messageText,
   layoutServices, normaliseSegments, segmentsDuration, hasGap, busyAt, MAX_SERVICES_PER_BOOKING,
+  staffCanDo, staffFor,
 } from './booking-core.js';
 
 // Re-export the pure core so pages import everything from one place.
@@ -23,6 +24,7 @@ export {
   buildICS, googleCalendarUrl, addDaysStr, weekdayOf,
   normalizePhone, formatPhonePT, randomToken, manageUrl, whatsAppUrl, firstName, dateLabelPT, messageText,
   layoutServices, normaliseSegments, segmentsDuration, hasGap, busyAt, MAX_SERVICES_PER_BOOKING,
+  staffCanDo, staffFor,
 };
 
 /** Public origin of the app (for links sent to clients). */
@@ -309,6 +311,7 @@ export function friendlyError(e, fallback = 'Ocorreu um erro. Tenta novamente.')
     'staff-time-off':      'O colaborador está de férias/indisponível nessa data.',
     'staff-day-off':       'O colaborador não trabalha nesse dia.',
     'no-staff-available':  'Nenhum colaborador disponível nesse horário.',
+    'staff-cannot-do-service': 'Esse colaborador não faz este serviço. Escolhe outro.',
     'invalid-transition':  'Esta ação já não é possível para o estado atual da marcação.',
     'booking-not-found':   'A marcação já não existe.',
     'booking-cancelled':   'A marcação está cancelada.',
@@ -473,7 +476,9 @@ export async function computeAvailability({ salonId, salon, ctx, service, servic
   const lead = salonSetting(salon, 'bookingLeadMinutes');
   const interval = salonSetting(salon, 'slotInterval');
   const notBefore = dateStr === now.dateStr ? now.minutes + lead : (dateStr < now.dateStr ? Infinity : null);
-  const candidates = staff ? [staff] : ctx.staff;
+  // Only offer people who actually do this work.
+  const wanted = (services?.length ? services : [service]).filter(Boolean).map(s => s.id);
+  const candidates = (staff ? [staff] : ctx.staff).filter(s => staffCanDo(s, wanted));
   if (!candidates.length) return { slots: [], perStaff: new Map(), window: null };
 
   const occ = await loadOccupied(salonId, candidates.map(s => s.id), dateStr, excludeBookingId);
@@ -509,8 +514,11 @@ export async function createBooking({ salonId, salon, ctx, service, services, st
   if (dateStr < now.dateStr) throw err('too-soon');
   if (source === 'online' && dateStr > addDaysStr(now.dateStr, maxDays)) throw err('outside-hours');
   const notBefore = dateStr === now.dateStr ? now.minutes + lead : null;
-  const candidates = staff ? [staff] : ctx.staff;
-  if (!candidates.length) throw err('no-staff-available');
+  // A booking must land on someone who does this work — otherwise the client
+  // turns up for a colour with a barber who has never done one.
+  const wantedIds = list.map(s => s.id);
+  const candidates = (staff ? [staff] : ctx.staff).filter(s => staffCanDo(s, wantedIds));
+  if (!candidates.length) throw err(staff ? 'staff-cannot-do-service' : 'no-staff-available');
 
   const bookingRef = doc(collection(db, 'salons', salonId, 'bookings'));
   const finalPrice = discount?.percent ? applyDiscount(layout.price, discount.percent) : layout.price;

@@ -491,6 +491,11 @@
           <div class="field__hint">JPG, PNG ou WEBP. Será redimensionada automaticamente para 400×400px e guardada na base de dados.</div>
         </div>
         <div class="field"><label for="staffBio">Sobre (opcional)</label><textarea id="staffBio"></textarea></div>
+        <div class="field">
+          <label>Serviços que faz</label>
+          <div class="field__hint" style="margin-bottom:var(--s-3)">Por omissão faz tudo. Marca só os serviços desta pessoa se ela não fizer todos — os clientes deixam de a ver nos que não faz.</div>
+          <div id="staffSvcPick" class="chips"></div>
+        </div>
         <button class="btn btn--primary" type="submit">Adicionar colaborador</button>
       </form>
 
@@ -818,6 +823,22 @@
 <div id="sidebarBackdrop" class="modal-overlay" data-action="close-sidebar"></div>
 
 <!-- Payment modal -->
+<div id="svcStaffModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="svcStaffTitle" aria-hidden="true">
+  <div class="modal">
+    <button class="modal__close" type="button" data-action="close-staff-services" aria-label="Fechar">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <h2 class="modal__title" id="svcStaffTitle">Serviços de <span id="svcStaffName">—</span></h2>
+    <p class="modal__sub">Sem nada marcado, faz todos. Marca só os serviços desta pessoa se ela não fizer todos — os clientes deixam de a ver nos restantes.</p>
+    <input type="hidden" id="svcStaffId" />
+    <div id="svcStaffPick" class="chips mb-4"></div>
+    <div class="flex" style="gap:10px;flex-wrap:wrap">
+      <button class="btn btn--primary" type="button" data-action="save-staff-services">Guardar</button>
+      <button class="btn" type="button" data-action="close-staff-services">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <div id="payModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="payTitle" aria-hidden="true">
   <div class="modal">
     <button class="modal__close" type="button" data-action="close-pay" aria-label="Fechar">
@@ -2006,6 +2027,9 @@ async function loadServices() {
   try {
     const snap = await getDocs(query(collection(db,'salons',salonId,'services'), orderBy('order','asc')));
     allServices = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // The staff form and list both name services, so they follow the catalogue.
+    renderStaffSvcPick(pickedStaffSvc());
+    if (allStaff.length) renderStaffList();
     if (!allServices.length) {
       el.innerHTML = `<p class="text-muted text-sm" style="padding:var(--s-4)">Nenhum serviço ainda.</p>`;
       return;
@@ -2558,6 +2582,15 @@ async function loadStaff() {
   } catch (e) { console.error(e); toastError(friendlyError(e)); }
 }
 
+/** What this person does, in the owner's words — not a list of ids. */
+function staffSvcLabel(s) {
+  const ids = Array.isArray(s.serviceIds) ? s.serviceIds.filter(Boolean) : [];
+  if (!ids.length) return '<span class="badge badge--gray">Faz todos os serviços</span>';
+  const names = ids.map(id => allServices.find(x => x.id === id)?.name).filter(Boolean);
+  const shown = names.slice(0, 3).map(escapeHTML).join(' · ');
+  return `<span class="badge badge--blue">Só ${escapeHTML(String(names.length))}</span> <span class="text-xs text-muted">${shown}${names.length > 3 ? ` +${names.length - 3}` : ''}</span>`;
+}
+
 function renderStaffList() {
   const el = $('#staffList');
   $('#staffCount').textContent = allStaff.length;
@@ -2576,10 +2609,12 @@ function renderStaffList() {
         <div>
           <div class="row-card__title">${s.name}</div>
           <div class="row-card__meta">${s.role || 'Colaborador/a'}${s.specialties ? ' · ' + s.specialties : ''}${s.photoUrl ? '' : ' · sem foto'}</div>
+          <div class="row-card__meta">${raw(staffSvcLabel(s))}</div>
         </div>
       </div>
       <div class="cluster">
         ${raw(`<span class="badge ${s.active !== false ? 'badge--green' : 'badge--gray'}">${s.active !== false ? 'Ativo' : 'Inativo'}</span>`)}
+        <button class="btn btn--sm" type="button" data-action="edit-staff-services" data-id="${s.id}">Serviços</button>
         <button class="btn btn--sm" type="button" data-action="edit-staff-photo" data-id="${s.id}">${s.photoUrl ? 'Mudar foto' : '+ Foto'}</button>
         <button class="btn btn--sm" type="button" data-action="toggle-staff" data-id="${s.id}" data-active="${s.active !== false}">${s.active !== false ? 'Desativar' : 'Ativar'}</button>
         <button class="btn btn--sm btn--danger" type="button" data-action="delete-staff" data-id="${s.id}">Remover</button>
@@ -2696,6 +2731,28 @@ $('#staffPhotoUrl').addEventListener('input', () => {
   }
 });
 
+/* Which services a person does. Nothing ticked = does everything, which is the
+   honest default in a small salon and what every existing record means. */
+function renderStaffSvcPick(selected = []) {
+  const box = $('#staffSvcPick');
+  if (!box) return;
+  const active = allServices.filter(s => s.active !== false);
+  if (!active.length) { box.innerHTML = '<span class="text-sm text-muted">Adiciona serviços primeiro.</span>'; return; }
+  box.innerHTML = active.map(s => htmlMix`
+    <button type="button" class="chip-toggle ${raw(selected.includes(s.id) ? 'on' : '')}" data-action="staff-svc-toggle" data-id="${s.id}" aria-pressed="${raw(String(selected.includes(s.id)))}">${s.name}</button>`).join('')
+    + `<span class="text-sm text-muted" id="staffSvcHint" style="align-self:center;margin-left:6px">${selected.length ? `${selected.length} de ${active.length}` : 'faz tudo'}</span>`;
+}
+on('staff-svc-toggle', (el) => {
+  const on = el.getAttribute('aria-pressed') === 'true';
+  el.setAttribute('aria-pressed', String(!on));
+  el.classList.toggle('on', !on);
+  const n = $$('#staffSvcPick .chip-toggle[aria-pressed="true"]').length;
+  const total = allServices.filter(s => s.active !== false).length;
+  const hint = $('#staffSvcHint');
+  if (hint) hint.textContent = n ? `${n} de ${total}` : 'faz tudo';
+});
+const pickedStaffSvc = (root = '#staffSvcPick') => $$(`${root} .chip-toggle[aria-pressed="true"]`).map(b => b.dataset.id);
+
 $('#staffForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const name = $('#staffName').value.trim();
@@ -2706,14 +2763,49 @@ $('#staffForm').addEventListener('submit', async (e) => {
     email: $('#staffEmail').value.trim(),
     photoUrl: $('#staffPhotoUrl').value.trim() || null,
     bio: $('#staffBio').value.trim(),
+    serviceIds: pickedStaffSvc(),
     active: true, order: allStaff.length + 1,
     createdAt: serverTimestamp()
   });
   $('#staffForm').reset();
   clearPhotoPreview();
+  renderStaffSvcPick([]);
   toastSuccess('Colaborador adicionado.');
   loadStaff();
 });
+
+/* Editing an existing person's services, from their row in the list. */
+on('edit-staff-services', (el) => {
+  const s = allStaff.find(x => x.id === el.dataset.id);
+  if (!s) return;
+  const active = allServices.filter(x => x.active !== false);
+  if (!active.length) return toastInfo('Adiciona serviços primeiro.');
+  const cur = Array.isArray(s.serviceIds) ? s.serviceIds : [];
+  $('#svcStaffName').textContent = s.name;
+  $('#svcStaffId').value = s.id;
+  $('#svcStaffPick').innerHTML = active.map(x => htmlMix`
+    <button type="button" class="chip-toggle ${raw(cur.includes(x.id) ? 'on' : '')}" data-action="staff-svc-toggle" data-id="${x.id}" aria-pressed="${raw(String(cur.includes(x.id)))}">${x.name}</button>`).join('');
+  const o = $('#svcStaffModal');
+  o.classList.add('show'); o.setAttribute('aria-hidden', 'false');
+  releaseSvcStaffFocus = trapFocus(o.querySelector('.modal'));
+});
+let releaseSvcStaffFocus = null;
+function closeSvcStaff() {
+  const o = $('#svcStaffModal');
+  o.classList.remove('show'); o.setAttribute('aria-hidden', 'true');
+  if (releaseSvcStaffFocus) { releaseSvcStaffFocus(); releaseSvcStaffFocus = null; }
+}
+on('close-staff-services', closeSvcStaff);
+on('save-staff-services', withLock('staffsvc', async () => {
+  const id = $('#svcStaffId').value;
+  const ids = pickedStaffSvc('#svcStaffPick');
+  try {
+    await updateDoc(doc(db,'salons',salonId,'staff', id), { serviceIds: ids });
+    closeSvcStaff();
+    toastSuccess(ids.length ? `Guardado — ${ids.length} serviço(s).` : 'Guardado — faz todos os serviços.');
+    loadStaff();
+  } catch (e) { console.error(e); toastError(friendlyError(e)); }
+}));
 on('toggle-staff', async (el) => {
   await updateDoc(doc(db,'salons',salonId,'staff', el.dataset.id), { active: el.dataset.active !== 'true' });
   loadStaff();

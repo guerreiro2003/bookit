@@ -136,7 +136,49 @@ refused('...e apaga os dados pessoais dela (RGPD)', await attempt(() => updateDo
 refused('...e lê a ficha de cliente dela', await attempt(() => getDocs(
   query(collection(db, 'salons', SALON, 'clients'), where('email', '==', VICTIM)))));
 
-/* ══ 4. Money and tenancy — already solid, kept so they stay that way ════ */
+/* ══ 4. A booking must land on someone who does the work ════════════════
+   Otherwise a client can force a colour onto a barber who has never done one,
+   simply by posting the staff id from the public staff list.               */
+console.log('\nQUEM FAZ O QUÊ');
+await signInWithEmailAndPassword(auth, ADMIN.email, ADMIN.pw);
+const allSvc = (await getDocs(collection(db, 'salons', SALON, 'services'))).docs.map(d => ({ id: d.id, ...d.data() }));
+const otherSvc = allSvc.find(s => s.id !== svc.id && s.active !== false);
+const staffRef = doc(db, 'salons', SALON, 'staff', S.id);
+const savedServiceIds = Array.isArray(S.serviceIds) ? S.serviceIds : null;
+if (otherSvc) {
+  // restrict this person to ONE service, then try to book them for the other
+  await updateDoc(staffRef, { serviceIds: [svc.id] });
+  await signOut(auth);
+  refused(`cliente marca "${otherSvc.name}" com quem só faz "${svc.name}"`, await attempt(() => setDoc(doc(collection(db, 'salons', SALON, 'bookings')), bookingFields({
+    serviceIds: [otherSvc.id], serviceId: otherSvc.id, serviceName: otherSvc.name,
+    serviceDuration: otherSvc.duration, servicePrice: otherSvc.price, finalPrice: otherSvc.price,
+    date: addDaysStr(today, 403), endMin: 600 + otherSvc.duration,
+  }))));
+  const combo = doc(collection(db, 'salons', SALON, 'bookings'));
+  refused('nem numa combinação onde só metade é dela', await attempt(() => setDoc(combo, bookingFields({
+    serviceIds: [svc.id, otherSvc.id], serviceId: svc.id, serviceName: `${svc.name} + ${otherSvc.name}`,
+    serviceDuration: svc.duration + otherSvc.duration, servicePrice: svc.price + otherSvc.price,
+    finalPrice: svc.price + otherSvc.price, date: addDaysStr(today, 403), endMin: 600 + svc.duration + otherSvc.duration,
+  }))));
+  const okRef = doc(collection(db, 'salons', SALON, 'bookings'));
+  tidy.push(okRef);
+  allowed('mas o serviço que ela faz continua a passar', await attempt(() => setDoc(okRef, bookingFields({ date: addDaysStr(today, 403) }))));
+  // back to "does everything" and the restriction disappears
+  await signInWithEmailAndPassword(auth, ADMIN.email, ADMIN.pw);
+  await updateDoc(staffRef, { serviceIds: [] });
+  await signOut(auth);
+  const freeRef = doc(collection(db, 'salons', SALON, 'bookings'));
+  tidy.push(freeRef);
+  allowed('sem lista, volta a fazer tudo', await attempt(() => setDoc(freeRef, bookingFields({
+    serviceIds: [otherSvc.id], serviceId: otherSvc.id, serviceName: otherSvc.name,
+    serviceDuration: otherSvc.duration, servicePrice: otherSvc.price, finalPrice: otherSvc.price,
+    date: addDaysStr(today, 404), endMin: 600 + otherSvc.duration,
+  }))));
+  await signInWithEmailAndPassword(auth, ADMIN.email, ADMIN.pw);
+  await updateDoc(staffRef, savedServiceIds ? { serviceIds: savedServiceIds } : { serviceIds: [] });
+} else console.log('  ⚪ só há um serviço — restrição por colaborador não testável');
+
+/* ══ 5. Money and tenancy — already solid, kept so they stay that way ════ */
 console.log('\nDINHEIRO E SEPARAÇÃO ENTRE SALÕES');
 await signOut(auth);
 refused('cliente forja o preço do serviço', await attempt(() => setDoc(doc(collection(db, 'salons', SALON, 'bookings')),

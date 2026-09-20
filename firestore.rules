@@ -128,6 +128,9 @@ service cloud.firestore {
           && optStr(request.resource.data.get('photoUrl', null), 400000)
           && request.resource.data.get('active', true) is bool
           && (request.resource.data.get('timeOff', []) is list)
+          // Which services this person does. Empty = does everything.
+          && (request.resource.data.get('serviceIds', []) is list)
+          && request.resource.data.get('serviceIds', []).size() <= 100
         ));
       }
       match /promotions/{id} {
@@ -364,6 +367,15 @@ service cloud.firestore {
               && d().finalPrice >= d().servicePrice * 0.5
               && d().finalPrice <= d().servicePrice;
         }
+        // The chosen staff member must actually perform these services. An empty
+        // serviceIds means "does everything", which is the default and true of
+        // most people in a small salon. Enforced on the public path only — the
+        // owner may deliberately assign anyone (covering a shift, say), and the
+        // admin panel already steers them to the right people.
+        function staffDoesTheWork() {
+          let allowed = get(/databases/$(database)/documents/salons/$(salonId)/staff/$(d().staffId)).data.get('serviceIds', []);
+          return allowed.size() == 0 || allowed.hasAll(d().get('serviceIds', []));
+        }
         function frozenForStaff() {
           return d().serviceId == resource.data.serviceId
               && d().get('serviceIds', []) == resource.data.get('serviceIds', [])
@@ -393,7 +405,8 @@ service cloud.firestore {
              ( honestPrice() && d().paid == false
                && ( ( d().get('source', 'online') == 'online' && planActive(salonId) && d().status == 'pending'
                       && str(d().get('clientPhoneE164', ''), 16) && d().get('clientPhoneE164', '').matches('^[0-9]{10,15}$')
-                      && (d().get('clientEmail', '') == '' || validEmail(d().clientEmail)) )
+                      && (d().get('clientEmail', '') == '' || validEmail(d().clientEmail))
+                      && staffDoesTheWork() )
                  || ( isStaff(salonId) && d().status in ['pending', 'confirmed'] ) ) )
           || validImport()
         );

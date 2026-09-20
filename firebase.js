@@ -21,7 +21,41 @@ const firebaseConfig = {
   appId: "1:304719409100:web:15f30b52ee324f00517769"
 };
 
+/* ── App Check ──────────────────────────────────────────────────────────────
+   The security rules can say WHO may write, but not HOW OFTEN or FROM WHERE.
+   App Check closes that gap: it proves the request came from this site in a
+   real browser, which is what stops a script from hammering the public write
+   paths (bookings, agenda holds, account sign-ups).
+
+   To turn it on — three steps, all in the console, no code change here:
+     1. Firebase → App Check → Apps → register the web app with reCAPTCHA v3
+        (it creates the reCAPTCHA site key for you).
+     2. Paste that site key into RECAPTCHA_SITE_KEY below and deploy.
+     3. Watch App Check → Metrics for a few days. When "verified requests" is
+        essentially everything, switch Firestore and Authentication to Enforced.
+
+   Until step 2 the block below does nothing, so the app runs exactly as now.
+   NOTE for tests: once enforcement is on, Node scripts need a debug token —
+   register one under App Check → Apps → ⋮ → Manage debug tokens and export it
+   as APPCHECK_DEBUG_TOKEN (tests/_register.mjs picks it up).                */
+const RECAPTCHA_SITE_KEY = '';
+
 const app  = initializeApp(firebaseConfig);
+
+if (RECAPTCHA_SITE_KEY && typeof window !== 'undefined') {
+  try {
+    const { initializeAppCheck, ReCaptchaV3Provider } =
+      await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check.js');
+    initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(RECAPTCHA_SITE_KEY),
+      isTokenAutoRefreshEnabled: true,
+    });
+  } catch (e) {
+    // A failure here must never take the booking page down with it.
+    console.error('App Check não arrancou:', e);
+  }
+}
+
 const db   = getFirestore(app);
 const auth = getAuth(app);
 
