@@ -60,15 +60,38 @@ await expectStatus('clients NOT readable without auth', () => runQuery(null, `sa
 await expectStatus('referrals NOT listable without auth (codes not enumerable)', () => api('GET', `${FS}/salons/${SALON}/referrals?pageSize=1`, null), 403);
 await expectStatus('bookingLinks NOT listable without auth (tokens not enumerable)', () => api('GET', `${FS}/salons/${SALON}/bookingLinks?pageSize=1`, null), 403);
 
+/* ── agenda ──────────────────────────────────────────────────────────────
+   An agenda entry is a SHADOW of a booking, never a thing of its own. Before
+   this was enforced, anyone without a login could write blocks for a booking
+   that did not exist and close a salon's whole calendar — invisibly, because
+   the owner's booking list stayed empty. These tests are that regression.   */
 const agId = `${S1.id}__${D1}`;
-await expectStatus('public creates agenda doc with exactly one booking entry', async () => { await createDocument(null, `salons/${SALON}/agenda`, agId, agendaDoc(S1.id, D1, { rt1: blocks(600, 645) })); created.push(`salons/${SALON}/agenda/${agId}`); }, 200);
+const dur = service.duration;
+const agenda = (byBooking, viaBookingId) => ({ staffId: S1.id, date: D1, byBooking, viaBookingId, updatedAt: new Date() });
+const mkBooking = async (over) => {
+  const id = (await createDocument(null, `salons/${SALON}/bookings`, null, booking(over))).name.split('/').pop();
+  created.push(`salons/${SALON}/bookings/${id}`);
+  return id;
+};
+// real bookings for the entries to shadow (the REST path creates them without
+// their agenda hold, which is exactly what we need to test the agenda rule)
+const ag1 = await mkBooking({});
+const ag2 = await mkBooking({ time: '11:00', startMin: 660, endMin: 660 + dur });
+const agOtherDay = await mkBooking({ date: D2, time: '10:00' });
+
+await expectStatus('public creates an agenda entry for its own booking', async () => { await createDocument(null, `salons/${SALON}/agenda`, agId, agenda({ [ag1]: blocks(600, 600 + dur) }, ag1)); created.push(`salons/${SALON}/agenda/${agId}`); }, 200);
 await expectStatus('agenda doc GET-able without auth (availability)', () => api('GET', `${FS}/salons/${SALON}/agenda/${agId}`, null), 200);
-await expectStatus('public agenda id must match staffId__date', () => createDocument(null, `salons/${SALON}/agenda`, `${S1.id}__${D2}`, agendaDoc(S1.id, D1, { x: blocks(600, 645) })), 403);
-await expectStatus('public may add ONE booking entry', () => patchDocument(null, `salons/${SALON}/agenda/${agId}`, agendaDoc(S1.id, D1, { rt1: blocks(600, 645), rt2: blocks(660, 705) }), { merge: false }), 200);
-await expectStatus('public may NOT add two entries at once', () => patchDocument(null, `salons/${SALON}/agenda/${agId}`, agendaDoc(S1.id, D1, { rt1: blocks(600, 645), rt2: blocks(660, 705), a: blocks(720, 765), b: blocks(780, 825) }), { merge: false }), 403);
-await expectStatus('public may NOT remove someone else\'s entry', () => patchDocument(null, `salons/${SALON}/agenda/${agId}`, agendaDoc(S1.id, D1, { rt1: blocks(600, 645) }), { merge: false }), 403);
-await expectStatus('public may NOT rewrite another booking while adding its own', () => patchDocument(null, `salons/${SALON}/agenda/${agId}`, agendaDoc(S1.id, D1, { rt1: blocks(0, 1), rt2: blocks(660, 705), rt3: blocks(800, 830) }), { merge: false }), 403);
-await expectStatus('public may NOT wipe the day', () => patchDocument(null, `salons/${SALON}/agenda/${agId}`, agendaDoc(S1.id, D1, {}), { merge: false }), 403);
+await expectStatus('public agenda id must match staffId__date', () => createDocument(null, `salons/${SALON}/agenda`, `${S1.id}__${D2}`, agenda({ [ag1]: blocks(600, 600 + dur) }, ag1)), 403);
+await expectStatus('public adds a second entry for another real booking', () => patchDocument(null, `salons/${SALON}/agenda/${agId}`, agenda({ [ag1]: blocks(600, 600 + dur), [ag2]: blocks(660, 660 + dur) }, ag2), { merge: false }), 200);
+// the fix itself
+await expectStatus('agenda entry for a booking that does NOT exist', () => patchDocument(null, `salons/${SALON}/agenda/${agId}`, agenda({ [ag1]: blocks(600, 600 + dur), [ag2]: blocks(660, 660 + dur), 'NOT-A-BOOKING': blocks(0, 1440) }, 'NOT-A-BOOKING'), { merge: false }), 403);
+await expectStatus('blocks wider than the booking they claim', () => patchDocument(null, `salons/${SALON}/agenda/${agId}`, agenda({ [ag1]: blocks(600, 600 + dur), [ag2]: blocks(660, 660 + dur), [agOtherDay]: blocks(0, 1440) }, agOtherDay), { merge: false }), 403);
+await expectStatus('entry claiming a booking from another day', () => patchDocument(null, `salons/${SALON}/agenda/${agId}`, agenda({ [ag1]: blocks(600, 600 + dur), [ag2]: blocks(660, 660 + dur), [agOtherDay]: blocks(600, 600 + dur) }, agOtherDay), { merge: false }), 403);
+await expectStatus('viaBookingId naming one booking while adding another', () => patchDocument(null, `salons/${SALON}/agenda/${agId}`, agenda({ [ag1]: blocks(600, 600 + dur), [ag2]: blocks(660, 660 + dur), 'SNEAKY': blocks(720, 780) }, ag1), { merge: false }), 403);
+await expectStatus('public may NOT add two entries at once', () => patchDocument(null, `salons/${SALON}/agenda/${agId}`, agenda({ [ag1]: blocks(600, 600 + dur), [ag2]: blocks(660, 660 + dur), a: blocks(720, 765), b: blocks(780, 825) }, ag1), { merge: false }), 403);
+await expectStatus('public may NOT remove someone else\'s entry', () => patchDocument(null, `salons/${SALON}/agenda/${agId}`, agenda({ [ag1]: blocks(600, 600 + dur) }, ag2), { merge: false }), 403);
+await expectStatus('public may NOT rewrite another booking while adding its own', () => patchDocument(null, `salons/${SALON}/agenda/${agId}`, agenda({ [ag1]: blocks(0, 1), [ag2]: blocks(660, 660 + dur), rt3: blocks(800, 830) }, ag2), { merge: false }), 403);
+await expectStatus('public may NOT wipe the day', () => patchDocument(null, `salons/${SALON}/agenda/${agId}`, agenda({}, ag1), { merge: false }), 403);
 // a booking with several services: price and duration must equal the catalogue sum
 const multi = (over) => booking({ serviceIds: [SERVICE_ID, service2.id], serviceName: `${service.name} + ${service2.name}`,
   servicePrice: service.price + service2.price, serviceDuration: service.duration + service2.duration,

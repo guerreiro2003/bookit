@@ -9,7 +9,7 @@ import {
 import {
   getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
   signInAnonymously, signOut, onAuthStateChanged, sendPasswordResetEmail,
-  updatePassword, updateProfile, deleteUser
+  sendEmailVerification, updatePassword, updateProfile, deleteUser
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -41,5 +41,5 @@ export {
   arrayUnion, arrayRemove, increment, getCountFromServer, deleteField, Timestamp,
   signInWithEmailAndPassword, createUserWithEmailAndPassword,
   signInAnonymously, signOut, onAuthStateChanged, sendPasswordResetEmail,
-  updatePassword, updateProfile, deleteUser
+  sendEmailVerification, updatePassword, updateProfile, deleteUser
 };

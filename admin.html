@@ -667,15 +667,16 @@
           </div>
           <div class="field">
             <label for="loyaltyDiscount">Desconto (%)</label>
-            <input type="number" id="loyaltyDiscount" min="1" max="100" />
-            <div class="field__hint">% na próxima visita.</div>
+            <input type="number" id="loyaltyDiscount" min="1" max="50" />
+            <div class="field__hint">% na próxima visita. Máximo 50%.</div>
           </div>
         </div>
         <div class="divider"></div>
         <div class="grid-2">
           <div class="field">
             <label for="referralDiscount">Desconto referido (%)</label>
-            <input type="number" id="referralDiscount" min="1" max="100" />
+            <input type="number" id="referralDiscount" min="1" max="50" />
+            <div class="field__hint">Máximo 50%.</div>
           </div>
           <div class="field">
             <label for="noShowPenalty">Pontos por "não compareceu"</label>
@@ -923,14 +924,14 @@ import {
   signOut, onAuthStateChanged, getSecondaryAuth, createUserWithEmailAndPassword
 } from './firebase.js';
 import {
-  $, $$, on, toast, toastSuccess, toastError, escapeHTML, htmlMix, raw,
+  $, $$, on, toast, toastSuccess, toastError, toastInfo, escapeHTML, htmlMix, raw,
   MONTHS_FULL, formatDate, formatDatePT, formatPrice, todayISO, relativeDay, todayForSalon,
   STATUS_LABELS, statusBadge, withLock, friendlyError, salonSetting, SALON_DEFAULTS, planActive,
   debounce, toggleTheme, getTheme, setTheme,
   markBookingPaid, markBookingNoShow, confirmBooking, cancelBooking, restoreBooking, rescheduleBooking,
   createBooking, computeAvailability, minToTime, timeToMin, isValidDateStr, BLOCKING_STATUSES,
   whatsAppFor, markMessageSent, addDaysStr, formatRelativeTime,
-  loadRetention, logReactivation, deleteReactivation, reactivationLink, whatsAppUrl, randomToken, formatPhonePT,
+  loadRetention, logReactivation, deleteReactivation, reactivationLink, whatsAppUrl, randomToken, formatPhonePT, firstName,
   loadImportContext, runImport,
   layoutServices, normaliseSegments, hasGap, MAX_SERVICES_PER_BOOKING,
   downloadCSV, subscribe, trapFocus,
@@ -1559,10 +1560,25 @@ on('confirm-reschedule', withLock('reschedule', async () => {
   const staff = allStaff.find(s => s.id === $('#rsStaff').value) || null;
   if (!isValidDateStr(date) || startMin == null) { err.textContent = 'Escolhe data e horário.'; err.classList.add('show'); return; }
   try {
-    await rescheduleBooking({ salonId, salon, ctx: bookingCtx, bookingId: rsContext.booking.id, newDate: date, newStartMin: startMin, newStaff: staff });
-    toastSuccess(`Reagendada para ${formatDatePT(date, { short: true })} às ${minToTime(startMin)}.`);
+    const b = rsContext.booking;
+    await rescheduleBooking({ salonId, salon, ctx: bookingCtx, bookingId: b.id, newDate: date, newStartMin: startMin, newStaff: staff });
     bookingsByDateCache = { date: null, rows: [] };
     document.querySelector('[data-action="close-reschedule"]').click();
+    // Moving an appointment without telling the client is how someone ends up
+    // at the door at the old time. Offer the message right here, while the
+    // change is still in the owner's head.
+    const moved = { ...b, salonId, date, time: minToTime(startMin), staffName: staff?.name || b.staffName };
+    const msg = whatsAppFor({ salon: { ...salon, id: salonId }, booking: moved, kind: 'rescheduled' });
+    if (msg) {
+      toastSuccess(`Reagendada para ${formatDatePT(date, { short: true })} às ${minToTime(startMin)}. Avisa ${firstName(b.clientName) || 'a cliente'}.`, {
+        action: { label: '💬 Avisar', run: async () => {
+          window.open(msg.url, '_blank', 'noopener');
+          try { await markMessageSent({ salonId, bookingId: b.id, kind: 'rescheduled' }); } catch (e) { console.error(e); }
+        } },
+      });
+    } else {
+      toastSuccess(`Reagendada para ${formatDatePT(date, { short: true })} às ${minToTime(startMin)}. Sem telemóvel — avisa a cliente por outro meio.`);
+    }
   } catch (e) { console.error(e); err.textContent = friendlyError(e, 'Não foi possível reagendar.'); err.classList.add('show'); renderRsSlots(); }
 }));
 
@@ -2125,7 +2141,28 @@ on('toggle-service', async (el) => {
 
 on('delete-service', async (el) => {
   const s = allServices.find(x => x.id === el.dataset.id);
-  if (!s || !confirm(`Remover serviço "${s.name}"?`)) return;
+  if (!s) return;
+  // A service that has been booked is part of the salon's history. Deleting it
+  // leaves those bookings pointing at nothing — so it gets retired, not erased.
+  let used = 0;
+  try {
+    used = (await getCountFromServer(query(collection(db,'salons',salonId,'bookings'), where('serviceIds','array-contains', s.id)))).data().count;
+  } catch (e) { console.error(e); used = -1; }
+
+  if (used !== 0) {
+    const n = used > 0 ? `${used} marcação(ões)` : 'marcações';
+    if (s.active === false) return toastInfo(`"${s.name}" já está desativado e tem ${n} no histórico — fica guardado.`);
+    if (!confirm(`"${s.name}" já foi usado em ${n}.\n\nVai ser DESATIVADO em vez de apagado: deixa de aparecer aos clientes, mas o histórico e a faturação continuam certos.\n\nContinuar?`)) return;
+    await updateDoc(doc(db,'salons',salonId,'services', s.id), { active: false });
+    toastSuccess(`"${s.name}" desativado. O histórico ficou intacto.`, { undo: async () => {
+      await updateDoc(doc(db,'salons',salonId,'services', s.id), { active: true });
+      loadServices();
+    }});
+    loadServices();
+    return;
+  }
+
+  if (!confirm(`Remover serviço "${s.name}"? Nunca foi usado numa marcação.`)) return;
   await deleteDoc(doc(db,'salons',salonId,'services', el.dataset.id));
   toastSuccess('Removido.', { undo: async () => {
     await setDoc(doc(db,'salons',salonId,'services', el.dataset.id), s);
@@ -2437,6 +2474,9 @@ $('#loyaltyForm').addEventListener('submit', async (e) => {
   const discount = parseInt($('#loyaltyDiscount').value, 10);
   const refDisc  = parseInt($('#referralDiscount').value, 10);
   const noShow   = parseInt($('#noShowPenalty').value, 10);
+  // Half price is the floor the booking rules enforce. Accepting a bigger number
+  // here would just produce an unexplainable "sem permissão" at booking time.
+  if (discount > 50 || refDisc > 50) return toastError('O desconto máximo é 50% — acima disso a marcação seria recusada.');
   await updateDoc(doc(db,'salons', salonId), {
     loyaltyVisits: visits, loyaltyDiscount: discount,
     referralDiscount: refDisc, noShowPenalty: noShow

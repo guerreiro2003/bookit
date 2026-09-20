@@ -53,6 +53,10 @@ async function queueMail({ salon, booking, bookingId, kind, subject, intro }) {
 
 exports.onBookingCreated = onDocumentCreated('salons/{salonId}/bookings/{bookingId}', async (event) => {
   const b = event.data.data(); const { salonId, bookingId } = event.params;
+  // History brought in from the salon's old software is NOT news. Without this
+  // guard, importing 2 000 past visits emails 2 000 real clients about
+  // appointments they had two years ago.
+  if (b.imported || b.source === 'import' || ['completed', 'cancelled', 'noshow'].includes(b.status)) return;
   const salon = await salonOf(salonId); if (!salon) return;
   await queueMail({ salon, booking: b, bookingId, kind: 'created',
     subject: b.status === 'confirmed' ? 'Marcação confirmada' : 'Marcação recebida',
@@ -62,6 +66,7 @@ exports.onBookingCreated = onDocumentCreated('salons/{salonId}/bookings/{booking
 exports.onBookingUpdated = onDocumentUpdated('salons/{salonId}/bookings/{bookingId}', async (event) => {
   const before = event.data.before.data(), after = event.data.after.data();
   const { salonId, bookingId } = event.params;
+  if (after.imported || after.source === 'import') return;   // re-importing history is not news either
   const salon = await salonOf(salonId); if (!salon) return;
   if (before.status !== 'confirmed' && after.status === 'confirmed')
     return queueMail({ salon, booking: after, bookingId, kind: 'confirmed', subject: 'Marcação confirmada', intro: `Olá ${esc(after.clientName)}, a tua marcação foi confirmada pelo salão.` });

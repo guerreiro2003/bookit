@@ -10,16 +10,23 @@ service cloud.firestore {
     // Team account of THIS salon (one shared Firebase account per salon; see staff.html)
     function isTeam(salonId)  { return isAuth() && salon(salonId).get('teamUid', '') == request.auth.uid; }
     function isStaff(salonId) { return isAdmin(salonId) || isTeam(salonId); }
+    // An email only proves identity once Firebase has confirmed the person can
+    // read it. Without this check anyone could register victim@example.com and
+    // walk straight into that person's bookings, notes and loyalty.
+    function verifiedEmail() {
+      return (isAuth() && request.auth.token.get('email_verified', false) == true)
+        ? request.auth.token.get('email', '') : '';
+    }
     function ownsClientDoc(d) {
       return isAuth() && (
         d.get('uid', '') == request.auth.uid ||
-        (d.get('email', '') != '' && d.get('email', '') == request.auth.token.email)
+        (verifiedEmail() != '' && d.get('email', '') == verifiedEmail())
       );
     }
     function ownsBooking(d) {
       return isAuth() && (
         d.get('clientId', '') == request.auth.uid ||
-        (d.get('clientEmail', '') != '' && d.get('clientEmail', '') == request.auth.token.email)
+        (verifiedEmail() != '' && d.get('clientEmail', '') == verifiedEmail())
       );
     }
     // Subscription gate. Salons without a plan field are treated as active.
@@ -74,9 +81,11 @@ service cloud.firestore {
         && intIn(request.resource.data.get('maxAdvanceDays', 90), 1, 365)
         && intIn(request.resource.data.get('cancellationHours', 24), 0, 336)
         && intIn(request.resource.data.get('loyaltyVisits', 5), 1, 100)
-        && intIn(request.resource.data.get('loyaltyDiscount', 20), 0, 100)
-        && intIn(request.resource.data.get('referralDiscount', 10), 0, 100)
-        && intIn(request.resource.data.get('birthdayDiscount', 15), 0, 100)
+        // Capped at 50 to match honestPrice(): a bigger discount would make its
+        // own bookings impossible, with no way for the owner to know why.
+        && intIn(request.resource.data.get('loyaltyDiscount', 20), 0, 50)
+        && intIn(request.resource.data.get('referralDiscount', 10), 0, 50)
+        && intIn(request.resource.data.get('birthdayDiscount', 15), 0, 50)
         && intIn(request.resource.data.get('noShowPenalty', 5), 0, 1000)
         && intIn(request.resource.data.get('pointsPerVisit', 10), 0, 1000)
         && (request.resource.data.get('closedDates', []) is list)
@@ -168,8 +177,13 @@ service cloud.firestore {
         // Listing would enumerate every token, so it is staff-only.
         allow get: if true;
         allow list: if isStaff(salonId);
-        allow create: if noPII() && str(request.resource.data.bookingId, 128)
-          && (isStaff(salonId) || planActive(salonId));
+        // The document id IS the booking's own token, so a public caller can only
+        // mint the link for a booking it just created — not arbitrary documents.
+        allow create: if noPII() && str(request.resource.data.bookingId, 128) && (
+             isStaff(salonId)
+          || ( planActive(salonId)
+               && getAfter(/databases/$(database)/documents/salons/$(salonId)/bookings/$(request.resource.data.bookingId)).data.get('manageToken', '') == token )
+        );
         // A link holder may only mirror the booking's real (post-transaction) status.
         allow update: if noPII() && (
              isStaff(salonId)
@@ -197,11 +211,30 @@ service cloud.firestore {
         function oldMap() { return resource.data.get('byBooking', {}); }
         function newMap() { return request.resource.data.byBooking; }
         function touched() { return newMap().diff(oldMap()).affectedKeys(); }
-        // Exactly one entry changed AND the entry count grew by one → a pure addition.
-        function addsOneEntry()  { return touched().size() == 1 && newMap().keys().size() == oldMap().keys().size() + 1; }
+        // Exactly that booking's entry changed AND the count grew by one → a pure addition.
+        function addsOnly(bid)   { return touched().hasOnly([bid]) && touched().size() == 1
+                                       && newMap().keys().size() == oldMap().keys().size() + 1; }
         // Exactly that booking's entry changed AND the count dropped by one → a pure removal.
         function removesOnly(bid) { return touched().hasOnly([bid]) && touched().size() == 1
                                         && newMap().keys().size() == oldMap().keys().size() - 1; }
+        // An agenda entry is a shadow of a booking, never a thing of its own.
+        // Without this, anyone could write blocks for a booking that does not
+        // exist and close a salon's whole calendar — a real, invisible DoS.
+        // The booking must exist when this request lands, belong to this staff
+        // member on this day, still be live, and the blocks must stay inside
+        // the booking's own window.
+        function shadowsBooking(bid) {
+          let bk = getAfter(/databases/$(database)/documents/salons/$(salonId)/bookings/$(bid)).data;
+          let bl = newMap()[bid].blocks;
+          return bk.staffId == request.resource.data.staffId
+              && bk.date == request.resource.data.date
+              && bk.status in ['pending', 'confirmed']
+              && bl is list && bl.size() >= 1 && bl.size() <= 8
+              && bl[0].start is int && bl[0].start >= bk.startMin
+              && bl[bl.size() - 1].end is int && bl[bl.size() - 1].end <= bk.endMin;
+        }
+        // The writer names the booking it is holding, the way a release does.
+        function heldBooking() { return request.resource.data.get('viaBookingId', ''); }
         // The booking being freed must really end up cancelled in this same
         // request, and the caller must hold that booking's own token.
         function tokenRelease() {
@@ -222,11 +255,18 @@ service cloud.firestore {
         }
         allow get: if true;               // availability is computed from direct gets (staffId__date)
         allow list: if isStaff(salonId);
-        allow create: if validAgenda() && (isStaff(salonId) || (planActive(salonId) && request.resource.data.byBooking.keys().size() == 1));
+        allow create: if validAgenda() && (
+             isStaff(salonId)
+          || ( planActive(salonId)
+               && newMap().keys().hasOnly([heldBooking()])
+               && newMap().keys().size() == 1
+               && shadowsBooking(heldBooking()) )
+        );
         allow update: if validAgenda() && (
              isStaff(salonId)
-          // A public booking may add exactly its own new entry, nothing else.
-          || ( planActive(salonId) && addsOneEntry() )
+          // A public booking may add exactly its own entry, for a booking that
+          // really exists, and nothing else.
+          || ( planActive(salonId) && addsOnly(heldBooking()) && shadowsBooking(heldBooking()) )
           || tokenRelease()
           || ownerRelease()
         );
@@ -333,6 +373,12 @@ service cloud.firestore {
               && d().get('manageToken', '') == resource.data.get('manageToken', '')
               && (isAdmin(salonId) || d().finalPrice == resource.data.finalPrice);
         }
+        // Did this write actually move the appointment?
+        function rescheduled() {
+          return d().date != resource.data.date
+              || d().time != resource.data.time
+              || d().staffId != resource.data.staffId;
+        }
         // Capability link: the request carries the booking's own token.
         function tokenOk() {
           return resource.data.get('manageToken', '') != ''
@@ -357,7 +403,11 @@ service cloud.firestore {
           ( isStaff(salonId)
             && frozenForStaff()
             && d().status in ['pending','confirmed','completed','cancelled','noshow']
-            && (d().status == resource.data.status || validTransition(resource.data.status, d().status))
+            && ( d().status == resource.data.status
+                 || validTransition(resource.data.status, d().status)
+                 // Moving an appointment drops its confirmation: it is no longer
+                 // the time the client agreed to, so they must confirm again.
+                 || (rescheduled() && resource.data.status == 'confirmed' && d().status == 'pending') )
             && validDate(d().date) && validTime(d().time) )
           // Client cancels their own booking, respecting the salon's cancellation window.
           || ( ownsBooking(resource.data)

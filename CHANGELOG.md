@@ -1,5 +1,31 @@
 # Changelog
 
+## 2.5.0 — 2026-09-20 · Fechar as falhas que a auditoria encontrou
+
+A auditoria de 18 de setembro explorou duas falhas reais contra o projeto em produção. Estão fechadas, e agora há uma suite de testes que tenta atacá-las a cada corrida.
+
+### Segurança
+
+- **Uma entrada de agenda é a sombra de uma marcação, nunca uma coisa em si.** As regras validavam a *forma* do documento mas nunca verificavam que a entrada pertencia a uma marcação. Qualquer pessoa sem login podia marcar um colaborador como ocupado das 00:00 às 24:00 para uma marcação que não existia — fechando a agenda do salão enquanto a lista de marcações ficava vazia, o que tornava a coisa invisível. Agora a regra exige, via `getAfter()`, que a marcação exista no fim do pedido, seja desse colaborador nesse dia, esteja viva, e que os blocos caibam dentro da janela da própria marcação. Quem escreve declara qual é a marcação (`viaBookingId`), tal como já acontecia ao libertar.
+- **Um email só prova identidade depois de ser aberto.** As regras confiavam em `request.auth.token.email` sem verificar `email_verified`, e o Firebase deixa registar qualquer endereço. Registar-se com o email de uma cliente dava acesso ao nome, telemóvel, histórico e às **notas privadas do salão** — que em cabeleireiro incluem alergias. Agora `ownsBooking()` e `ownsClientDoc()` exigem email verificado.
+  - `account.html` ganhou o ecrã **"Confirma o teu email"**, com reenviar e "já confirmei". A ficha de cliente só é escrita no primeiro login verificado, e é aí que se liga a um registo de visitante que o salão já tivesse criado.
+- **`bookingLinks` deixou de aceitar escrita arbitrária.** O id do documento é o token da própria marcação, e a regra exige agora que bata certo com o `manageToken` dela. Antes, qualquer pessoa sem login escrevia documentos sem limite — lixo permanente que o dono pagava.
+- **`tests/abuse.e2e.mjs`** (25 testes): a suite que faltava. Não pergunta "quem tem direito consegue?" mas "quem não tem consegue por outro caminho?". Foi ela que apanhou, já depois da correção, que o teste do plano de subscrição era um falso positivo.
+
+### Produto
+
+- **Reagendar avisa a cliente.** Havia código morto — `? {} : {}` — com um comentário a dizer que a marcação teria de ser reconfirmada. Nunca foi implementado, e a cliente aparecia à hora antiga. Agora mover uma marcação **larga a confirmação** (volta a *pendente*), limpa lembretes já enviados, e o painel oferece o botão **💬 Avisar** com a mensagem de WhatsApp pronta.
+- **Apagar um serviço já usado passou a desativá-lo.** Era um `deleteDoc` com um `confirm()`, e deixava as marcações a apontar para nada. Agora conta as marcações que o usam: se houver alguma, desativa (o histórico e a faturação ficam certos) e explica porquê; só apaga mesmo os serviços que nunca foram usados.
+- **Desconto máximo de 50%,** na interface e nas regras. As definições aceitavam até 100% mas o motor de preços recusa abaixo de metade — um salão que configurasse 60% via os clientes com cupão a receber "sem permissão" sem explicação possível.
+- **As Cloud Functions ignoram histórico importado.** Estavam prontas a enviar email a *todas* as marcações criadas: lançá-las depois de importar 2 000 visitas antigas mandaria 2 000 emails a clientes reais sobre marcações de há dois anos.
+
+### Operação
+
+- **Primeiro backup real alguma vez feito** (`npm run backup`) — 142 KB, os 7 salões. Revelou que os dados do Zen Organic estão espalhados por três tenants.
+- `npm run test:all` corre tudo de uma vez.
+
+Testes: 54 unit · 74 regras · 25 abuso · 38 motor · 18 links · 21 retenção · 27 importação · stress de concorrência — **257, todos verdes**.
+
 ## 2.4.0 — 2026-09-18 · Importador: trazer os clientes e o histórico do software antigo
 
 Um salão que já trabalha há anos não começa do zero. O importador lê o ficheiro que ele consegue exportar do software atual (ou do Excel) e transforma-o em clientes e histórico — que é o que dá matéria ao painel *Reativar* logo no primeiro dia.

@@ -382,6 +382,8 @@ export function messageText(kind, { clientName, salonName, serviceName, dateStr,
       return `${hi}É hoje! *${serviceName}* às *${time}* no ${salonName}.${tail}\nAté já! ✂️`;
     case 'freeSlot':
       return `${hi}Surgiu uma vaga no ${salonName}: *${serviceName}*, *${when}*. Queres? Responde *1* e é tua.${tail}`;
+    case 'rescheduled':
+      return `${hi}Aqui é do ${salonName}. Tivemos de mudar a tua marcação de *${serviceName}* para *${when}*. Dá-te jeito? Responde *1* para confirmares.${tail}`;
     default:
       return `${hi}${salonName}: ${serviceName}, ${when}.${tail}`;
   }

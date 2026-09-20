@@ -93,6 +93,25 @@
         </form>
       </div>
 
+      <!-- An email only proves who you are once you have opened it. Until then
+           the salon's data stays closed — the rules enforce the same thing. -->
+      <div id="screenVerify" hidden>
+        <div class="container" style="max-width:34rem;padding:var(--s-9) 0;text-align:center">
+          <div class="empty-state__icon" style="margin:0 auto var(--s-4)">✉️</div>
+          <h1 class="page-title">Confirma o teu email</h1>
+          <p class="page-sub" style="margin:var(--s-3) auto var(--s-6)">
+            Enviámos uma mensagem para <strong id="verifyEmail"></strong>. Abre-a e carrega no link para entrares na tua área pessoal.
+          </p>
+          <div class="flex" style="gap:10px;justify-content:center;flex-wrap:wrap">
+            <button class="btn btn--primary" type="button" data-action="verify-check">Já confirmei — entrar</button>
+            <button class="btn" type="button" data-action="verify-resend">Reenviar email</button>
+          </div>
+          <p class="text-sm text-muted" style="margin-top:var(--s-5)">
+            Não encontras a mensagem? Vê o spam. <a href="#" data-action="logout">Sair</a>
+          </p>
+        </div>
+      </div>
+
       <div id="screenProfile" hidden>
 
         <div id="bdayBanner" class="bday" hidden>
@@ -255,10 +274,10 @@
 <script type="module">
 import {
   db, auth, collection, doc, getDoc, getDocs, updateDoc, setDoc, deleteDoc,
-  query, where, orderBy, runTransaction, serverTimestamp,
+  query, where, orderBy, serverTimestamp,
   onAuthStateChanged, signOut, deleteUser,
   signInWithEmailAndPassword, createUserWithEmailAndPassword,
-  sendPasswordResetEmail, updatePassword
+  sendPasswordResetEmail, sendEmailVerification, updatePassword, updateProfile
 } from './firebase.js';
 import {
   $, $$, on, toast, toastSuccess, toastError, escapeHTML, htmlMix, raw,
@@ -293,6 +312,7 @@ onAuthStateChanged(auth, async (u) => {
   if (u) {
     const adminSnap = await getDocs(query(collection(db,'salons'), where('adminUid','==', u.uid)));
     if (!adminSnap.empty) { window.location.href = 'admin.html'; return; }
+    if (!u.emailVerified) { showVerify(u.email); return; }
     user = u;
     await loadClient(u);
     showProfile();
@@ -362,54 +382,73 @@ $('#authRegister').addEventListener('submit', withLock('register', async (e) => 
 
   const btn = $('#registerBtn'); btn.disabled = true;
   try {
+    // Create the account and stop there. The client record is only written once
+    // the person has opened the verification email — until then the salon's data
+    // stays closed, and the rules enforce exactly the same line.
     const cred = await createUserWithEmailAndPassword(auth, email, pw);
-    const uid  = cred.user.uid;
-    const refCode = generateReferralCode(name, salonId);
-
-    // If a guest record with this email already exists (created by the salon at
-    // a paid visit), link it to the new account; otherwise create a fresh one.
-    // The referral code is also published to /referrals (public, no PII) so
-    // friends can redeem it without reading client documents.
-    const existing = await getDocs(query(collection(db,'salons',salonId,'clients'), where('email','==', email)));
-    await runTransaction(db, async (tx) => {
-      if (!existing.empty) {
-        const ref = doc(db,'salons',salonId,'clients', existing.docs[0].id);
-        const cur = existing.docs[0].data();
-        tx.update(ref, { uid, name, phone, birthday: birthday || null, referralCode: cur.referralCode || refCode, updatedAt: serverTimestamp() });
-        if (!cur.referralCode) tx.set(doc(db,'salons',salonId,'referrals', refCode), { clientId: uid, createdAt: serverTimestamp() });
-      } else {
-        tx.set(doc(db,'salons',salonId,'clients', uid), {
-          uid, name, email, phone, birthday: birthday || null,
-          referralCode: refCode,
-          visits: 0, points: 0, totalSpent: 0,
-          referredBy: null, referrals: [], discounts: [],
-          createdAt: serverTimestamp()
-        });
-        tx.set(doc(db,'salons',salonId,'referrals', refCode), { clientId: uid, createdAt: serverTimestamp() });
-      }
-    });
-    toastSuccess('Conta criada com sucesso!');
+    await updateProfile(cred.user, { displayName: name }).catch(() => {});
+    await sendEmailVerification(cred.user);
+    stashProfile({ name, phone, birthday: birthday || null });
+    showVerify(email);
   } catch (err) {
     setErr('registerErr', authErrorMessage(err.code) || err.message);
     btn.disabled = false;
   }
 }));
 
+/* What the person typed at registration, kept until the first verified login
+   writes it into their client record. */
+const PROFILE_KEY = `bookit:pending-profile:${salonId}`;
+function stashProfile(p) { try { sessionStorage.setItem(PROFILE_KEY, JSON.stringify(p)); } catch {} }
+function takeProfile() {
+  try { const v = sessionStorage.getItem(PROFILE_KEY); sessionStorage.removeItem(PROFILE_KEY); return v ? JSON.parse(v) : null; } catch { return null; }
+}
+
+on('verify-resend', withLock('resend', async () => {
+  if (!auth.currentUser) return;
+  try { await sendEmailVerification(auth.currentUser); toastSuccess('Email reenviado.'); }
+  catch (e) { toastError(e.code === 'auth/too-many-requests' ? 'Já enviámos há pouco — espera um minuto.' : 'Não foi possível reenviar.'); }
+}));
+
+on('verify-check', withLock('verify', async () => {
+  if (!auth.currentUser) return;
+  await auth.currentUser.reload();
+  if (!auth.currentUser.emailVerified) return toastError('Ainda não está confirmado. Abre o link na mensagem que te enviámos.');
+  // The ID token carries email_verified, so it must be refreshed before the
+  // security rules will see the new state.
+  await auth.currentUser.getIdToken(true);
+  user = auth.currentUser;
+  await loadClient(user);
+  showProfile();
+}));
+
 on('logout', async () => { await signOut(auth); });
 
 async function loadClient(u) {
   try {
+    // Whatever was typed at registration, waiting for this first verified login.
+    const pending = takeProfile();
     let snap = await getDoc(doc(db,'salons',salonId,'clients', u.uid));
     if (!snap.exists()) {
+      // A guest record the salon already created at a paid visit? Link it
+      // instead of starting a second one for the same person.
       const q = await getDocs(query(collection(db,'salons',salonId,'clients'), where('email','==', u.email)));
       if (!q.empty) {
         client = { id: q.docs[0].id, ...q.docs[0].data() };
-        if (!client.uid) await updateDoc(doc(db,'salons',salonId,'clients', q.docs[0].id), { uid: u.uid });
+        const patch = { ...(client.uid ? {} : { uid: u.uid }) };
+        if (pending?.name)     patch.name = pending.name;
+        if (pending?.phone)    patch.phone = pending.phone;
+        if (pending?.birthday) patch.birthday = pending.birthday;
+        if (Object.keys(patch).length) {
+          await updateDoc(doc(db,'salons',salonId,'clients', q.docs[0].id), patch);
+          client = { ...client, ...patch };
+        }
       } else {
-        const refCode = generateReferralCode(u.email.split('@')[0], salonId);
+        const name = pending?.name || u.displayName || u.email.split('@')[0];
+        const refCode = generateReferralCode(name, salonId);
         await setDoc(doc(db,'salons',salonId,'clients', u.uid), {
-          uid: u.uid, name: u.displayName || u.email.split('@')[0], email: u.email,
-          phone: '', birthday: null, referralCode: refCode,
+          uid: u.uid, name, email: u.email,
+          phone: pending?.phone || '', birthday: pending?.birthday || null, referralCode: refCode,
           visits: 0, points: 0, totalSpent: 0,
           referredBy: null, referrals: [], discounts: [],
           createdAt: serverTimestamp()
@@ -438,12 +477,23 @@ function showAuth() {
   $('#screenInit').hidden    = true;
   $('#screenAuth').hidden    = false;
   $('#screenAuth').style.display = '';
+  $('#screenVerify').hidden  = true;
   $('#screenProfile').hidden = true;
+  $('#headerActions').innerHTML = '';
+}
+function showVerify(email) {
+  $('#screenInit').hidden    = true;
+  $('#screenAuth').hidden    = true;
+  $('#screenAuth').style.display = 'none';
+  $('#screenVerify').hidden  = false;
+  $('#screenProfile').hidden = true;
+  $('#verifyEmail').textContent = email || '';
   $('#headerActions').innerHTML = '';
 }
 function showProfile() {
   $('#screenInit').hidden    = true;
   $('#screenAuth').style.display = 'none';
+  $('#screenVerify').hidden  = true;
   $('#screenProfile').hidden = false;
 }
 

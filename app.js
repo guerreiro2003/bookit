@@ -99,11 +99,17 @@ function ensureToast() {
   return t;
 }
 
+/**
+ * @param {object|string} opts  kind, or { kind, undo, action:{ label, run } }.
+ *   `undo` is the classic 6-second escape hatch; `action` is any other single
+ *   follow-up the moment calls for ("Avisar a cliente" after a reschedule).
+ */
 export function toast(msg, opts = {}) {
   const t = ensureToast();
   const kind = typeof opts === 'string' ? opts : (opts.kind || '');
   const undo = (typeof opts === 'object' && opts.undo) || null;
-  toastUndoFn = undo;
+  const action = (typeof opts === 'object' && opts.action) || null;
+  toastUndoFn = undo || (action ? action.run : null);
 
   t.className = '';
   if (kind) t.classList.add(`toast--${kind}`);
@@ -114,11 +120,11 @@ export function toast(msg, opts = {}) {
   msgEl.textContent = msg;
   t.appendChild(msgEl);
 
-  if (undo) {
+  if (undo || action) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'toast__action';
-    btn.textContent = 'Anular';
+    btn.textContent = undo ? 'Anular' : action.label;
     btn.addEventListener('click', async () => {
       if (toastUndoFn) {
         const fn = toastUndoFn;
@@ -136,7 +142,7 @@ export function toast(msg, opts = {}) {
   toastTimer = setTimeout(() => {
     t.classList.remove('show');
     toastUndoFn = null;
-  }, undo ? 6000 : 3000);
+  }, (undo || action) ? 8000 : 3000);
 }
 export const toastSuccess = (m, opts = {}) => toast(m, { ...opts, kind: 'success' });
 export const toastError   = (m, opts = {}) => toast(m, { ...opts, kind: 'error' });
@@ -550,9 +556,12 @@ export async function createBooking({ salonId, salon, ctx, service, services, st
     }
 
     // ── writes ──
+    // `viaBookingId` names the booking this hold belongs to. The rules use it to
+    // check the entry really shadows a booking of this staff member on this day —
+    // without it, anyone could write blocks for a booking that does not exist.
     const aRef = agendaRef(salonId, chosen.id, dateStr);
-    if (chosenSnap.exists()) tx.update(aRef, { [`byBooking.${bookingRef.id}`]: { blocks: busyAt(startMin, layout) }, updatedAt: serverTimestamp() });
-    else tx.set(aRef, { staffId: chosen.id, date: dateStr, byBooking: { [bookingRef.id]: { blocks: busyAt(startMin, layout) } }, updatedAt: serverTimestamp() });
+    if (chosenSnap.exists()) tx.update(aRef, { [`byBooking.${bookingRef.id}`]: { blocks: busyAt(startMin, layout) }, viaBookingId: bookingRef.id, updatedAt: serverTimestamp() });
+    else tx.set(aRef, { staffId: chosen.id, date: dateStr, byBooking: { [bookingRef.id]: { blocks: busyAt(startMin, layout) } }, viaBookingId: bookingRef.id, updatedAt: serverTimestamp() });
 
     const bookingDoc = {
       salonId,
@@ -807,8 +816,8 @@ function releaseInterval(tx, aSnap, aRef, bookingId) {
 }
 /** Write a booking's busy blocks into an agenda doc (creating it if needed). */
 function holdInterval(tx, aSnap, aRef, { staffId, date, bookingId, blocks }) {
-  if (aSnap.exists()) tx.update(aRef, { [`byBooking.${bookingId}`]: { blocks }, updatedAt: serverTimestamp() });
-  else tx.set(aRef, { staffId, date, byBooking: { [bookingId]: { blocks } }, updatedAt: serverTimestamp() });
+  if (aSnap.exists()) tx.update(aRef, { [`byBooking.${bookingId}`]: { blocks }, viaBookingId: bookingId, updatedAt: serverTimestamp() });
+  else tx.set(aRef, { staffId, date, byBooking: { [bookingId]: { blocks } }, viaBookingId: bookingId, updatedAt: serverTimestamp() });
 }
 /** The busy blocks of an existing booking, relative to its start (legacy-safe). */
 function bookingLayout(b) {
@@ -892,12 +901,15 @@ export async function rescheduleBooking({ salonId, salon, ctx, bookingId, newDat
       releaseInterval(tx, oldSnap, oldRef, bookingId);
       holdInterval(tx, newSnap, newRef, { staffId: staff.id, date: newDate, bookingId, blocks });
     }
+    // A moved appointment is no longer the one the client agreed to, so the
+    // confirmation is dropped and any reminder already sent is cleared. The
+    // caller is expected to tell the client — see `whatsAppFor(kind:'rescheduled')`.
     tx.update(bRef, {
       date: newDate, time: minToTime(newStartMin), startMin: newStartMin, endMin: newStartMin + duration,
       staffId: staff.id, staffName: staff.name,
       rescheduledFrom: { date: b.date, time: b.time, staffId: b.staffId }, rescheduledAt: serverTimestamp(),
-      // a moved appointment must be re-confirmed by the client
-      ...(b.status === 'confirmed' && b.confirmedVia === 'link' ? {} : {}),
+      status: 'pending', confirmedAt: null, confirmedVia: null,
+      confirmRequestedAt: null, reminderSentAt: null, clientNotifiedAt: null,
     });
     syncLink(tx, salonId, bookingId, b, { date: newDate, time: minToTime(newStartMin), startMin: newStartMin, endMin: newStartMin + duration, staffId: staff.id, staffName: staff.name });
     return { ok: true };

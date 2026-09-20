@@ -14,6 +14,7 @@ import { db, auth, doc, getDoc, getDocs, updateDoc, deleteDoc, deleteField, coll
 import {
   loadSalon, loadBookingContext, computeAvailability, createBooking, cancelBooking, restoreBooking, rescheduleBooking,
   confirmBooking, markBookingPaid, markBookingNoShow, timeToMin, minToTime, addDaysStr, nowInTimezone, salonSetting, agendaId,
+  whatsAppFor,
 } from '../app.js';
 
 const E = process.env;
@@ -121,6 +122,20 @@ await rescheduleBooking({ salonId: SALON, salon, ctx, bookingId: thief.id, newDa
 th = (await getDoc(doc(db, 'salons', SALON, 'bookings', thief.id))).data();
 ok('reschedule (other staff, other day) moves across agendas', th.staffId === S2.id && th.date === D3 && (await agendaOf(S2.id, D3)).some(iv => iv.bookingId === thief.id) && !(await agendaOf(S1.id, D1)).some(iv => iv.bookingId === thief.id));
 await expectErr('reschedule onto an occupied slot is rejected', () => rescheduleBooking({ salonId: SALON, salon, ctx, bookingId: b1.id, newDate: D3, newStartMin: 11 * 60, newStaff: S2 }), 'invalid-transition');
+
+// A moved appointment is no longer the one the client agreed to: the
+// confirmation is dropped so nobody thinks it still stands, and any reminder
+// already sent is cleared. Otherwise the client turns up at the old time.
+await confirmBooking({ salonId: SALON, bookingId: thief.id });
+th = (await getDoc(doc(db, 'salons', SALON, 'bookings', thief.id))).data();
+ok('booking confirms before the move', th.status === 'confirmed');
+await rescheduleBooking({ salonId: SALON, salon, ctx, bookingId: thief.id, newDate: D3, newStartMin: 12 * 60, newStaff: S2 });
+th = (await getDoc(doc(db, 'salons', SALON, 'bookings', thief.id))).data();
+ok('moving a confirmed booking drops the confirmation', th.status === 'pending' && th.confirmedAt == null && th.confirmedVia == null, JSON.stringify({ s: th.status, at: th.confirmedAt }));
+ok('and clears any reminder already sent', th.reminderSentAt == null && th.confirmRequestedAt == null);
+ok('and records where it came from', th.rescheduledFrom?.date === D3 && th.rescheduledAt != null);
+const moveMsg = whatsAppFor({ salon: { ...salon, id: SALON }, booking: { ...th, id: thief.id, salonId: SALON }, kind: 'rescheduled' });
+ok('a message telling the client is ready to send', !!moveMsg && moveMsg.text.includes('mudar') && moveMsg.url.startsWith('https://wa.me/'), moveMsg?.text?.slice(0, 60));
 
 // pay a guest booking → client auto-created & linked; loyalty counters
 const winner = race.find(r => r.status === 'fulfilled').value;
