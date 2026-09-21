@@ -21,7 +21,9 @@
     "backup:verify": "node scripts/verify-backup.mjs",
     "backup:encrypt": "node scripts/crypt.mjs enc",
     "backup:decrypt": "node scripts/crypt.mjs dec",
-    "restore": "node scripts/backup-restore.mjs"
+    "restore": "node scripts/backup-restore.mjs",
+    "health": "node --import ./tests/_register.mjs scripts/healthcheck.mjs",
+    "errors": "node scripts/errors.mjs"
   },
   "devDependencies": {
     "firebase": "^10.14.1"

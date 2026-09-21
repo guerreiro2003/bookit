@@ -222,8 +222,12 @@ import {
   setActor, resolveActor,
   markBookingPaid, markBookingNoShow, confirmBooking, cancelBooking, restoreBooking, withLock,
   whatsAppFor, markMessageSent, formatRelativeTime,
-  debounce, toggleTheme, getTheme, trapFocus
+  debounce, toggleTheme, getTheme, trapFocus,
+  installErrorReporting, setErrorScope, reportError, breadcrumb
 } from './app.js';
+
+// Apanhar o que de outra forma desaparecia sem rasto.
+installErrorReporting();   // âmbito do salão é definido assim que ele for conhecido
 
 /** Every booking rendered on this page, by id — used by the WhatsApp action. */
 const bookingIndex = new Map();
@@ -238,6 +242,7 @@ let cachedToday = [];
   salon = await loadSalon(salonId);
   if (!salon) { showFatalError('Salão não encontrado. Verifica o link.'); return; }
   applySalonBranding(salon, { titlePrefix: 'Portal da equipa' });
+  setErrorScope(salonId);   // a partir daqui, um erro sabe a que salão pertence
   syncThemeIcon();
 
   // Role is decided by THIS salon's document — the same uid is admin/team only
@@ -428,7 +433,7 @@ async function loadAll() {
     );
     renderBookings('#allList', bookings, { showDate: true });
   } catch (e) {
-    console.error(e);
+    reportError(e, 'loadAll');
     el.innerHTML = `<div class="error-state"><div class="error-state__icon">⚠️</div><div class="error-state__title">Erro a carregar</div></div>`;
   }
 }
@@ -494,7 +499,7 @@ function bookingActions(b) {
 
 on('confirm-booking', withLock('confirm', async (el) => {
   try { await confirmBooking({ salonId, bookingId: el.dataset.id }); toastSuccess('Marcação confirmada.'); }
-  catch (e) { console.error(e); toastError(friendlyError(e)); }
+  catch (e) { reportError(e, 'confirm-booking'); toastError(friendlyError(e)); }
 }));
 
 /* WhatsApp (manual, zero cost): opens wa.me with the right message for the
@@ -507,7 +512,7 @@ on('wa-message', async (el) => {
   const msg = whatsAppFor({ salon: { ...salon, id: salonId }, booking: { ...b, salonId }, kind });
   if (!msg) return toastError('Sem número de telemóvel válido nesta marcação.');
   window.open(msg.url, '_blank', 'noopener');
-  try { await markMessageSent({ salonId, bookingId: b.id, kind }); } catch (e) { console.error(e); }
+  try { await markMessageSent({ salonId, bookingId: b.id, kind }); } catch (e) { reportError(e, 'wa-message'); }
 });
 
 /* "Por confirmar": today + tomorrow, still pending — the end-of-day routine. */
@@ -534,7 +539,7 @@ on('cancel-booking', withLock('cancel', async (el) => {
       try { await restoreBooking({ salonId, bookingId: id }); toastSuccess('Cancelamento anulado.'); }
       catch (e) { toastError(friendlyError(e, 'Não foi possível anular: o horário já foi ocupado.')); }
     }});
-  } catch (e) { console.error(e); toastError(friendlyError(e)); }
+  } catch (e) { reportError(e, 'cancel-booking'); toastError(friendlyError(e)); }
 }));
 
 on('noshow-booking', async (el) => {
@@ -542,7 +547,7 @@ on('noshow-booking', async (el) => {
   try {
     await markBookingNoShow({ salonId, salon, bookingId: el.dataset.id });
     toastSuccess('Marcado como "Não compareceu".');
-  } catch (e) { console.error(e); toastError(friendlyError(e)); }
+  } catch (e) { reportError(e, 'noshow-booking'); toastError(friendlyError(e)); }
 });
 
 /* ── PAYMENT MODAL ───────────────────────────────────────── */
@@ -579,7 +584,7 @@ on('confirm-pay', withLock('confirm-pay', async () => {
     toastSuccess('Pagamento registado · pontos atribuídos.');
     document.querySelector('[data-action="close-pay"]').click();
   } catch (e) {
-    console.error(e); toastError(friendlyError(e, 'Erro ao registar pagamento.'));
+    reportError(e, 'confirm-pay'); toastError(friendlyError(e, 'Erro ao registar pagamento.'));
     $('#payConfirmBtn').disabled = false;
   }
 }));
@@ -608,7 +613,7 @@ async function loadServices() {
           <td>${raw(`<span class="badge ${s.active ? 'badge--green' : 'badge--gray'}">${s.active ? 'Ativo' : 'Inativo'}</span>`)}</td>
         </tr>`).join('')}</tbody></table></div>`;
   } catch (e) {
-    console.error(e);
+    reportError(e, 'loadServices');
     el.innerHTML = `<div class="error-state"><div class="error-state__icon">⚠️</div><div class="error-state__title">Erro</div></div>`;
   }
 }
@@ -636,7 +641,7 @@ async function loadClients() {
           <td><code>${c.referralCode || '—'}</code></td>
         </tr>`).join('')}</tbody></table></div>`;
   } catch (e) {
-    console.error(e);
+    reportError(e, 'loadClients');
     el.innerHTML = `<div class="error-state"><div class="error-state__icon">⚠️</div><div class="error-state__title">Erro</div></div>`;
   }
 }

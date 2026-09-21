@@ -45,10 +45,10 @@ Auditoria completa a 2026-09-18: 4 críticos, 7 graves, 13 médios. Duas falhas 
 |---|---|---|
 | 🟡 | App Check | Chave reCAPTCHA (consola) |
 | ❌ | Backups automáticos fora da máquina do Pedro | Decisão Blaze vs GitHub Actions |
-| ❌ | Rastreio de erros (Sentry) e uptime | Nada — gratuitos |
+| ✅ | Rastreio de erros e healthcheck | Sem contas externas; Sentry fica pronto a ligar |
 | ❌ | Tirar emails de administração do documento público | Nada |
 | ❌ | CI: testes a correr a cada push | Nada |
-| ❌ | Restauro de backup testado a sério | Nada |
+| ✅ | Restauro de backup testado a sério | Ensaio corrido 20/09 |
 | ❌ | Falhar depressa quando o cliente está offline | Nada |
 
 ---

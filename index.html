@@ -253,7 +253,11 @@ import {
   loadBookingContext, computeAvailability, createBooking, minToTime, staffFor,
   validateBookingInput, applyDiscount, clampStr,
   layoutServices, MAX_SERVICES_PER_BOOKING,
+  installErrorReporting, reportError, breadcrumb
 } from './app.js';
+
+// Apanhar o que de outra forma desaparecia sem rasto.
+installErrorReporting();
 
 const state = {
   salon: null, salonId: getSalonId(), ctx: { schedule: null, staff: [] },
@@ -298,7 +302,7 @@ const state = {
     renderPromos(); renderServices();
     if (!planActive(state.salon)) { $('#planNotice').hidden = false; $$('#servicesList .select-item').forEach(b => b.disabled = true); }
   } catch (e) {
-    console.error(e);
+    reportError(e, 'init');
     showFatalError(friendlyError(e, 'Erro ao carregar. Verifica a tua ligação.'));
   }
 })();
@@ -491,7 +495,7 @@ async function loadTimeslots() {
     }
     list.innerHTML = slots.map(min => htmlMix`<button class="timeslot" type="button" data-action="pick-time" data-min="${min}" role="option" aria-selected="false">${minToTime(min)}</button>`).join('');
   } catch (e) {
-    console.error(e);
+    reportError(e, 'loadTimeslots');
     list.innerHTML = `<div class="error-state" style="grid-column:1/-1"><div class="error-state__icon">⚠️</div><div class="error-state__title">${escapeHTML(friendlyError(e, 'Erro a carregar horários'))}</div><button class="btn btn--sm mt-3" type="button" data-action="retry-slots">Tentar de novo</button></div>`;
   }
 }
@@ -577,7 +581,7 @@ async function checkDiscountCode() {
       title.textContent = 'Desconto aplicado'; desc.textContent = `Código de amigo válido · ${state.discount.percent}% de desconto`;
     }
     $('#confirmPrice').textContent = formatPrice(applyDiscount(basePrice, state.discount.percent));
-  } catch (e) { console.error(e); desc.textContent = 'Não foi possível validar o código agora.'; }
+  } catch (e) { reportError(e, 'checkDiscountCode'); desc.textContent = 'Não foi possível validar o código agora.'; }
 }
 
 /* ── waitlist ────────────────────────────────────────────────
@@ -620,7 +624,7 @@ on('join-waitlist', withLock('waitlist', async () => {
     $('#waitlistModal').setAttribute('aria-hidden', 'true');
     toastSuccess('Ficaste na lista. Se abrir vaga, o salão avisa-te.');
   } catch (e) {
-    console.error(e);
+    reportError(e, 'join-waitlist');
     fail(friendlyError(e, 'Não foi possível entrar na lista. Tenta de novo.'));
   }
 }));
@@ -651,7 +655,7 @@ on('submit-booking', withLock('submit-booking', async () => {
     });
     window.location.href = `success.html?${params.toString()}`;
   } catch (e) {
-    console.error(e);
+    reportError(e, 'submit-booking');
     $('#screenLoading').hidden = true;
     const code = e?.code || e?.message;
     // We waited, then went looking, and still cannot say whether the booking

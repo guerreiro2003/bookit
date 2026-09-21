@@ -1,0 +1,102 @@
+name: Está de pé?
+
+# De 30 em 30 minutos, alguém tem de percorrer o caminho de um cliente real e
+# confirmar que ele dá para marcar. Sem isto, um salão fechado às 9h de segunda
+# só se descobre quando o dono telefona.
+#
+# Não precisa de segredo nenhum: corre exatamente como um visitante, sem sessão.
+# Quando falha, abre um issue (e comenta no que já estiver aberto, em vez de
+# abrir um por cada corrida). Quando volta a correr bem, fecha-o.
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]          # um deploy que parta a marcação aparece já
+
+permissions:
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+
+      - name: Percorrer o caminho de um cliente
+        id: check
+        run: |
+          set +e
+          node --import ./tests/_register.mjs scripts/healthcheck.mjs "${SALON_ID:-demo}" 2>&1 \
+            | grep -vE 'GrpcConnection|@firebase' | tee resultado.txt
+          echo "code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+        env:
+          SALON_ID: ${{ vars.SALON_ID }}
+          SITE_URL: ${{ vars.SITE_URL }}
+
+      - name: Abrir ou atualizar o alerta
+        if: steps.check.outputs.code != '0'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const saida = fs.readFileSync('resultado.txt', 'utf8').trim();
+            const titulo = '🔴 O Book It não está a aceitar marcações';
+            const corpo = [
+              'O healthcheck automático falhou. Isto significa que um cliente real',
+              'pode não conseguir marcar **agora**.',
+              '',
+              '```',
+              saida,
+              '```',
+              '',
+              `Corrida: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              '',
+              'Este issue fecha-se sozinho quando a verificação voltar a passar.',
+            ].join('\n');
+
+            const abertos = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo,
+              state: 'open', labels: 'healthcheck',
+            });
+            if (abertos.data.length) {
+              // Já se sabe que está em baixo — comentar, não encher o repositório.
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: abertos.data[0].number,
+                body: `Continua em baixo:\n\n\`\`\`\n${saida}\n\`\`\``,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner, repo: context.repo.repo,
+                title: titulo, body: corpo, labels: ['healthcheck'],
+              });
+            }
+            core.setFailed('Healthcheck falhou — ver o issue aberto.');
+
+      - name: Fechar o alerta
+        if: steps.check.outputs.code == '0'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const abertos = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo,
+              state: 'open', labels: 'healthcheck',
+            });
+            for (const i of abertos.data) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: i.number, body: 'Voltou ao normal. A fechar.',
+              });
+              await github.rest.issues.update({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: i.number, state: 'closed',
+              });
+            }

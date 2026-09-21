@@ -47,6 +47,135 @@ function stampedBy(action) {
   return { [`${action}ByUid`]: _actor.uid, [`${action}ByName`]: _actor.name || _actor.role };
 }
 
+/* ── Errors ───────────────────────────────────────────────────────────────
+   An error in somebody's browser is invisible: `console.error` writes to a
+   console nobody will ever open. Worse, an uncaught error or a rejected
+   promise leaves no trace at all, so the salon says "às vezes não dá" and
+   there is nothing to look at.
+
+   What this does: keeps a short trail of what the person was doing, catches
+   what would otherwise vanish, and — for a signed-in salon session, where
+   there is already a write path and therefore no new door to abuse — records
+   distinct errors so an operator can read them later with `npm run errors`.
+
+   Deliberately NOT done: a public write path for errors from the booking page.
+   Anyone could fill it, and that is exactly the kind of hole this project has
+   already had to close twice. Those need Sentry (see SENTRY_DSN below).       */
+
+/** Paste a DSN here to also send errors to Sentry. Empty = does nothing.
+ *  A Sentry DSN is public by design — it identifies a project, it is not a key.
+ *  Remember to add the ingest host to `connect-src` in firebase.json. */
+const SENTRY_DSN = '';
+
+const trail = [];
+const MAX_TRAIL = 20;
+/** Note something the person just did, so an error has a story around it. */
+export function breadcrumb(what, data = null) {
+  trail.push({ t: new Date().toISOString().slice(11, 19), what: clampStr(what, 80), ...(data ? { data: clampStr(JSON.stringify(data), 200) } : {}) });
+  if (trail.length > MAX_TRAIL) trail.shift();
+}
+
+/** Strip anything that looks like a person out of a message before storing it. */
+function scrub(s) {
+  return String(s ?? '')
+    .replace(/[\w.+-]+@[\w.-]+\.\w+/g, '‹email›')
+    // Optional country code, in the four shapes people write it. No leading
+    // \b: it cannot match before a "+", which let "+351…" through untouched.
+    // The lookarounds stop a long id from being mistaken for a number.
+    .replace(/(?<!\d)(?:(?:\+|00)?351[\s.-]?)?9\d{2}[\s.-]?\d{3}[\s.-]?\d{3}(?!\d)/g, '‹telemóvel›')
+    .slice(0, 300);
+}
+
+/**
+ * Same error, same place → same fingerprint, so repeats become a counter.
+ *
+ * The message is part of it, with digits and ids flattened first: without it,
+ * two unrelated failures in the same handler collapse into one document and
+ * the second silently overwrites the first — which is how you end up reading
+ * a count of 40 and only ever seeing the last message.
+ */
+function fingerprint(code, where, message) {
+  const shape = String(message || '').replace(/\d+/g, '#').replace(/\s+/g, ' ').slice(0, 80);
+  let h = 0x811c9dc5;
+  for (const ch of `${code}|${where}|${shape}`) { h ^= ch.charCodeAt(0); h = Math.imul(h, 0x01000193) >>> 0; }
+  return 'e_' + h.toString(16).padStart(8, '0');
+}
+
+let reportedThisSession = 0;
+const REPORT_CAP = 20;          // a loop must not be able to write forever
+let errorSalonId = null;        // set by the salon-facing pages
+
+/** Tell the reporter which salon this session belongs to. */
+export function setErrorScope(salonId) { errorSalonId = salonId || null; }
+
+/**
+ * Record an error. Never throws, never blocks, never waits.
+ * @param {Error|any} e
+ * @param {string} where  what was being attempted, in plain words
+ */
+export function reportError(e, where = '') {
+  const code = (e && (e.code || e.name)) || 'erro';
+  const message = scrub(e?.message || String(e));
+  console.error(`[${where || 'app'}]`, e);
+
+  if (typeof window === 'undefined') return;
+  if (reportedThisSession++ >= REPORT_CAP) return;
+
+  const payload = {
+    code: clampStr(code, 60), message, where: clampStr(where, 80),
+    page: location.pathname.replace(/^\//, '') || 'index.html',
+    agent: clampStr(navigator.userAgent, 200),
+    trail: trail.slice(-8),
+  };
+
+  // Only from a signed-in salon session: no new public door.
+  if (errorSalonId && auth.currentUser) {
+    const id = fingerprint(payload.code, payload.where + '|' + payload.page, payload.message);
+    setDoc(doc(db, 'salons', errorSalonId, '_errors', id), {
+      ...payload, count: increment(1), lastAt: serverTimestamp(),
+      firstAt: serverTimestamp(), uid: auth.currentUser.uid,
+    }, { merge: true }).catch(() => {});   // reporting must never cause an error
+  }
+
+  if (SENTRY_DSN) sendToSentry(payload, e);
+}
+
+/** Sentry's envelope endpoint directly — no SDK, so nothing new to load. */
+function sendToSentry(payload, e) {
+  try {
+    const m = /^https:\/\/([^@]+)@([^/]+)\/(.+)$/.exec(SENTRY_DSN);
+    if (!m) return;
+    const [, key, host, project] = m;
+    const event = {
+      event_id: (crypto.randomUUID?.() || String(Date.now())).replace(/-/g, ''),
+      timestamp: Date.now() / 1000,
+      platform: 'javascript',
+      level: 'error',
+      logger: payload.where || 'app',
+      message: { formatted: `${payload.code}: ${payload.message}` },
+      extra: { page: payload.page, trail: payload.trail },
+      exception: e?.stack ? { values: [{ type: payload.code, value: payload.message, stacktrace: { frames: [] } }] } : undefined,
+    };
+    const body = `${JSON.stringify({ event_id: event.event_id, sent_at: new Date().toISOString() })}\n`
+      + `${JSON.stringify({ type: 'event' })}\n${JSON.stringify(event)}\n`;
+    fetch(`https://${host}/api/${project}/envelope/?sentry_key=${key}&sentry_version=7`,
+      { method: 'POST', body, keepalive: true }).catch(() => {});
+  } catch { /* never let reporting break the page */ }
+}
+
+/** Catch what would otherwise vanish. Call once, early, on every page. */
+export function installErrorReporting(salonId = null) {
+  if (typeof window === 'undefined' || window.__bookitErrors) return;
+  window.__bookitErrors = true;
+  setErrorScope(salonId);
+  window.addEventListener('error', (ev) => {
+    if (ev.error || ev.message) reportError(ev.error || new Error(ev.message), 'erro-nao-apanhado');
+  });
+  window.addEventListener('unhandledrejection', (ev) => {
+    reportError(ev.reason || new Error('promessa rejeitada'), 'promessa-rejeitada');
+  });
+}
+
 /* ── Salon defaults (single source of truth for tunables) ── */
 export const SALON_DEFAULTS = {
   timezone: 'Europe/Lisbon',

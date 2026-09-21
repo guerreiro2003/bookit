@@ -38,7 +38,12 @@ const salon = await getDocument(null, `salons/${SALON}`);
 const service = await getDocument(null, `salons/${SALON}/services/${SERVICE_ID}`);
 const staff = (await listAll(null, `salons/${SALON}/staff`)).filter(s => s.active !== false);
 const S1 = staff[0];
-const D1 = nextOpenDate(20), D2 = nextOpenDate(27);
+// A different pair of days on each run. With fixed dates, a run interrupted
+// before its cleanup left an agenda document behind and the NEXT run failed
+// with "document already exists" — a red suite that says nothing about the
+// rules is worse than no suite.
+const OFFSET = 20 + (Date.now() % 15);
+const D1 = nextOpenDate(OFFSET), D2 = nextOpenDate(OFFSET + 7);
 const booking = (over) => ({
   salonId: SALON, clientId: null, clientName: 'RULES-TEST visitante', clientEmail: 'rules-test@example.com', clientPhone: '912345678', clientPhoneE164: '351912345678',
   forSomeone: null, notes: '', serviceIds: [SERVICE_ID], serviceId: SERVICE_ID, serviceName: service.name, serviceDuration: service.duration, servicePrice: service.price,

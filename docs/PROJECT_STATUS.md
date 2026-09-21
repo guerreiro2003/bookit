@@ -19,6 +19,7 @@ O software funciona e está em produção. O que falta para o vender não é có
 | Serviços por colaborador | ✅ Feito 20/09 | Verificado em produção no site do cliente |
 | Vista de semana | ✅ Feito 20/09 | Posições verificadas ao pixel em produção |
 | Lista de espera | ✅ Feito 20/09 | Ciclo completo verificado em produção |
+| Monitorização | ✅ Feito 21/09 | Healthcheck de 30 em 30 min + log de erros |
 | Importador CSV | ✅ Feito | 27 testes E2E, reimportação não duplica |
 | Retenção / reativação | ✅ Feito | 21 testes E2E, receita atribuída |
 | App Check | 🟡 Código pronto | Falta a chave reCAPTCHA (consola) |
@@ -31,11 +32,11 @@ O software funciona e está em produção. O que falta para o vender não é có
 
 ## Testes
 
-`npm run test:all` — **343 a passar**, zero a falhar.
+`npm run test:all` — **349 a passar**, zero a falhar.
 
 | Suite | N.º | O que cobre |
 |---|---|---|
-| unit (`*.test.mjs`) | 79 | Lógica pura: horários, cadência, métricas, CSV, quem-faz-o-quê |
+| unit (`*.test.mjs`) | 85 | Lógica pura: horários, cadência, métricas, CSV, quem-faz-o-quê |
 | `rules.integration` | 74 | Autorização e validação, via REST, contra produção |
 | `engine.e2e` | 38 | Ciclo completo de marcação |
 | `links.e2e` | 18 | Confirmar/cancelar por token |
@@ -56,8 +57,8 @@ O software funciona e está em produção. O que falta para o vender não é có
 
 ## Próximo trabalho
 
-1. Rastreio de erros (Sentry) + monitor de uptime ← **a seguir**, ambos gratuitos
-2. Pesquisa de clientes que procure todos, não só os 200 carregados
+1. Pesquisa de clientes que procure todos, não só os 200 carregados ← **a seguir**
+2. Leituras sem limite nos painéis pesados (KI-004)
 5. Termos de Serviço + contrato de subcontratação (precisa de advogado)
 
 ## Bloqueadores

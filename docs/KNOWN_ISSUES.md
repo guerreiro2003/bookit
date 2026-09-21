@@ -61,11 +61,13 @@ Cada pessoa passou a ter a sua conta (`staffAuth/{uid}`), e confirmar/cancelar/f
 
 ---
 
-## KI-006 · Sem monitorização nem rastreio de erros
+## KI-006 · Monitorização · ✅ maioritariamente resolvido 2026-09-21
 
-**Gravidade:** alta · **Estado:** por corrigir
+**O site:** `.github/workflows/healthcheck.yml` corre de 30 em 30 minutos e percorre o caminho de um cliente real — a página carrega, o salão está configurado, há horários livres nos próximos 14 dias — e re-verifica duas propriedades de segurança que não podem desfazer-se em silêncio. Quando falha abre um issue; quando recupera, fecha-o. Não precisa de segredo nenhum.
 
-Se o site cair às 9h de segunda, ficamos a saber quando o salão ligar. Os erros dos clientes finais são invisíveis — só existe `console.error` no browser deles. Sentry e um monitor de uptime são gratuitos nos escalões que precisamos.
+**Os erros:** `installErrorReporting()` apanha erros não tratados e promessas rejeitadas, que antes desapareciam sem deixar rasto. Numa sessão de salão autenticada são gravados em `_errors` — um documento por erro distinto, com contador — e lêem-se com `npm run errors`. Emails e telemóveis são limpos antes de sair do browser.
+
+**O que falta:** erros da **página pública de marcação**. Gravá-los exigiria uma porta de escrita que qualquer pessoa podia encher — exatamente o buraco que este projeto já teve de fechar duas vezes. Precisam do Sentry: o código está escrito, falta colar um DSN em `SENTRY_DSN` no `firebase.js` e acrescentar o host ao `connect-src`.
 
 ---
 

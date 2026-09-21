@@ -66,7 +66,11 @@ import {
   $, on, toastSuccess, toastError, friendlyError, escapeHTML,
   getSalonId, loadSalon, applySalonBranding, loadBookingLink, confirmBookingByToken, cancelBookingByToken,
   clientCanCancel, salonSetting, nowInTimezone, buildICS, googleCalendarUrl, MONTHS_FULL, STATUS_LABELS, withLock,
+  installErrorReporting, reportError, breadcrumb
 } from './app.js';
+
+// Apanhar o que de outra forma desaparecia sem rasto.
+installErrorReporting();
 
 const p = new URLSearchParams(location.search);
 const salonId = p.get('s') || getSalonId();
@@ -85,7 +89,7 @@ async function load() {
     $('#loading').hidden = true;
     if (!salon || !link) { $('#missing').hidden = false; return; }
     render();
-  } catch (e) { console.error(e); $('#loading').hidden = true; $('#missing').hidden = false; }
+  } catch (e) { reportError(e, 'load'); $('#loading').hidden = true; $('#missing').hidden = false; }
 }
 
 function render() {
@@ -116,14 +120,14 @@ function render() {
 on('confirm', withLock('confirm', async () => {
   $('#btnConfirm').disabled = true;
   try { await confirmBookingByToken({ salonId, token }); link.status = 'confirmed'; render(); toastSuccess('Presença confirmada. Obrigado!'); }
-  catch (e) { console.error(e); toastError(friendlyError(e, 'Não foi possível confirmar. Contacta o salão.')); $('#btnConfirm').disabled = false; }
+  catch (e) { reportError(e, 'confirm'); toastError(friendlyError(e, 'Não foi possível confirmar. Contacta o salão.')); $('#btnConfirm').disabled = false; }
 }));
 
 on('cancel', withLock('cancel', async () => {
   if (!confirm('Cancelar esta marcação? O horário fica livre para outra pessoa.')) return;
   $('#btnCancel').disabled = true;
   try { await cancelBookingByToken({ salonId, salon, token }); link.status = 'cancelled'; render(); toastSuccess('Marcação cancelada.'); }
-  catch (e) { console.error(e); toastError(friendlyError(e, 'Não foi possível cancelar. Contacta o salão.')); $('#btnCancel').disabled = false; }
+  catch (e) { reportError(e, 'cancel'); toastError(friendlyError(e, 'Não foi possível cancelar. Contacta o salão.')); $('#btnCancel').disabled = false; }
 }));
 
 on('ics', () => {

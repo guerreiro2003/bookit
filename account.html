@@ -284,8 +284,12 @@ import {
   MONTHS_FULL, formatDate, formatDatePT, formatPrice, todayISO, todayForSalon,
   getSalonId, loadSalon, applySalonBranding,
   generateReferralCode, authErrorMessage, friendlyError, statusBadge, withLock,
-  isEmail, cancelBooking, clientCanCancel, salonSetting, nowInTimezone
+  isEmail, cancelBooking, clientCanCancel, salonSetting, nowInTimezone,
+  installErrorReporting, reportError, breadcrumb
 } from './app.js';
+
+// Apanhar o que de outra forma desaparecia sem rasto.
+installErrorReporting();
 
 const salonId = getSalonId();
 let salon = null, user = null, client = null, bookingsCache = null;
@@ -468,7 +472,7 @@ async function loadClient(u) {
     loadReferrals();
     fillSettings();
   } catch (e) {
-    console.error(e);
+    reportError(e, 'loadClient');
     toastError('Erro ao carregar perfil.');
   }
 }
@@ -574,7 +578,7 @@ async function loadUpcoming() {
     }
     el.innerHTML = upcoming.map(b => renderBookingRow(b, true)).join('');
   } catch (e) {
-    console.error(e);
+    reportError(e, 'loadUpcoming');
     el.innerHTML = `<div class="error-state"><div class="error-state__icon">⚠️</div><div class="error-state__title">Erro a carregar</div></div>`;
   }
 }
@@ -591,7 +595,7 @@ async function loadHistory() {
     }
     el.innerHTML = past.map(b => renderBookingRow(b, false)).join('');
   } catch (e) {
-    console.error(e);
+    reportError(e, 'loadHistory');
     el.innerHTML = `<div class="error-state"><div class="error-state__icon">⚠️</div><div class="error-state__title">Erro a carregar</div></div>`;
   }
 }
@@ -637,7 +641,7 @@ on('cancel-booking', withLock('client-cancel', async (el) => {
     toastSuccess('Marcação cancelada.');
     invalidateCache();
     loadUpcoming(); loadHistory();
-  } catch (e) { console.error(e); toastError(friendlyError(e, 'Não foi possível cancelar.')); }
+  } catch (e) { reportError(e, 'cancel-booking'); toastError(friendlyError(e, 'Não foi possível cancelar.')); }
 }));
 
 /* ── GDPR: export everything we hold about this client ── */
@@ -655,7 +659,7 @@ on('export-data', async () => {
     const a = document.createElement('a'); a.href = url; a.download = `os-meus-dados-${salonId}.json`;
     document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     toastSuccess('Ficheiro exportado.');
-  } catch (e) { console.error(e); toastError(friendlyError(e, 'Não foi possível exportar.')); }
+  } catch (e) { reportError(e, 'export-data'); toastError(friendlyError(e, 'Não foi possível exportar.')); }
 });
 
 function loadDiscounts() {
@@ -726,7 +730,7 @@ async function loadReferrals() {
         </div>
         <span class="badge badge--green">+${refDisc}%</span>
       </div>`).join('');
-  } catch (e) { console.error(e); }
+  } catch (e) { reportError(e, 'loadReferrals'); }
 }
 
 on('copy-ref', async () => {
@@ -822,7 +826,7 @@ on('delete-account', withLock('delete-account', async () => {
     toastSuccess('Conta apagada.');
     setTimeout(() => window.location.href = 'index.html', 1500);
   } catch (e) {
-    console.error(e);
+    reportError(e, 'delete-account');
     if (e.code === 'auth/requires-recent-login') {
       toastError('Por segurança, sai e entra de novo antes de apagar a conta.');
     } else {

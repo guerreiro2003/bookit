@@ -1055,8 +1055,12 @@ import {
   loadWaitlist, freedSlotFrom, markWaitlistOffered, setWaitlistStatus, removeWaitlistEntry, waitlistBookingLink,
   layoutServices, normaliseSegments, hasGap, MAX_SERVICES_PER_BOOKING,
   downloadCSV, subscribe, trapFocus,
-  isEmail, isPhone, isHexColor
+  isEmail, isPhone, isHexColor,
+  installErrorReporting, setErrorScope, reportError, breadcrumb
 } from './app.js';
+
+// Apanhar o que de outra forma desaparecia sem rasto.
+installErrorReporting();   // âmbito do salão é definido assim que ele for conhecido
 
 import { computeBaseline, computeRecovered, availableMinutes, pct, eur } from './metrics-core.js';
 import { rankCandidates, describeWant, offerMessage, waitlistSummary, staleEntries } from './waitlist-core.js';
@@ -1100,7 +1104,7 @@ onAuthStateChanged(auth, async (user) => {
     loadLoyalty();
     loadStaff();
   } catch (e) {
-    console.error(e); toastError('Erro ao carregar painel.');
+    reportError(e, 'app'); toastError('Erro ao carregar painel.');
   }
 });
 
@@ -1135,8 +1139,10 @@ async function loadSalon(uid) {
   }
   const d = snap.docs[0];
   salonId = d.id; salon = d.data();
-  // Everything this session writes gets stamped with who did it.
+  // Everything this session writes gets stamped with who did it, and any error
+  // from here on knows which salon it belongs to.
   setActor(await resolveActor(salonId, salon, auth.currentUser));
+  setErrorScope(salonId);
 
   const brand = (s) => (s.name || 'B').charAt(0).toUpperCase();
   $('#sidebarMark').textContent = brand(salon);
@@ -1364,7 +1370,7 @@ async function loadBookings() {
       try {
         const snap = await getDocs(query(collection(db,'salons',salonId,'bookings'), where('date','==', dateFilter)));
         bookingsByDateCache = { date: dateFilter, rows: snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.time || '').localeCompare(b.time || '')) };
-      } catch (e) { console.error(e); toastError(friendlyError(e)); bookingsByDateCache = { date: dateFilter, rows: [] }; }
+      } catch (e) { reportError(e, 'loadBookings'); toastError(friendlyError(e)); bookingsByDateCache = { date: dateFilter, rows: [] }; }
     }
     bookings = bookingsByDateCache.rows.slice();
   } else {
@@ -1430,7 +1436,7 @@ function bookingActions(b) {
 
 on('confirm-booking', withLock('confirm', async (el) => {
   try { await confirmBooking({ salonId, bookingId: el.dataset.id }); toastSuccess('Marcação confirmada.'); }
-  catch (e) { console.error(e); toastError(friendlyError(e)); }
+  catch (e) { reportError(e, 'confirm-booking'); toastError(friendlyError(e)); }
 }));
 
 on('wa-message', async (el) => {
@@ -1441,7 +1447,7 @@ on('wa-message', async (el) => {
   const msg = whatsAppFor({ salon: { ...salon, id: salonId }, booking: { ...b, salonId }, kind });
   if (!msg) return toastError('Sem número de telemóvel válido nesta marcação.');
   window.open(msg.url, '_blank', 'noopener');
-  try { await markMessageSent({ salonId, bookingId: b.id, kind }); } catch (e) { console.error(e); }
+  try { await markMessageSent({ salonId, bookingId: b.id, kind }); } catch (e) { reportError(e, 'wa-message'); }
 });
 
 /* Dashboard: who still needs a confirmation request for today/tomorrow. */
@@ -1472,7 +1478,7 @@ async function loadWaitlistPanel(force = false) {
   if (!waitlistCache || force) {
     el.innerHTML = '<div class="loading-state"><span class="spinner" aria-hidden="true"></span></div>';
     try { waitlistCache = await loadWaitlist(salonId); }
-    catch (e) { console.error(e); el.innerHTML = '<div class="error-state"><div class="error-state__icon">⚠️</div><div class="error-state__title">Erro a carregar</div></div>'; return; }
+    catch (e) { reportError(e, 'loadWaitlistPanel'); el.innerHTML = '<div class="error-state"><div class="error-state__icon">⚠️</div><div class="error-state__title">Erro a carregar</div></div>'; return; }
   }
   renderWaitlistPanel();
 }
@@ -1528,7 +1534,7 @@ on('wl-booked', async (el) => {
     waitlistCache = (waitlistCache || []).map(x => x.id === el.dataset.id ? { ...x, status: 'booked' } : x);
     renderWaitlistPanel();
     toastSuccess('Marcada como resolvida.');
-  } catch (e) { console.error(e); toastError(friendlyError(e)); }
+  } catch (e) { reportError(e, 'wl-booked'); toastError(friendlyError(e)); }
 });
 
 /* ── quem queria este horário ─────────────────────────────────
@@ -1536,7 +1542,7 @@ on('wl-booked', async (el) => {
    pergunta não for feita agora, não é feita — e o horário fica vazio. */
 async function offerFreedSlot(booking) {
   let list;
-  try { list = await loadWaitlist(salonId); } catch (e) { console.error(e); return; }
+  try { list = await loadWaitlist(salonId); } catch (e) { reportError(e, 'offerFreedSlot'); return; }
   const slot = freedSlotFrom(booking);
   const today = todayForSalon(salon);
   const candidates = rankCandidates(list, slot, today);
@@ -1577,7 +1583,7 @@ on('offer-slot', async (el) => {
   try {
     await markWaitlistOffered({ salonId, entryId: c.id, slot, today: todayForSalon(salon) });
     el.textContent = '✓ Avisada'; el.disabled = true;
-  } catch (e) { console.error(e); toastError(friendlyError(e)); }
+  } catch (e) { reportError(e, 'offer-slot'); toastError(friendlyError(e)); }
 });
 on('wl-remove', async (el) => {
   try {
@@ -1585,7 +1591,7 @@ on('wl-remove', async (el) => {
     el.closest('.row-card')?.remove();
     toastSuccess('Tirada da lista.');
     if (waitlistCache) waitlistCache = waitlistCache.filter(x => x.id !== el.dataset.id);
-  } catch (e) { console.error(e); toastError(friendlyError(e)); }
+  } catch (e) { reportError(e, 'wl-remove'); toastError(friendlyError(e)); }
 });
 
 on('cancel-booking', withLock('cancel', async (el) => {
@@ -1600,7 +1606,7 @@ on('cancel-booking', withLock('cancel', async (el) => {
     // Wait out the undo window: offering a slot the owner is about to take
     // back would be worse than not offering it at all.
     if (booking) setTimeout(() => offerFreedSlot(booking), 7000);
-  } catch (e) { console.error(e); toastError(friendlyError(e)); }
+  } catch (e) { reportError(e, 'cancel-booking'); toastError(friendlyError(e)); }
 }));
 
 on('noshow-booking', async (el) => {
@@ -1608,7 +1614,7 @@ on('noshow-booking', async (el) => {
   try {
     await markBookingNoShow({ salonId, salon, bookingId: el.dataset.id });
     toastSuccess('Marcado como "Não compareceu".');
-  } catch (e) { console.error(e); toastError(friendlyError(e)); }
+  } catch (e) { reportError(e, 'noshow-booking'); toastError(friendlyError(e)); }
 });
 
 /* ── PAYMENT MODAL ───────────────────────────────────────── */
@@ -1646,7 +1652,7 @@ on('confirm-pay', withLock('confirm-pay', async () => {
     toastSuccess('Pagamento registado · pontos atribuídos.');
     callPayClose();
   } catch (e) {
-    console.error(e);
+    reportError(e, 'confirm-pay');
     toastError(friendlyError(e, 'Erro ao registar pagamento.'));
     $('#payConfirmBtn').disabled = false;
   }
@@ -1711,7 +1717,7 @@ async function renderNbSlots() {
     if (window?.closed) { box.innerHTML = `<div class="slot-picker__empty">${escapeHTML(friendlyError({ code: window.reason }, 'Fechado neste dia.'))}</div>`; return; }
     if (!slots.length) { box.innerHTML = '<div class="slot-picker__empty">Sem horários livres neste dia.</div>'; return; }
     box.innerHTML = slots.map(m => htmlMix`<button type="button" class="timeslot" data-action="nb-pick" data-min="${m}">${minToTime(m)}</button>`).join('');
-  } catch (e) { console.error(e); box.innerHTML = `<div class="slot-picker__empty">${escapeHTML(friendlyError(e))}</div>`; }
+  } catch (e) { reportError(e, 'renderNbSlots'); box.innerHTML = `<div class="slot-picker__empty">${escapeHTML(friendlyError(e))}</div>`; }
 }
 ['nbStaff','nbDate'].forEach(id => $('#' + id).addEventListener('change', renderNbSlots));
 on('nb-pick', (el) => {
@@ -1761,7 +1767,7 @@ $('#newBookingForm').addEventListener('submit', withLock('nb', async (e) => {
     toastSuccess(`Marcação criada às ${res.time} com ${res.staff.name}.`);
     document.querySelector('[data-action="close-new-booking"]').click();
   } catch (e) {
-    console.error(e); err.textContent = friendlyError(e, 'Erro a criar marcação.'); err.classList.add('show');
+    reportError(e, 'close-new-booking'); err.textContent = friendlyError(e, 'Erro a criar marcação.'); err.classList.add('show');
     renderNbSlots();
   } finally { $('#nbSubmit').disabled = false; }
 }));
@@ -1804,7 +1810,7 @@ async function renderRsSlots() {
     const cur = (date === b.date && staff.id === b.staffId) ? timeToMin(b.time) : null;
     box.innerHTML = slots.map(m => htmlMix`<button type="button" class="timeslot ${raw(m === cur ? 'selected' : '')}" data-action="rs-pick" data-min="${m}">${minToTime(m)}</button>`).join('');
     if (cur != null && slots.includes(cur)) $('#rsTime').value = cur;
-  } catch (e) { console.error(e); box.innerHTML = `<div class="slot-picker__empty">${escapeHTML(friendlyError(e))}</div>`; }
+  } catch (e) { reportError(e, 'renderRsSlots'); box.innerHTML = `<div class="slot-picker__empty">${escapeHTML(friendlyError(e))}</div>`; }
 }
 ['rsStaff','rsDate'].forEach(id => $('#' + id).addEventListener('change', renderRsSlots));
 on('rs-pick', (el) => { $('#rsTime').value = el.dataset.min; $$('#rsSlots .timeslot').forEach(x => x.classList.toggle('selected', x === el)); });
@@ -1828,13 +1834,13 @@ on('confirm-reschedule', withLock('reschedule', async () => {
       toastSuccess(`Reagendada para ${formatDatePT(date, { short: true })} às ${minToTime(startMin)}. Avisa ${firstName(b.clientName) || 'a cliente'}.`, {
         action: { label: '💬 Avisar', run: async () => {
           window.open(msg.url, '_blank', 'noopener');
-          try { await markMessageSent({ salonId, bookingId: b.id, kind: 'rescheduled' }); } catch (e) { console.error(e); }
+          try { await markMessageSent({ salonId, bookingId: b.id, kind: 'rescheduled' }); } catch (e) { reportError(e, 'confirm-reschedule'); }
         } },
       });
     } else {
       toastSuccess(`Reagendada para ${formatDatePT(date, { short: true })} às ${minToTime(startMin)}. Sem telemóvel — avisa a cliente por outro meio.`);
     }
-  } catch (e) { console.error(e); err.textContent = friendlyError(e, 'Não foi possível reagendar.'); err.classList.add('show'); renderRsSlots(); }
+  } catch (e) { reportError(e, 'confirm-reschedule'); err.textContent = friendlyError(e, 'Não foi possível reagendar.'); err.classList.add('show'); renderRsSlots(); }
 }));
 
 /* ── IMPORTAR ────────────────────────────────────────────── */
@@ -1850,7 +1856,7 @@ $('#impFile').addEventListener('change', async (e) => {
     const { clients, services } = await loadImportContext(salonId);
     impAnalysis = analyseImport({ text, existingClients: clients, services, today: todayForSalon(salon) });
     renderImport();
-  } catch (err) { console.error(err); toastError(friendlyError(err, 'Não foi possível ler o ficheiro.')); }
+  } catch (err) { reportError(err, 'confirm-reschedule'); toastError(friendlyError(err, 'Não foi possível ler o ficheiro.')); }
 });
 
 on('imp-cancel', () => { impAnalysis = null; $('#impResult').hidden = true; $('#impFile').value = ''; $('#impFileName').textContent = 'Nenhum ficheiro escolhido'; });
@@ -1929,7 +1935,7 @@ on('imp-run', withLock('import', async () => {
     retState.loaded = false; clientsCursor = null;
     await loadClients(); await loadRetentionPanel(true);
     toastSuccess('Vê agora o painel "Reativar".');
-  } catch (e) { console.error(e); toastError(friendlyError(e, 'A importação falhou.')); }
+  } catch (e) { reportError(e, 'imp-run'); toastError(friendlyError(e, 'A importação falhou.')); }
   finally { $('#impRunBtn').disabled = false; }
 }));
 
@@ -2016,7 +2022,7 @@ async function loadBusiness() {
 
     $('#bizLoading').hidden = true; $('#bizBody').hidden = false;
   } catch (e) {
-    console.error(e); $('#bizLoading').hidden = true;
+    reportError(e, 'loadBusiness'); $('#bizLoading').hidden = true;
     toastError(friendlyError(e, 'Não foi possível calcular as métricas.'));
   } finally { bizBusy = false; }
 }
@@ -2040,7 +2046,7 @@ async function loadRetentionPanel(force = false) {
     retState.loaded = true;
     renderRetention();
   } catch (e) {
-    console.error(e); $('#retLoading').hidden = true;
+    reportError(e, 'loadRetentionPanel'); $('#retLoading').hidden = true;
     toastError(friendlyError(e, 'Não foi possível analisar o histórico.'));
   } finally { retState.busy = false; }
 }
@@ -2135,7 +2141,7 @@ on('ret-message', withLock('ret-message', async (el) => {
     if (retState.recovered) retState.recovered.sent++;
     renderRetention();
     toastSuccess('Mensagem aberta no WhatsApp. Se marcar por este link, contamos a receita.');
-  } catch (e) { console.error(e); toastError(friendlyError(e, 'Mensagem aberta, mas não consegui registá-la.')); }
+  } catch (e) { reportError(e, 'ret-message'); toastError(friendlyError(e, 'Mensagem aberta, mas não consegui registá-la.')); }
 }));
 
 on('ret-dismiss', withLock('ret-dismiss', async (el) => {
@@ -2145,7 +2151,7 @@ on('ret-dismiss', withLock('ret-dismiss', async (el) => {
     p.suppressed = true; p.daysSinceContact = 0; p.lastContactKind = 'dismissed';
     renderRetention();
     toastSuccess(`${p.name} deixa de aparecer durante 6 meses.`);
-  } catch (e) { console.error(e); toastError(friendlyError(e)); }
+  } catch (e) { reportError(e, 'ret-dismiss'); toastError(friendlyError(e)); }
 }));
 
 /* ── CLIENTS ─────────────────────────────────────────────── */
@@ -2165,7 +2171,7 @@ async function loadClients(more = false) {
     clientsHasMore = snap.docs.length === CLIENTS_PAGE;
     renderClients();
   } catch (e) {
-    console.error(e);
+    reportError(e, 'loadClients');
     el.innerHTML = `<div class="error-state"><div class="error-state__icon">⚠️</div><div class="error-state__title">${escapeHTML(friendlyError(e, 'Erro a carregar'))}</div></div>`;
   }
 }
@@ -2251,7 +2257,7 @@ on('export-salon-json', withLock('export-json', async () => {
     const a = document.createElement('a'); a.href = url; a.download = `bookit-${salonId}-${todayISO()}.json`;
     document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     toastSuccess('Exportação concluída.');
-  } catch (e) { console.error(e); toastError(friendlyError(e, 'Não foi possível exportar.')); }
+  } catch (e) { reportError(e, 'export-salon-json'); toastError(friendlyError(e, 'Não foi possível exportar.')); }
 }));
 
 /* ── SERVICES ────────────────────────────────────────────── */
@@ -2288,7 +2294,7 @@ async function loadServices() {
           </td>
         </tr>`).join('')}</tbody></table></div>`;
   } catch (e) {
-    console.error(e);
+    reportError(e, 'loadServices');
     el.innerHTML = `<div class="error-state"><div class="error-state__icon">⚠️</div><div class="error-state__title">Erro a carregar</div></div>`;
   }
 }
@@ -2349,7 +2355,7 @@ $('#serviceForm').addEventListener('submit', async (e) => {
       toastSuccess('Serviço adicionado.');
     }
     resetServiceForm(); loadServices();
-  } catch (e) { console.error(e); toastError(friendlyError(e, 'Erro a guardar.')); }
+  } catch (e) { reportError(e, 'syncGapFields'); toastError(friendlyError(e, 'Erro a guardar.')); }
 });
 
 function resetServiceForm() {
@@ -2405,7 +2411,7 @@ on('delete-service', async (el) => {
   let used = 0;
   try {
     used = (await getCountFromServer(query(collection(db,'salons',salonId,'bookings'), where('serviceIds','array-contains', s.id)))).data().count;
-  } catch (e) { console.error(e); used = -1; }
+  } catch (e) { reportError(e, 'delete-service'); used = -1; }
 
   if (used !== 0) {
     const n = used > 0 ? `${used} marcação(ões)` : 'marcações';
@@ -2585,7 +2591,7 @@ async function loadGallery() {
         </div>`).join('')
     }</div>`;
   } catch (e) {
-    console.error(e);
+    reportError(e, 'loadGallery');
     el.innerHTML = `<div class="error-state"><div class="error-state__icon">⚠️</div><div class="error-state__title">Erro a carregar</div></div>`;
   }
 }
@@ -2628,7 +2634,7 @@ $('#galleryForm').addEventListener('submit', async (e) => {
     $('#galPhotoPreview').hidden = true;
     toastSuccess('Foto adicionada à galeria.');
     loadGallery();
-  } catch (e) { console.error(e); toastError('Erro a guardar foto.'); }
+  } catch (e) { reportError(e, 'loadGallery'); toastError('Erro a guardar foto.'); }
 });
 
 on('gallery-delete', async (el) => {
@@ -2679,7 +2685,7 @@ async function loadPartners() {
         </div>
       </div>`).join('');
   } catch (e) {
-    console.error(e);
+    reportError(e, 'loadPartners');
     el.innerHTML = `<div class="error-state"><div class="error-state__icon">⚠️</div><div class="error-state__title">Erro a carregar</div></div>`;
   }
 }
@@ -2789,7 +2795,7 @@ $('#settingsForm').addEventListener('submit', async (e) => {
     $('#teamStatus').textContent = salon.teamUid ? 'Definida · a equipa entra em staff.html com esta password.' : 'Ainda não definida.';
     toastSuccess(updates.teamUid ? 'Configurações guardadas · password da equipa atualizada.' : 'Configurações guardadas.');
     refreshOnboarding();
-  } catch (err) { console.error(err); toastError(friendlyError(err, 'Não foi possível guardar.')); }
+  } catch (err) { reportError(err, 'loadLoyalty'); toastError(friendlyError(err, 'Não foi possível guardar.')); }
   finally { if (btn) btn.disabled = false; }
 });
 
@@ -2817,7 +2823,7 @@ async function loadStaff() {
     allStaff = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999));
     bookingCtx.staff = allStaff.filter(s => s.active !== false);
     renderStaffList(); renderStaffSelect(); renderTimeOffSelect();
-  } catch (e) { console.error(e); toastError(friendlyError(e)); }
+  } catch (e) { reportError(e, 'loadStaff'); toastError(friendlyError(e)); }
 }
 
 /* ── Individual logins ──────────────────────────────────────
@@ -2884,7 +2890,7 @@ on('grant-access', withLock('grant', async () => {
     toastSuccess(`${firstName(s.name)} já entra com o email dela. Dá-lhe a password.`);
     await loadStaff();
   } catch (e) {
-    console.error(e);
+    reportError(e, 'grant-access');
     fail(e.code === 'email-in-use' ? 'Esse email já tem conta. Usa outro.'
        : e.code === 'weak-password' ? 'Password demasiado curta.'
        : friendlyError(e, 'Não foi possível criar o acesso.'));
@@ -2898,7 +2904,7 @@ on('toggle-access', withLock('togglea', async () => {
     closeAccess();
     toastSuccess(a.active === false ? 'Acesso reativado.' : 'Acesso suspenso.');
     await loadStaff();
-  } catch (e) { console.error(e); toastError(friendlyError(e)); }
+  } catch (e) { reportError(e, 'toggle-access'); toastError(friendlyError(e)); }
 }));
 on('revoke-access', withLock('revokea', async () => {
   const staffId = $('#accessStaffId').value, uid = $('#accessUid').value;
@@ -2909,7 +2915,7 @@ on('revoke-access', withLock('revokea', async () => {
     closeAccess();
     toastSuccess('Acesso removido.');
     await loadStaff();
-  } catch (e) { console.error(e); toastError(friendlyError(e)); }
+  } catch (e) { reportError(e, 'revoke-access'); toastError(friendlyError(e)); }
 }));
 
 /** What this person does, in the owner's words — not a list of ids. */
@@ -3136,7 +3142,7 @@ on('save-staff-services', withLock('staffsvc', async () => {
     closeSvcStaff();
     toastSuccess(ids.length ? `Guardado — ${ids.length} serviço(s).` : 'Guardado — faz todos os serviços.');
     loadStaff();
-  } catch (e) { console.error(e); toastError(friendlyError(e)); }
+  } catch (e) { reportError(e, 'save-staff-services'); toastError(friendlyError(e)); }
 }));
 on('toggle-staff', async (el) => {
   await updateDoc(doc(db,'salons',salonId,'staff', el.dataset.id), { active: el.dataset.active !== 'true' });
@@ -3325,7 +3331,7 @@ async function loadWeek() {
       weekCache = { from: weekStart, rows: snap.docs.map(d => ({ id: d.id, ...d.data() })) };
     }
     renderWeek(days);
-  } catch (e) { console.error(e); toastError(friendlyError(e, 'Não foi possível carregar a semana.')); }
+  } catch (e) { reportError(e, 'loadWeek'); toastError(friendlyError(e, 'Não foi possível carregar a semana.')); }
 }
 
 function weekRangeLabel(from, to) {

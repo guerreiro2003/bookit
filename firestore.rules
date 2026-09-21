@@ -107,6 +107,25 @@ service cloud.firestore {
         allow write: if isAdmin(salonId);
       }
 
+      /* ───────────── error log (operator diagnostics, no PII) ─────────────
+         Written only by a signed-in salon session, so this is not a new public
+         door — the booking page deliberately has no way to write here. One
+         document per distinct error, merged, so a loop bumps a counter instead
+         of filling the database. Messages are scrubbed of emails and phone
+         numbers before they arrive.                                         */
+      match /_errors/{id} {
+        allow read: if isStaff(salonId);
+        // A delete carries no request.resource.data, so the field checks below
+        // would reject every attempt to clear the log.
+        allow delete: if isStaff(salonId);
+        allow create, update: if isStaff(salonId)
+          && str(request.resource.data.code, 60)
+          && str(request.resource.data.get('message', ''), 300)
+          && str(request.resource.data.get('where', ''), 80)
+          && str(request.resource.data.get('page', ''), 60)
+          && !request.resource.data.keys().hasAny(['clientName', 'clientEmail', 'clientPhone', 'clientPhoneE164']);
+      }
+
       /* ───────────── owner-only ─────────────
          The salon document is public — the booking page needs the name, the
          colour and the opening rules. Anything that must NOT travel with it
