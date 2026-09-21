@@ -20,10 +20,11 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { ownerToken, listAll, getDocument, deleteDocument, FS, api } from './_lib.mjs';
+import { ownerToken, listAll, getDocument, deleteDocument, TENANT_COLLECTIONS, FS, api } from './_lib.mjs';
 
-const SUBS = ['config', 'private', 'staffAuth', 'users', 'services', 'staff', 'promotions', 'site_gallery', 'site_partners',
-              'referrals', 'reactivations', 'bookingLinks', 'agenda', 'clients', 'bookings'];
+// Same list as the backup. A collection missing here leaves orphan documents
+// behind after a "successful" delete — and this list had already lost waitlist.
+const SUBS = TENANT_COLLECTIONS;
 
 const args = process.argv.slice(2);
 const apply = args.includes('--yes');

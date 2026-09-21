@@ -129,3 +129,18 @@ Até lá, o único backup é o que se corre à mão, e só existe no portátil d
 **Gravidade:** média · **Estado:** decisão de negócio ([D-004](DECISIONS.md#d-004))
 
 Ambos exigem plano Blaze. Sem PITR, a granularidade de recuperação é o último backup — perde-se até 24 horas. Sem proteção contra apagar, alguém com acesso ao projeto pode destruir o Firestore inteiro de uma vez.
+
+
+---
+
+## KI-014 · Backups anteriores a 2026-09-21 são incompletos
+
+**Gravidade:** média · **Estado:** corrigido daqui para a frente; os ficheiros antigos ficam como estão
+
+O exportador, o eliminador e as regras mantinham cada um a sua lista de subcoleções, e as listas divergiram: `staffAuth` e `waitlist` foram acrescentadas à aplicação e ninguém as acrescentou ao backup. Os exports continuaram a dizer "✓" por tudo o que liam, por isso nada parecia errado.
+
+**O que isso significava:** restaurar a partir de um desses ficheiros trazia o salão de volta com **todos os colaboradores sem conseguir entrar** (o `staffAuth` é o índice de autorização) e sem a fila de espera. E o `delete-salon.mjs` deixava a `waitlist` órfã depois de um apagamento "bem-sucedido".
+
+**Correção:** uma lista única em `scripts/_lib.mjs` (`TENANT_COLLECTIONS`), usada pelos três. O export passa a declarar no ficheiro que coleções percorreu, e o verificador compara-as com essa lista — se voltarem a divergir, o backup falha em vez de mentir.
+
+**Os 4 ficheiros de 20 de setembro continuam incompletos** e o verificador rejeita-os. Não vale a pena "arranjá-los": há backups novos e completos.

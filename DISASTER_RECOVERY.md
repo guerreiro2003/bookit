@@ -34,7 +34,9 @@ Verificar que presta:
 npm run backup:verify backups/bookit-<data>.json
 ```
 
-Um export vazio parece ter corrido bem e não serve para nada. O verificador apanha isso, e apanha leituras incompletas.
+Um export vazio parece ter corrido bem e não serve para nada. O verificador apanha isso, apanha leituras incompletas, e **apanha coleções em falta** — compara o que o backup diz ter exportado com a lista única em `scripts/_lib.mjs`.
+
+> **Backups anteriores a 2026-09-21 são incompletos.** Não incluem `staffAuth` nem `waitlist`: um restauro a partir deles traria o salão de volta com **todos os colaboradores sem acesso** e sem a fila de espera. O verificador rejeita-os por esse motivo. Guarda-os se quiseres, mas não contes com eles.
 
 ---
 
@@ -119,6 +121,6 @@ Anota a data do último ensaio em [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.m
 
 ## O que isto ainda não cobre
 
-- **Contas de autenticação.** Os backups levam os dados do Firestore, não os utilizadores do Firebase Auth. Perder o projeto significa que admins, equipa e clientes têm de recriar conta. Os dados sobrevivem; os logins não.
+- **Contas de autenticação.** Os backups levam os dados do Firestore, não os utilizadores do Firebase Auth. Perder o projeto significa que admins, equipa e clientes têm de recriar conta. Os dados sobrevivem; os logins não. O `staffAuth` volta (quem tinha acesso a quê), mas as contas em si não.
 - **Menos de 24 horas.** Sem PITR, a granularidade é o último backup.
 - **O projeto Firebase em si.** Se a conta Google for perdida ou suspensa, os backups em GitHub são o que resta — e não trazem o Auth de volta.

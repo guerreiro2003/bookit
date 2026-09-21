@@ -6,20 +6,23 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { ownerToken, listAll } from './_lib.mjs';
+import { ownerToken, listAll, TENANT_COLLECTIONS } from './_lib.mjs';
 
 const [outDirArg, onlySalon] = process.argv.slice(2);
 const outDir = outDirArg || 'backups';
-const SUBS = ['config', 'private', 'users', 'services', 'staff', 'promotions', 'site_gallery', 'site_partners', 'referrals', 'reactivations', 'bookingLinks', 'agenda', 'clients', 'bookings'];
+const SUBS = TENANT_COLLECTIONS;
 
 const token = await ownerToken();
 const salons = (await listAll(token, 'salons')).filter(s => !onlySalon || s.id === onlySalon);
-const dump = { exportedAt: new Date().toISOString(), salons: [] };
+// `collections` records what this export WALKED, not just what it found. Without
+// it a backup cannot be told apart from one that silently skipped a collection.
+const dump = { exportedAt: new Date().toISOString(), collections: SUBS, salons: [] };
 for (const s of salons) {
   const entry = { ...s, collections: {} };
   for (const c of SUBS) entry.collections[c] = await listAll(token, `salons/${s.id}/${c}`);
   dump.salons.push(entry);
-  console.log(`✓ ${s.id}: ${SUBS.map(c => `${c}=${entry.collections[c].length}`).join(' ')}`);
+  const shown = SUBS.filter(c => entry.collections[c].length);
+  console.log(`✓ ${s.id}: ${shown.map(c => `${c}=${entry.collections[c].length}`).join(' ') || '(vazio)'}`);
 }
 fs.mkdirSync(outDir, { recursive: true });
 const file = path.join(outDir, `bookit-${new Date().toISOString().replace(/[:.]/g, '-')}${onlySalon ? '-' + onlySalon : ''}.json`);

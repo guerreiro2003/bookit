@@ -14,6 +14,27 @@ export const PROJECT = process.env.FIREBASE_PROJECT || 'bookit-51575';
 export const API_KEY = process.env.FIREBASE_API_KEY || 'AIzaSyABK6W0yTe_EQfna5_Sz7DcI9nPwvh5TNw';
 export const FS = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
 
+/**
+ * Every sub-collection a salon owns.
+ *
+ * ONE list, deliberately. There used to be three — one in the exporter, one in
+ * the deleter, one implied by the rules — and they drifted: `staffAuth` and
+ * `waitlist` were added to the app and nobody added them here. The backups
+ * kept saying "✓" while quietly leaving out the document that decides who on
+ * the team can sign in. A restore from one of those would have brought the
+ * salon back with every employee locked out.
+ *
+ * Adding a collection to firestore.rules means adding it here. The backup
+ * verifier checks this list against what a backup declares, so the next time
+ * they drift the backup fails instead of lying.
+ */
+export const TENANT_COLLECTIONS = [
+  'config', 'private', 'staffAuth', 'users',
+  'services', 'staff', 'promotions', 'site_gallery', 'site_partners',
+  'referrals', 'reactivations', 'bookingLinks', 'waitlist',
+  'agenda', 'clients', 'bookings', '_errors',
+];
+
 /** RS256 JWT → access token. Lets the backup run somewhere with no human
  *  logged in (CI, a cron box) using a service-account key. No dependencies:
  *  node:crypto signs it, which keeps this repo free of a runtime tree. */
