@@ -54,4 +54,9 @@ jobs:
           PY
 
       - name: As regras compilam
-        run: npx --yes firebase-tools@latest firestore:rules:check firestore.rules --project bookit-51575 || echo "aviso: verificação de regras precisa de credenciais — ignorado"
+        # Bloco literal (`|`): um comando de shell leva dois-pontos e aspas, e
+        # num escalar simples de YAML isso parte o ficheiro inteiro — foi o que
+        # aconteceu aqui e o workflow deixou de arrancar sem criar um único job.
+        run: |
+          npx --yes firebase-tools@latest firestore:rules:check firestore.rules --project bookit-51575 \
+            || echo "aviso - verificação de regras precisa de credenciais, ignorado"
