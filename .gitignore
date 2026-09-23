@@ -16,3 +16,8 @@ node_modules/
 # backups / functions deps
 backups/
 functions/node_modules/
+
+# Segredos. O Hosting publica a raiz do repositório: um .env commitado fica
+# público no site, não apenas no histórico.
+.env
+.env.*

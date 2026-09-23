@@ -4,22 +4,24 @@ Coisas que sabemos que estão mal e ainda não corrigimos. Um problema só sai d
 
 ---
 
-## KI-001 · Dois salões, e o "a sério" tem o slug errado {#ki-001}
+## KI-001 · Dois salões de teste, e o slug bonito está no errado {#ki-001}
 
-**Gravidade:** média · **Estado:** à espera de decisão do Pedro (B2)
+**Gravidade:** baixa · **Estado:** à espera de decisão do Pedro (B2)
 
-Restam dois tenants, e estão trocados em relação ao que seria de esperar:
+**Não há clientes reais.** Os dois tenants são dados de teste — o que está escrito noutras versões desta secção, sobre "os dados reais" e "o que um cliente real vê", estava errado.
 
 | Salão | Nome | Plano | Clientes | Marcações | O que é |
 |---|---|---|---|---|---|
-| `demo` | Zen Organic Hair Concept | **active** | 8 | 27 (nov/25 → ago/26) | O que está vivo: site, testes, demo |
-| `zen-organic` | Zen Organic Hair concept | — | 5 (`jkeke`, `ffff`…) | 4 (abr/26) | Tentativa antiga, dados de teste |
+| `demo` | Zen Organic Hair Concept | **active** | 8 | 27 (nov/25 → ago/26) | Dados de teste, mas **é o que está ligado**: o site público, o healthcheck e as suites E2E apontam todos para aqui |
+| `zen-organic` | Zen Organic Hair concept | — | 5 (`jkeke`, `ffff`…) | 4 (abr/26) | Tentativa antiga, dados de teste, sem nada ligado |
 
-O salão com os dados reais e o plano ativo é o `demo`; o slug bonito (`zen-organic`) está no que tem lixo. O URL que um cliente real vê é `?salon=demo`, o que não se vende.
+O incómodo é de nomes, não de dados: o slug apresentável (`zen-organic`) está no tenant abandonado e o tenant em uso chama-se `demo`. Enquanto não houver contrato, ninguém vê nenhum dos dois.
 
-**Opções:** (a) manter como está; (b) migrar o `demo` para o slug `zen-organic` (precisa de um script novo — `migrate-salon.mjs` faz upgrade no lugar, não muda o id); (c) criar o tenant definitivo de raiz quando houver contrato.
+**Não apagar nem renomear o `demo` sem mudar o que aponta para ele** — o site público e o healthcheck de 30 em 30 minutos partem-se juntos.
 
-**Risco de não decidir:** trabalhar no tenant errado, ou entregar ao cliente um URL com "demo".
+**Opções:** (a) manter como está; (b) migrar o `demo` para o slug `zen-organic` (precisa de um script novo — `migrate-salon.mjs` faz upgrade no lugar, não muda o id); (c) criar o tenant definitivo de raiz quando houver contrato — a mais provável, agora que se sabe que não há dados a salvar.
+
+**Risco de não decidir:** baixo. Trabalhar no tenant errado por distração, e nada mais.
 
 ---
 
@@ -143,4 +145,70 @@ O exportador, o eliminador e as regras mantinham cada um a sua lista de subcole�
 
 **Correção:** uma lista única em `scripts/_lib.mjs` (`TENANT_COLLECTIONS`), usada pelos três. O export passa a declarar no ficheiro que coleções percorreu, e o verificador compara-as com essa lista — se voltarem a divergir, o backup falha em vez de mentir.
 
+**Testado desde 2026-09-23** (22 testes em `npm test`, sem rede):
+
+- `tests/verify-backup.test.mjs` (12) — a lógica do verificador saiu para `scripts/verify-backup-core.mjs`, uma função pura, e corre contra backups partidos de propósito: formato antigo sem `collections`, coleção em falta, `staffAuth` vazio com colaboradores que têm conta, export sem salões, salão sem serviços. O que interessa num verificador é o **não**, e agora há provas de que ele o diz.
+- `tests/rules-collections.test.mjs` (10) — compara `TENANT_COLLECTIONS` com o que está em `firestore.rules`, que é a única fonte independente do que um salão tem. Uma lista comparada consigo própria concorda para sempre; foi assim que isto aconteceu da primeira vez. Tira-se `waitlist` da lista e o teste falha a dizer o nome. O parser (`tests/_rules-paths.mjs`) conta chavetas a sério — ignora comentários e o interior das strings, onde os `{4}` das expressões regulares estragariam a contagem — e falha também se aparecer uma subcoleção de **segundo nível**, que o export não percorreria.
+
+**A exceção que fica por cobrir:** uma coleção que exista só no código da aplicação e nunca chegue às regras é invisível para este teste — mas também é invisível para os utilizadores, porque sem regra ninguém lhe toca. E `config` e `private` usam `{document=**}`: se alguém lá guardar documentos a dois níveis, o export leva o primeiro e deixa o resto. O teste congela esse conjunto em dois, para um wildcard novo obrigar a olhar.
+
 **Os 4 ficheiros de 20 de setembro continuam incompletos** e o verificador rejeita-os. Não vale a pena "arranjá-los": há backups novos e completos.
+
+---
+
+## KI-015 · Os testes cross-tenant podem estar a testar um salão que não existe
+
+**Gravidade:** média · **Estado:** por corrigir (encontrado 2026-09-23)
+
+`tests/rules.integration.mjs` escolhe os dois salões por omissão:
+
+```js
+const SALON = E.SALON_ID || 'demo';
+const OTHER = E.OTHER_SALON_ID || 'zenorganic';
+```
+
+O segundo **não existe**: o salão chama-se `zen-organic`, com hífen ([KI-001](#ki-001)). As cinco asserções de isolamento (linhas 186–190) pedem `salons/zenorganic/...` e esperam 403 — e recebem 403, porque as regras chamam `get()` no documento do salão, não o encontram, e negam. **O teste passa pela razão errada:** prova que não se lê um salão inexistente, não que não se lê o salão do vizinho. A propriedade que interessa — dois tenants com dados a sério, um não vê o outro — nunca chega a ser exercida.
+
+Corrigir é mudar o valor por omissão para `zen-organic`. Vale a pena confirmar primeiro que o `zen-organic` tem marcações e clientes que sirvam de alvo, senão a correção troca um falso positivo por outro.
+
+`SALON` por omissão é `demo`, o que está certo hoje, mas prende a suite a um tenant escolhido em 2025 — se o `demo` for renomeado ([KI-001](#ki-001)), estes testes vão dizer que está tudo bem sobre um salão que já não existe.
+
+---
+
+## KI-016 · O passo das regras no CI nunca falha
+
+**Gravidade:** média · **Estado:** por corrigir (encontrado 2026-09-23)
+
+Em `.github/workflows/tests.yml`, o passo *As regras compilam* acaba em:
+
+```
+  || echo "aviso - verificação de regras precisa de credenciais, ignorado"
+```
+
+O `|| echo` devolve 0 **sempre**. Regras com erro de sintaxe, ficheiro apagado, `firebase-tools` que nem arranca: o passo fica verde na mesma. O objetivo era não partir o CI em forks sem credenciais, mas o efeito é que a única verificação automática das regras — o ficheiro que **é** toda a segurança deste produto — não verifica nada.
+
+Distinguir os dois casos: falta de credenciais (ignorar) de regras inválidas (falhar). O `firestore:rules:check` devolve códigos diferentes, ou corre-se a validação com o emulador, que não precisa de login.
+
+---
+
+## KI-017 · O restauro sem `--as` nunca chega a correr
+
+**Gravidade:** alta · **Estado:** por corrigir (encontrado 2026-09-23)
+
+`scripts/backup-restore.mjs` separa argumentos assim:
+
+```js
+const asIdx = args.indexOf('--as');
+const [file, salonId] = args.filter((a, i) => !a.startsWith('--') && i !== asIdx + 1);
+```
+
+Sem `--as`, `indexOf` devolve `-1` e a condição passa a ser `i !== 0`: **descarta o primeiro argumento posicional, que é o ficheiro de backup.** `salonId` fica `undefined` e o script imprime o `usage` e sai com 1.
+
+```
+$ node scripts/backup-restore.mjs <backup>.json ensaio
+usage: node scripts/backup-restore.mjs <backup.json> <salonId> [--as <novoId>] [--yes]
+```
+
+Com `--as` funciona, porque aí `asIdx + 1` aponta mesmo para o id novo. Ou seja: **o ensaio corre, a recuperação a sério não** — e é a recuperação a sério que se vai tentar usar no dia em que um salão desaparecer. O `DISASTER_RECOVERY.md` documenta o comando que não funciona.
+
+Uma linha resolve (`i !== (asIdx === -1 ? -1 : asIdx + 1)`), mas mexer no caminho que escreve por cima de um salão vivo merece a sua própria tarefa, com um ensaio `--as` a confirmá-lo antes.
