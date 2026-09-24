@@ -3,9 +3,12 @@
   "permissions": {
     "deny": [
       "Bash(git push *)",
+      "Bash(git -C * push *)",
       "Bash(firebase deploy *)",
       "Bash(firebase firestore:delete *)",
-      "Bash(npm run deploy*)"
+      "Bash(npm run deploy*)",
+      "Bash(npx firebase *)",
+      "Bash(npx firebase-tools *)"
     ],
     "ask": [
       "Bash(node *)",

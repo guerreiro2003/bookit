@@ -10,6 +10,10 @@ node_modules/
 .vscode/
 .idea/
 
+# Definições locais do Claude Code: caminhos e permissões desta máquina, que
+# não valem nada noutra. O settings.json (partilhado) é versionado; este não.
+.claude/settings.local.json
+
 # Local Netlify folder
 .netlify
 
