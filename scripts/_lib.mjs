@@ -10,9 +10,82 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-export const PROJECT = process.env.FIREBASE_PROJECT || 'bookit-51575';
-export const API_KEY = process.env.FIREBASE_API_KEY || 'AIzaSyABK6W0yTe_EQfna5_Sz7DcI9nPwvh5TNw';
-export const FS = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
+/* ── Where these requests go ───────────────────────────────────────────────
+ *
+ * Two targets: the real project, and the local emulator suite.
+ *
+ * `BOOKIT_TARGET=real|emulator` decides, and it is the ONLY switch for that.
+ * An unrecognised value throws instead of falling back, because a typo
+ * (`emulador`, `1`, `true`) must never be read as "real" and send writes to a
+ * live salon.
+ *
+ * The default depends on who is asking, deliberately:
+ *   - operator scripts default to REAL — a backup has to back up what exists;
+ *   - tests default to EMULATOR, so a suite run by hand or by CI cannot write
+ *     to a live salon just because somebody forgot a variable.
+ *
+ * Consequence worth knowing before relying on a green suite: the suites stop
+ * being a smoke test of production. Checking what is actually in the air means
+ * `BOOKIT_TARGET=real`, and the emulator does not enforce composite indexes —
+ * a query that passes there can still fail in production asking for one.
+ */
+
+/** Project id used in the emulator.
+ *
+ *  The `demo-` prefix is a Firebase convention: the tooling treats such a
+ *  project as emulator-only, asks for no login, and there is nothing behind it
+ *  if something is ever misconfigured — which is what lets CI run with no
+ *  secrets at all.
+ *
+ *  Name collision, said out loud because it will trip somebody up:
+ *  `demo-bookit` is a PROJECT that exists only inside the emulator; `demo` is
+ *  a SALON — a tenant id — and it exists both there and in the real project.
+ *  Different things at different levels: a project holds salons. When you read
+ *  "demo" somewhere, check which of the two it is.
+ */
+export const EMULATOR_PROJECT = 'demo-bookit';
+
+/**
+ * @param {{defaultTarget?: 'real'|'emulator'}} [opts]
+ * @returns {'real'|'emulator'}
+ */
+export function resolveTarget({ defaultTarget = 'real' } = {}) {
+  const raw = (process.env.BOOKIT_TARGET || '').trim().toLowerCase();
+  if (!raw) return defaultTarget;
+  if (raw === 'real' || raw === 'emulator') return raw;
+  throw new Error(`BOOKIT_TARGET inválido: "${process.env.BOOKIT_TARGET}" — usa "real" ou "emulator"`);
+}
+
+export const TARGET = resolveTarget();          // scripts: the real project
+export const IS_EMULATOR = TARGET === 'emulator';
+
+/* Where the emulator listens. The ports match the `emulators` block in
+   firebase.json, and `firebase emulators:exec` exports both variables into the
+   child process — so inside an exec these are already correct. They say WHERE
+   the emulator is, never WHETHER to use it: that is BOOKIT_TARGET's job, and
+   one switch is enough. */
+const FIRESTORE_HOST = process.env.FIRESTORE_EMULATOR_HOST || '127.0.0.1:8080';
+const AUTH_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST || '127.0.0.1:9099';
+
+export const PROJECT = process.env.FIREBASE_PROJECT || (IS_EMULATOR ? EMULATOR_PROJECT : 'bookit-51575');
+// A deliberately fake key in emulator mode: the Auth emulator requires the
+// parameter and ignores the value, and a fake key cannot authenticate against
+// production if a host is ever misresolved.
+export const API_KEY = process.env.FIREBASE_API_KEY
+  || (IS_EMULATOR ? 'fake-api-key' : 'AIzaSyABK6W0yTe_EQfna5_Sz7DcI9nPwvh5TNw');
+export const FS = IS_EMULATOR
+  ? `http://${FIRESTORE_HOST}/v1/projects/${PROJECT}/databases/(default)/documents`
+  : `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
+const IDENTITY = IS_EMULATOR
+  ? `http://${AUTH_HOST}/identitytoolkit.googleapis.com/v1`
+  : 'https://identitytoolkit.googleapis.com/v1';
+
+/** One line naming where this process is pointing, for a script or a suite to
+ *  print before it does anything. "It ran green" is only worth something once
+ *  you know what it ran against. */
+export const targetSummary = () => (IS_EMULATOR
+  ? `emulador · projeto ${PROJECT} · firestore ${FIRESTORE_HOST} · auth ${AUTH_HOST}`
+  : `PROJETO REAL · ${PROJECT}`);
 
 /**
  * Every sub-collection a salon owns.
@@ -58,6 +131,11 @@ async function serviceAccountToken(sa) {
 }
 
 export async function ownerToken() {
+  // The Firestore emulator accepts the literal bearer token "owner" as a
+  // request that bypasses the rules. No login, no service-account key, no
+  // secret of any kind — which is precisely what makes the suites runnable in
+  // CI, on forks, and on a laptop with nobody signed in.
+  if (IS_EMULATOR) return 'owner';
   // A service-account key wins when present — that is how CI authenticates.
   if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
     return serviceAccountToken(JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON));
@@ -79,7 +157,7 @@ export async function ownerToken() {
 }
 
 export async function signIn(email, password) {
-  const r = await (await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${API_KEY}`, {
+  const r = await (await fetch(`${IDENTITY}/accounts:signInWithPassword?key=${API_KEY}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password, returnSecureToken: true }),
   })).json();
@@ -88,7 +166,7 @@ export async function signIn(email, password) {
 }
 
 export async function signUp(email, password) {
-  const r = await (await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${API_KEY}`, {
+  const r = await (await fetch(`${IDENTITY}/accounts:signUp?key=${API_KEY}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password, returnSecureToken: true }),
   })).json();

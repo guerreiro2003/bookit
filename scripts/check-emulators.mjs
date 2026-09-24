@@ -20,10 +20,17 @@
  */
 import { spawnSync } from 'node:child_process';
 
-const MIN_JAVA = 11;
+/* 21, not 11. firebase-tools 15 refuses outright:
+ *   "firebase-tools no longer supports Java version before 21."
+ * It checks before downloading anything, so a JDK 17 fails in seconds with a
+ * message about Java and nothing about which tool wanted it. Older
+ * firebase-tools were happy with 11, and most of the documentation still says
+ * so — this floor tracks the tool we actually pin, and 21 satisfies the old
+ * versions too. Raise it when firebase-tools raises its own. */
+const MIN_JAVA = 21;
 /* Versions this was last known to work with, for when something behaves oddly
    and you want to know whether you are far from the tested ground. */
-const TESTED = { java: '17.0.20.1 (Temurin)', firebase: '15.18.0', node: '20.20.2' };
+const TESTED = { java: '21+ (exigido pelo firebase-tools 15)', firebase: '15.18.0', node: '20.20.2' };
 
 const problems = [];
 const found = [];
@@ -40,9 +47,12 @@ function run(cmd, args) {
    shapes: "17.0.20.1" on anything modern, "1.8.0_292" on 8 and earlier, where
    the number that matters is the second one. */
 const INSTALL_JAVA =
-  '     Instala um JDK 11 ou superior (o Temurin da Adoptium serve) e garante\n'
+  `     Instala um JDK ${MIN_JAVA} ou superior (o Temurin da Adoptium serve) e garante\n`
   + '     que o `java` fica no PATH. Se já o instalaste, fecha e reabre a app:\n'
-  + '     a sessão herda o PATH de quem a lançou e não relê o ~/.zshrc.';
+  + '     a sessão herda o PATH de quem a lançou e não relê o ~/.zshrc.\n'
+  + `     Atenção: um JDK 17 não serve. O firebase-tools 15 exige ${MIN_JAVA}+ e\n`
+  + '     recusa antes de descarregar os jars, com um erro que fala de Java e\n'
+  + '     não diz que foi ele quem o pediu.';
 
 const javaOut = run('java', ['-version']);
 const javaVer = javaOut === null ? null : /version "(\d+)(?:\.(\d+))?/.exec(javaOut);
