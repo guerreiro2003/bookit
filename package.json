@@ -2,7 +2,7 @@
   "name": "bookit",
   "version": "2.0.0",
   "private": true,
-  "description": "Book It — multi-tenant salon booking SaaS (static frontend + Firebase)",
+  "description": "Book It \u2014 multi-tenant salon booking SaaS (static frontend + Firebase)",
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -15,7 +15,7 @@
     "check:emul": "node scripts/check-emulators.mjs",
     "seed:emul": "BOOKIT_TARGET=emulator node scripts/seed-emulator.mjs",
     "test:emul": "npm run check:emul && firebase emulators:exec --project demo-bookit --only firestore,auth \"npm run test:emul:run\"",
-    "test:emul:run": "npm run seed:emul && for t in rules.integration abuse.e2e team-access.e2e waitlist.e2e engine.e2e links.e2e retention.e2e import.e2e; do node --import ./tests/_register.mjs tests/$t.mjs || exit 1; done",
+    "test:emul:run": "npm run seed:emul && for t in rules.integration abuse.e2e team-access.e2e waitlist.e2e engine.e2e links.e2e retention.e2e import.e2e restore.e2e; do node --import ./tests/_register.mjs tests/$t.mjs || exit 1; done",
     "backup": "node scripts/backup-export.mjs",
     "serve": "python3 -m http.server 8000",
     "emulators": "firebase emulators:start --only firestore,auth,hosting",

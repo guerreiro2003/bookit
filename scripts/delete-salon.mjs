@@ -20,7 +20,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { ownerToken, listAll, getDocument, deleteDocument, TENANT_COLLECTIONS, FS, api } from './_lib.mjs';
+import { ownerToken, listAll, getDocument, deleteDocument, TENANT_COLLECTIONS, FS, api, IS_EMULATOR, targetSummary } from './_lib.mjs';
 
 // Same list as the backup. A collection missing here leaves orphan documents
 // behind after a "successful" delete — and this list had already lost waitlist.
@@ -33,6 +33,18 @@ const ids = args.filter(a => !a.startsWith('--'));
 
 if (!ids.length) {
   console.error('usage: node scripts/delete-salon.mjs <salonId> [<salonId>…] [--yes] [--skip-backup]');
+  process.exit(1);
+}
+
+/* `--skip-backup` is for the emulator, where the data is invented and a fresh
+   backup would only be a file of fiction in backups/. Against the real project
+   it is refused: deleting a salon is the one operation with nothing to undo it,
+   and "I know what I am doing" is exactly what the person who did not know
+   also said. */
+if (skipBackup && !IS_EMULATOR) {
+  console.error('\n✗ --skip-backup só é aceite contra o emulador.');
+  console.error(`  alvo atual: ${targetSummary()}`);
+  console.error('  Apagar um salão a sério exige um backup do próprio dia:  npm run backup\n');
   process.exit(1);
 }
 
