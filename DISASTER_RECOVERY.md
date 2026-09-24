@@ -2,7 +2,9 @@
 
 O que fazer quando correr mal. Escrito para ser seguido às 9h de uma segunda-feira com um salão ao telefone.
 
-**O ensaio completo foi corrido a 2026-09-20** — backup → cifrar → decifrar → verificar → restaurar → verificar → limpar. Funcionou e está coberto pelos comandos abaixo. Volta a correr o ensaio de três em três meses; um plano que ninguém executa é uma esperança, não um plano.
+**O ensaio completo foi corrido a 2026-09-20** — backup → cifrar → decifrar → verificar → restaurar → verificar → limpar. Volta a correr o ensaio de três em três meses; um plano que ninguém executa é uma esperança, não um plano.
+
+> **Os comandos de restauro desta página foram corrigidos a 2026-09-24.** Estavam escritos na forma `npm run restore … --yes`, e o npm não passa as flags ao script sem um `--` à frente: o `--as` e o `--yes` desapareciam pelo caminho. Quem correu o ensaio de setembro terá chamado o `node scripts/backup-restore.mjs` diretamente, porque a forma documentada não chegava a restaurar nada. É por isso que os comandos abaixo passaram todos a invocar o script diretamente — é a forma que a própria mensagem de erro do script ensina, e não tem separador para esquecer. Ver [KI-017](docs/KNOWN_ISSUES.md).
 
 ---
 
@@ -46,24 +48,24 @@ Um export vazio parece ter corrido bem e não serve para nada. O verificador apa
 
 ```bash
 npm run backup                                            # preserva o estado atual primeiro
-npm run restore backups/<ficheiro>.json <salonId> --as ensaio-restauro --yes
+node scripts/backup-restore.mjs backups/<ficheiro>.json <salonId> --as ensaio-restauro --yes
 ```
 
-Restaura **ao lado** do salão vivo, num id descartável. Confirma no painel que os dados estão certos, e só então escreve por cima:
+Restaura **ao lado** do salão vivo, num id descartável. A cópia não fica com dono nenhum — sem `adminUid`, sem login de equipa, `staffAuth` todo inativo — para não aparecer no painel de quem tem conta. Confirma os dados, e só então escreve por cima:
 
 ```bash
-npm run restore backups/<ficheiro>.json <salonId> --yes
+node scripts/backup-restore.mjs backups/<ficheiro>.json <salonId> --yes
 node scripts/delete-salon.mjs ensaio-restauro --yes
 ```
 
-Sem `--yes` qualquer um destes comandos só mostra o que faria.
+Sem `--yes` qualquer um destes comandos só mostra o que faria — e **vale a pena correr sempre sem `--yes` primeiro**, para ler o plano antes de o executar.
 
 ### 2. Um salão inteiro desapareceu
 
 Igual ao cenário 1, mas o `--as` é escusado: não há nada por cima do que escrever.
 
 ```bash
-npm run restore backups/<ficheiro>.json <salonId> --yes
+node scripts/backup-restore.mjs backups/<ficheiro>.json <salonId> --yes
 ```
 
 ### 3. Um deploy partiu o site
@@ -110,10 +112,12 @@ O workflow corre às 03:00 de Lisboa, cifra antes de guardar, **decifra outra ve
 ```bash
 npm run backup
 npm run backup:verify backups/<o-mais-recente>.json
-npm run restore backups/<o-mais-recente>.json <salonId> --as ensaio-$(date +%s) --yes
+node scripts/backup-restore.mjs backups/<o-mais-recente>.json <salonId> --as ensaio-$(date +%s) --yes
 # confere no painel, depois:
 node scripts/delete-salon.mjs ensaio-<…> --yes
 ```
+
+> **`npm run restore` também serve, mas precisa de `--`:** `npm run restore -- backups/….json <salonId> --as ensaio --yes`. Sem o separador o npm come as flags e o script recebe `ensaio` como terceiro argumento solto — recusa-se a correr e diz `✗ argumentos a mais: ensaio`. Recusar é de propósito: um `--as` que se perde faz o restauro cair no id original, ou seja, escreve por cima do salão vivo. Os `npm run backup` e `npm run backup:verify` não têm flags e não precisam de separador.
 
 Anota a data do último ensaio em [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md).
 

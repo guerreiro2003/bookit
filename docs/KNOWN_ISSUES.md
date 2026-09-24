@@ -191,11 +191,11 @@ Distinguir os dois casos: falta de credenciais (ignorar) de regras inválidas (f
 
 ---
 
-## KI-017 · O restauro sem `--as` nunca chega a correr
+## ~~KI-017 · O restauro sem `--as` nunca chega a correr~~ ✅ resolvido 2026-09-24
 
-**Gravidade:** alta · **Estado:** por corrigir (encontrado 2026-09-23)
+**Encontrado 2026-09-23 · corrigido 2026-09-24**
 
-`scripts/backup-restore.mjs` separa argumentos assim:
+`scripts/backup-restore.mjs` separava argumentos assim:
 
 ```js
 const asIdx = args.indexOf('--as');
@@ -209,6 +209,12 @@ $ node scripts/backup-restore.mjs <backup>.json ensaio
 usage: node scripts/backup-restore.mjs <backup.json> <salonId> [--as <novoId>] [--yes]
 ```
 
-Com `--as` funciona, porque aí `asIdx + 1` aponta mesmo para o id novo. Ou seja: **o ensaio corre, a recuperação a sério não** — e é a recuperação a sério que se vai tentar usar no dia em que um salão desaparecer. O `DISASTER_RECOVERY.md` documenta o comando que não funciona.
+Com `--as` funcionava, porque aí `asIdx + 1` apontava mesmo para o id novo. Ou seja: **o ensaio corria, a recuperação a sério não** — e é a recuperação a sério que se vai tentar usar no dia em que um salão desaparecer.
 
-Uma linha resolve (`i !== (asIdx === -1 ? -1 : asIdx + 1)`), mas mexer no caminho que escreve por cima de um salão vivo merece a sua própria tarefa, com um ensaio `--as` a confirmá-lo antes.
+**Correção:** a leitura dos argumentos saiu para `scripts/restore-args.mjs` (`parseRestoreArgs`), uma função pura que percorre os argumentos um a um em vez de adivinhar posições. Flags desconhecidas passam a ser recusadas em vez de ignoradas, e isso é uma decisão de segurança: um `--as` mal escrito deixava `target` a nulo, o destino caía no id original e um `--yes` a seguir escrevia o ensaio **por cima do salão vivo**. Um erro de escrita tem de parar o script, não mudar que salão é sobrescrito.
+
+**Impede o regresso:** `tests/restore-args.test.mjs` (15 testes, sem rede). O primeiro — *"no flags: a dry run over the salon itself"* — é exatamente o comando que nunca corria. Repor a linha antiga faz falhar **8 dos 15**, e o CLI volta a imprimir o `usage`.
+
+**Encontrado ao corrigir, e também corrigido:** os comandos do `DISASTER_RECOVERY.md` estavam na forma `npm run restore … --as … --yes`, e o npm **não passa flags ao script sem um `--` à frente** (confirmado com npm 10.8.2: o script recebia `["ficheiro","salão","ensaio"]`, sem `--as` e sem `--yes`). Nem com o código antigo nem com o novo essa forma restaurava o que dizia restaurar. A página passou a invocar `node scripts/backup-restore.mjs` diretamente. Com o parser novo, essa forma partida falha alto (`✗ argumentos a mais: ensaio`) em vez de restaurar para o sítio errado.
+
+**O que continua por provar:** o caminho de escrita sem `--as` — o que faz `PATCH` por cima de um salão vivo — continua sem nunca ter corrido contra uma base de dados. A correção prova que os argumentos chegam ao sítio certo e que a simulação imprime o plano certo; não prova que a escrita funciona. Provava-se com os emuladores do Firebase (`npm run emulators`), que não tocam em produção, ou com um `--as` para um id descartável seguido de um `delete-salon` — que exercita o mesmo código de escrita, só que noutro destino.

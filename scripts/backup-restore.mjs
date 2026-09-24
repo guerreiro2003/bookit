@@ -24,21 +24,11 @@
 import fs from 'node:fs';
 import { ownerToken, api, listAll, FS, toValue } from './_lib.mjs';
 import { neutraliseOwnership, activeOwnershipIn } from './restore-ownership.mjs';
+import { parseRestoreArgs } from './restore-args.mjs';
 
-const args = process.argv.slice(2);
-const apply = args.includes('--yes');
-const asIdx = args.indexOf('--as');
-const target = asIdx !== -1 ? args[asIdx + 1] : null;
-const [file, salonId] = args.filter((a, i) => !a.startsWith('--') && i !== asIdx + 1);
-
-if (!file || !salonId) {
-  console.error('usage: node scripts/backup-restore.mjs <backup.json> <salonId> [--as <novoId>] [--yes]');
-  process.exit(1);
-}
-if (target && !/^[a-z0-9][a-z0-9-]{1,62}$/.test(target)) {
-  console.error('✗ --as tem de ser um slug válido (minúsculas, números e hífenes)');
-  process.exit(1);
-}
+const parsed = parseRestoreArgs(process.argv.slice(2));
+if (!parsed.ok) { console.error(parsed.error); process.exit(1); }
+const { file, salonId, target, apply } = parsed;
 
 const dump = JSON.parse(fs.readFileSync(file, 'utf8'));
 const original = dump.salons.find(s => s.id === salonId);
