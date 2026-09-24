@@ -203,6 +203,126 @@ export function fromValue(v) {
 }
 export const fromDoc = (d) => ({ id: d.name.split('/').pop(), path: d.name.split('/documents/')[1], ...Object.fromEntries(Object.entries(d.fields || {}).map(([k, v]) => [k, fromValue(v)])) });
 
+/* ── Lossless (de)serialisation, for backups ───────────────────────────────
+ *
+ * `fromValue` above is the ergonomic one: it hands a script a plain JS value
+ * to do arithmetic and comparisons with, and in doing so it throws type away.
+ * A timestamp comes back as a string, and `toValue` then writes that string
+ * back as a string. A backup taken and restored through that pair returns
+ * every document with the right VALUES and the wrong TYPES — which nothing
+ * noticed, because the restore verified counts and the counts were right.
+ *
+ * What that costs: firestore.rules line 45 does `request.time < s.trialEndsAt`.
+ * Comparing a timestamp with a string is a type error in the rules, and an
+ * error denies — so a salon on a trial plan, restored, comes back whole and
+ * unable to take a single online booking, with nothing saying why.
+ *
+ * So the backup gets its own pair, and this one is symmetric: dumpValue →
+ * loadValue → the same Firestore value, for every type Firestore has. The
+ * types JSON cannot express carry a tag:
+ *
+ *    {"$ts": "2026-…Z"}      timestamp   (a plain string stays a string)
+ *    {"$bytes": "<base64>"}  bytes
+ *    {"$ref": "projects/…"}  reference
+ *    {"$geo": {latitude, longitude}}
+ *    {"$int": "9007199254740993"}   integer too big for a JS number
+ *    {"$double": 35}         a double whose value is whole (35.0 ≠ 35)
+ *    {"$map": {…}}           a map that itself has a key starting with "$"
+ *
+ * Everything else — null, booleans, ordinary integers and decimals, strings,
+ * arrays, maps — stays exactly as JSON writes it, so a backup is still a file
+ * a person can open and read.
+ */
+/** Encoding version of the backup file.
+ *  1 = every value passed through fromValue/toValue, which lost type.
+ *  2 = dumpValue/loadValue, lossless. */
+export const BACKUP_FORMAT = 2;
+
+const TAGS = ['$ts', '$bytes', '$ref', '$geo', '$int', '$double', '$map'];
+const isTagged = (o) => o !== null && typeof o === 'object' && !Array.isArray(o)
+  && Object.keys(o).length === 1 && TAGS.includes(Object.keys(o)[0]);
+
+/** Firestore REST value → JSON that survives a round trip. */
+export function dumpValue(v) {
+  if (!v || 'nullValue' in v) return null;
+  if ('booleanValue' in v) return v.booleanValue;
+  if ('integerValue' in v) {
+    // int64 does not fit a JS number. Past the safe range, keep the digits.
+    const n = Number(v.integerValue);
+    return Number.isSafeInteger(n) ? n : { $int: String(v.integerValue) };
+  }
+  if ('doubleValue' in v) {
+    const d = v.doubleValue;
+    // NaN and ±Infinity have no JSON form; a whole double must not be read
+    // back as an integer.
+    if (typeof d === 'string' || !Number.isFinite(d)) return { $double: String(d) };
+    return Number.isInteger(d) ? { $double: d } : d;
+  }
+  if ('stringValue' in v) return v.stringValue;
+  if ('timestampValue' in v) return { $ts: v.timestampValue };
+  if ('bytesValue' in v) return { $bytes: v.bytesValue };
+  if ('referenceValue' in v) return { $ref: v.referenceValue };
+  if ('geoPointValue' in v) {
+    return { $geo: { latitude: v.geoPointValue?.latitude ?? 0, longitude: v.geoPointValue?.longitude ?? 0 } };
+  }
+  if ('arrayValue' in v) return (v.arrayValue.values || []).map(dumpValue);
+  if ('mapValue' in v) {
+    const o = Object.fromEntries(Object.entries(v.mapValue.fields || {}).map(([k, x]) => [k, dumpValue(x)]));
+    return Object.keys(o).some(k => k.startsWith('$')) ? { $map: o } : o;
+  }
+  throw new Error('dumpValue: tipo desconhecido ' + JSON.stringify(Object.keys(v)));
+}
+
+/** The inverse. `loadValue(dumpValue(x))` must equal `x`, for every x. */
+export function loadValue(j) {
+  if (j === null || j === undefined) return { nullValue: null };
+  if (typeof j === 'boolean') return { booleanValue: j };
+  if (typeof j === 'number') {
+    return Number.isInteger(j) ? { integerValue: String(j) } : { doubleValue: j };
+  }
+  if (typeof j === 'string') return { stringValue: j };
+  if (j instanceof Date) return { timestampValue: j.toISOString() };
+  if (Array.isArray(j)) return { arrayValue: { values: j.map(loadValue) } };
+  if (typeof j === 'object') {
+    if (isTagged(j)) {
+      const [tag, x] = Object.entries(j)[0];
+      if (tag === '$ts') return { timestampValue: x };
+      if (tag === '$bytes') return { bytesValue: x };
+      if (tag === '$ref') return { referenceValue: x };
+      if (tag === '$geo') return { geoPointValue: { latitude: x?.latitude ?? 0, longitude: x?.longitude ?? 0 } };
+      if (tag === '$int') return { integerValue: String(x) };
+      if (tag === '$double') return { doubleValue: typeof x === 'string' ? Number(x) : x };
+      if (tag === '$map') return { mapValue: { fields: Object.fromEntries(Object.entries(x).map(([k, y]) => [k, loadValue(y)])) } };
+    }
+    return { mapValue: { fields: Object.fromEntries(Object.entries(j).map(([k, y]) => [k, loadValue(y)])) } };
+  }
+  throw new Error('loadValue: valor não suportado ' + typeof j);
+}
+
+/** A document as it goes into a backup: ids, plus lossless fields. */
+export const dumpDoc = (d) => ({
+  id: d.name.split('/').pop(),
+  path: d.name.split('/documents/')[1],
+  ...Object.fromEntries(Object.entries(d.fields || {}).map(([k, v]) => [k, dumpValue(v)])),
+});
+
+/** listAll, but lossless — what the backup walks with. */
+export async function listAllDump(token, collectionPath) {
+  let out = [], pageToken = '';
+  do {
+    const j = await api('GET', `${FS}/${collectionPath}?pageSize=300${pageToken ? '&pageToken=' + pageToken : ''}`, token);
+    out = out.concat((j.documents || []).map(dumpDoc));
+    pageToken = j.nextPageToken || '';
+  } while (pageToken);
+  return out;
+}
+
+/** One document, lossless. null when it does not exist. */
+export async function getDocumentDump(token, docPath) {
+  try { return dumpDoc(await api('GET', `${FS}/${docPath}`, token)); }
+  catch (e) { if (e.status === 404) return null; throw e; }
+}
+
 export async function api(method, url, token, body) {
   const h = { 'Content-Type': 'application/json' };
   if (token) h.Authorization = `Bearer ${token}`;

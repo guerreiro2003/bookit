@@ -9,8 +9,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { checkBackup, countDocuments, backupSource, crossTargetProblem } from '../scripts/verify-backup-core.mjs';
-import { TENANT_COLLECTIONS } from '../scripts/_lib.mjs';
+import { checkBackup, countDocuments, backupSource, crossTargetProblem, formatProblem } from '../scripts/verify-backup-core.mjs';
+import { TENANT_COLLECTIONS, BACKUP_FORMAT } from '../scripts/_lib.mjs';
 
 /** A salon that would genuinely restore: services to sell, people, history. */
 function salon(over = {}) {
@@ -28,6 +28,7 @@ function salon(over = {}) {
 /** A whole export around those salons. */
 const dump = (over = {}) => ({
   exportedAt: '2026-09-22T10:00:00.000Z',
+  format: BACKUP_FORMAT,
   collections: [...TENANT_COLLECTIONS],
   salons: [salon()],
   ...over,
@@ -178,6 +179,38 @@ test('the crossing is reported even when the file is also broken', () => {
   const problems = checkBackup(bad, { target: 'real' });
   assert.match(problems[0], /tirado do EMULADOR/);
   assert.ok(problems.length > 1, 'the other problems are still reported');
+});
+
+/* ── how the values inside are encoded ────────────────────────────────────
+   Format 1 wrote every value through the ergonomic decoder, so timestamps came
+   out as strings and went back as strings. Restoring one returns the right
+   values with the wrong types, and `request.time < s.trialEndsAt` in the rules
+   then raises instead of comparing — a salon on a trial plan comes back whole
+   and refuses every online booking. */
+
+test('a format-1 backup is refused, and the message says what it would cost', () => {
+  const old = dump();
+  delete old.format;
+  const problems = checkBackup(old);
+  assert.equal(problems.length, 1);
+  assert.match(problems[0], /formato 1 \(sem versão\)/);
+  assert.match(problems[0], /datas como texto/);
+  assert.match(problems[0], /período experimental/, 'names the consequence, not just the rule');
+  assert.match(problems[0], /backup novo/, 'and says what to do');
+});
+
+test('a format from the future is refused too, rather than guessed at', () => {
+  assert.match(formatProblem({ format: 3 }), /formato 3 desconhecido/);
+  assert.match(formatProblem({ format: 'dois' }), /desconhecido/);
+  assert.equal(formatProblem({ format: BACKUP_FORMAT }), null);
+});
+
+test('the format check is independent of everything else being right', () => {
+  const broken = dump({ salons: [] });
+  delete broken.format;
+  const problems = checkBackup(broken);
+  assert.ok(problems.some(p => /formato 1/.test(p)));
+  assert.ok(problems.some(p => /sem salões/.test(p)), 'the other problems are still reported');
 });
 
 test('the document count is what the CLI prints on success', () => {

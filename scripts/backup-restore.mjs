@@ -22,7 +22,7 @@
  * every salon document.
  */
 import fs from 'node:fs';
-import { ownerToken, api, listAll, FS, toValue, targetSummary } from './_lib.mjs';
+import { ownerToken, api, listAllDump, getDocumentDump, FS, loadValue, targetSummary } from './_lib.mjs';
 import { neutraliseOwnership, activeOwnershipIn } from './restore-ownership.mjs';
 import { parseRestoreArgs } from './restore-args.mjs';
 import { crossTargetProblem } from './verify-backup-core.mjs';
@@ -82,27 +82,52 @@ if (target) {
 
 const token = await ownerToken();
 const strip = ({ id, path, collections, ...fields }) => fields;
-const write = (docPath, fields) => api('PATCH', `${FS}/${docPath}`, token, { fields: Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, toValue(v)])) });
+const stripRead = (d) => (d ? strip(d) : null);
+const write = (docPath, fields) => api('PATCH', `${FS}/${docPath}`, token, { fields: Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, loadValue(v)])) });
 
-await write(`salons/${dest}`, { ...strip(salon), ...(target ? { slug: dest, restoredFrom: salonId, restoredAt: new Date().toISOString() } : {}) });
+const stamp = { slug: dest, restoredFrom: salonId, restoredAt: { $ts: new Date().toISOString() } };
+await write(`salons/${dest}`, { ...strip(salon), ...(target ? stamp : {}) });
 let n = 1;
 for (const [col, docs] of Object.entries(salon.collections)) {
   for (const d of docs) { await write(`salons/${dest}/${col}/${d.id}`, strip(d)); n++; }
 }
 
-/* ── verify: what landed must match what we meant to write ──────────────── */
-let back = 1;
-const missing = [];
+/* ── verify: read it all back and compare the CONTENT ────────────────────
+   This used to count documents per collection and call equal counts a match.
+   It was right about the counts and blind to everything else: a restore that
+   returned every field with the wrong type printed "tudo bate certo". So now
+   each document is re-read and compared field by field, through the same
+   lossless encoder the backup uses — which means a timestamp that comes back
+   as a string is a difference, not a coincidence of printing. */
+const problems = [];
+const compare = (where, expected, actual) => {
+  if (actual === null) { problems.push(`${where}: não está lá`); return; }
+  const keys = [...new Set([...Object.keys(expected), ...Object.keys(actual)])]
+    .filter(k => k !== 'id' && k !== 'path');
+  const diff = keys.filter(k => JSON.stringify(expected[k]) !== JSON.stringify(actual[k]));
+  if (diff.length) {
+    problems.push(`${where}: ${diff.length} campo(s) diferentes — ${diff.slice(0, 6).join(', ')}`
+      + (diff.length > 6 ? ` …` : '')
+      + `\n       esperado ${JSON.stringify(expected[diff[0]])}, encontrado ${JSON.stringify(actual[diff[0]])}`);
+  }
+};
+
+let back = 0;
+compare(`salons/${dest}`, strip({ ...salon, ...(target ? stamp : {}) }), stripRead(await getDocumentDump(token, `salons/${dest}`)));
+back++;
 for (const [col, docs] of Object.entries(salon.collections)) {
   if (!docs.length) continue;
-  const live = await listAll(token, `salons/${dest}/${col}`);
-  back += live.length;
-  if (live.length !== docs.length) missing.push(`${col}: escrevi ${docs.length}, encontrei ${live.length}`);
+  const live = await listAllDump(token, `salons/${dest}/${col}`);
+  const byId = new Map(live.map(d => [d.id, d]));
+  if (live.length !== docs.length) problems.push(`${col}: escrevi ${docs.length}, encontrei ${live.length}`);
+  for (const d of docs) { compare(`${col}/${d.id}`, strip(d), stripRead(byId.get(d.id) || null)); back++; }
 }
+
 console.log(`\n✓ ${n} documentos escritos em salons/${dest}`);
-if (missing.length) {
-  console.error('✗ verificação falhou:');
-  for (const m of missing) console.error('   · ' + m);
+if (problems.length) {
+  console.error(`✗ verificação falhou — o que foi lido de volta não é o que estava no backup:`);
+  for (const p of problems.slice(0, 20)) console.error('   · ' + p);
+  if (problems.length > 20) console.error(`   … e mais ${problems.length - 20}`);
   process.exit(1);
 }
-console.log(`✓ verificado: ${back} documentos estão lá, tudo bate certo\n`);
+console.log(`✓ verificado: ${back} documentos, campo a campo e com os tipos certos\n`);

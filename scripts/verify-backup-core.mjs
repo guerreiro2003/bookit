@@ -9,7 +9,36 @@
  * The CLI keeps the I/O (read the file, parse it, print, exit code). Everything
  * below decides, and decides only from the value it is given.
  */
-import { TENANT_COLLECTIONS, TARGET } from './_lib.mjs';
+import { TENANT_COLLECTIONS, TARGET, BACKUP_FORMAT } from './_lib.mjs';
+
+/**
+ * Is this file written in an encoding we can restore faithfully?
+ *
+ * Format 1 — everything before 2026-09-24 — passed each value through the
+ * ergonomic decoder, so timestamps arrived as strings and were written back as
+ * strings. Restoring one returns every document with the right values and the
+ * wrong types, and `request.time < s.trialEndsAt` in the rules then raises
+ * instead of comparing: a salon on a trial plan comes back whole and refuses
+ * every online booking, with nothing saying why.
+ *
+ * Refused rather than repaired. Guessing which strings used to be timestamps
+ * is exactly the kind of cleverness that would one day turn a client's note
+ * into a date, and no format-1 file is worth anything today — the only ones
+ * that exist are from the emulator or from before this project had data worth
+ * keeping.
+ *
+ * @returns {string|null}
+ */
+export function formatProblem(dump) {
+  const f = dump?.format;
+  if (f === BACKUP_FORMAT) return null;
+  if (f === undefined || f === null) {
+    return 'formato 1 (sem versão) — os valores foram guardados sem tipo, e restaurar este ficheiro '
+      + 'devolveria as datas como texto. Um salão em período experimental voltaria sem conseguir '
+      + 'receber marcações. Faz um backup novo';
+  }
+  return `formato ${JSON.stringify(f)} desconhecido — este código escreve e lê o formato ${BACKUP_FORMAT}`;
+}
 
 /**
  * Where a backup came from.
@@ -69,10 +98,13 @@ export function checkBackup(dump, { collections = TENANT_COLLECTIONS, target = T
     return ['não é um objeto de backup'];
   }
 
-  // First, because it makes every other answer beside the point: a file from
-  // somewhere else is not a backup of this, however well-formed it is.
+  // First, because these make every other answer beside the point: a file from
+  // somewhere else, or written in an encoding that cannot be restored
+  // faithfully, is not a backup of this — however well-formed the rest is.
   const crossed = crossTargetProblem(dump, target);
   if (crossed) problems.push(crossed);
+  const badFormat = formatProblem(dump);
+  if (badFormat) problems.push(badFormat);
 
   if (!dump.exportedAt) problems.push('sem data de exportação');
   if (!Array.isArray(dump.salons) || !dump.salons.length) {
