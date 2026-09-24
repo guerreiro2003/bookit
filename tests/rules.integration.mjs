@@ -15,7 +15,7 @@
  * Creates clearly-named test documents (clientName "RULES-TEST …") and deletes
  * them at the end.
  */
-import { signIn, signUp, getDocument, listAll, patchDocument, createDocument, deleteDocument, api, FS, API_KEY, IDENTITY, toValue } from '../scripts/_lib.mjs';
+import { signIn, signUp, getDocument, listAll, patchDocument, createDocument, deleteDocument, api, FS, API_KEY, IDENTITY, toValue, ownerToken } from '../scripts/_lib.mjs';
 import { timeToMin } from '../booking-core.js';
 import { SALON, OTHER_SALON as OTHER, ADMIN, CLIENT, TEAM_PW, SERVICE_ID } from './_target.mjs';
 
@@ -180,13 +180,60 @@ await expectStatus('client publishes own referral code', async () => { await cre
 await expectStatus('a typed referral code is GET-able without auth', () => api('GET', `${FS}/salons/${SALON}/referrals/RULESTEST1`, null), 200);
 await expectStatus('client cannot publish a referral for another uid', () => createDocument(client.token, `salons/${SALON}/referrals`, 'RULESTEST2', { clientId: 'someone-else' }), 403);
 
-/* ── 6. TENANT ISOLATION ── */
+/* ── 6. TENANT ISOLATION ─────────────────────────────────────────────────
+   KI-016. These five assertions used to point at `zenorganic`, a salon that
+   does not exist — the neighbour is `zen-organic`, with a hyphen. Every read
+   was refused, every assertion passed, and not one of them tested isolation:
+   the rules call get() on the salon document, do not find it, and deny. A
+   refusal for the wrong reason looks exactly like a refusal for the right one.
+
+   So before asking whether the neighbour is unreadable, we establish that
+   there IS a neighbour, with the very data each assertion is about. The
+   owner token bypasses the rules, which is what makes it the right instrument
+   here: it answers "what is really there", not "what may this caller see".
+
+   If the precondition fails the suite stops. A vacuous pass is worse than a
+   red run — it is a security test that reports success while testing nothing. */
 console.log('TENANT ISOLATION');
-await expectStatus('demo admin cannot read other salon bookings', () => api('GET', `${FS}/salons/${OTHER}/bookings?pageSize=1`, admin.token), 403);
+
+const owner = await ownerToken();
+async function neighbourHas(what, path, atLeast = 1) {
+  let n = -1;
+  try { n = (await listAll(owner, path)).length; } catch (e) { n = -1; }
+  if (n < atLeast) {
+    console.log(`  ✗ PRÉ-CONDIÇÃO: ${OTHER} não tem ${what} (${path} → ${n < 0 ? 'ilegível' : n})`);
+    console.log(`     Sem isso, o 403 que se segue não prova isolamento nenhum: seria`);
+    console.log(`     recusado à mesma por não haver lá nada. Semeia o salão vizinho`);
+    console.log(`     (npm run seed:emul) ou aponta OTHER_SALON_ID a um salão com dados.`);
+    fail++;
+    return false;
+  }
+  check(`pré-condição: ${OTHER} tem mesmo ${what} (${n})`, true);
+  return true;
+}
+
+const otherSalon = await getDocument(owner, `salons/${OTHER}`);
+check(`pré-condição: o salão ${OTHER} existe`, !!otherSalon, '(não existe — o 403 seguinte não provaria nada)');
+if (!otherSalon) fail++;
+const hasBookings = await neighbourHas('marcações', `salons/${OTHER}/bookings`);
+const hasClients = await neighbourHas('clientes', `salons/${OTHER}/clients`);
+const hasServices = await neighbourHas('serviços', `salons/${OTHER}/services`);
+// A different owner, or "the neighbour" is this salon under another name.
+check(`pré-condição: ${OTHER} é de outro dono`, !!otherSalon && otherSalon.adminUid !== salon.adminUid,
+  `(adminUid igual ao de ${SALON})`);
+if (otherSalon && otherSalon.adminUid === salon.adminUid) fail++;
+
+if (hasBookings) {
+  await expectStatus('demo admin cannot read other salon bookings', () => api('GET', `${FS}/salons/${OTHER}/bookings?pageSize=1`, admin.token), 403);
+  await expectStatus('demo team cannot confirm other salon bookings', () => patchDocument(team.token, `salons/${OTHER}/bookings/nonexistent`, { status: 'confirmed' }), 403);
+}
 await expectStatus('demo admin cannot edit other salon', () => patchDocument(admin.token, `salons/${OTHER}`, { name: 'hack' }), 403);
-await expectStatus('demo team cannot confirm other salon bookings', () => patchDocument(team.token, `salons/${OTHER}/bookings/nonexistent`, { status: 'confirmed' }), 403);
-await expectStatus('demo admin cannot write other salon services', () => createDocument(admin.token, `salons/${OTHER}/services`, null, { name: 'x', price: 1, duration: 30, active: true }), 403);
-await expectStatus('demo client cannot read other salon clients', () => api('GET', `${FS}/salons/${OTHER}/clients?pageSize=1`, client.token), 403);
+if (hasServices) {
+  await expectStatus('demo admin cannot write other salon services', () => createDocument(admin.token, `salons/${OTHER}/services`, null, { name: 'x', price: 1, duration: 30, active: true }), 403);
+}
+if (hasClients) {
+  await expectStatus('demo client cannot read other salon clients', () => api('GET', `${FS}/salons/${OTHER}/clients?pageSize=1`, client.token), 403);
+}
 
 /* ── cleanup ── */
 for (const p of created.reverse()) { try { await deleteDocument(admin.token, p); } catch (e) { console.log('  cleanup failed', p, e.status); } }
