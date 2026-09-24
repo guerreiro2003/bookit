@@ -1,9 +1,17 @@
 name: Testes
 
-# Os testes unitários são puros — sem Firebase, sem rede, sem segredos — por
-# isso correm em qualquer push e em qualquer fork. As suites E2E escrevem no
-# projeto real e ficam de fora daqui de propósito: correm-se à mão antes de um
-# deploy, com `npm run test:all`.
+# Tudo isto corre sem um único segredo, e por isso corre em qualquer fork e em
+# qualquer pull request.
+#
+# Os testes unitários são puros: sem Firebase, sem rede. As suites E2E correm
+# contra os emuladores do Firebase, semeados com dois salões inventados — é
+# `npm run test:emul`, e inclui as regras de segurança a serem exercidas a
+# sério. O emulador aceita o token "owner", por isso não é preciso conta
+# nenhuma; o projeto chama-se demo-bookit, e o prefixo demo- garante que não
+# há nada do outro lado se algo ficar mal configurado.
+#
+# O que correr contra o projeto real continua a ser um ato deliberado de uma
+# pessoa: `BOOKIT_TARGET=real npm run test:all`, antes de um deploy. Ver DEPLOY.md.
 
 on:
   push:
@@ -13,9 +21,9 @@ on:
 
 jobs:
   unit:
-    name: Unitários + sintaxe
+    name: Unitários + sintaxe + emuladores
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -24,7 +32,26 @@ jobs:
           node-version: '20'
           cache: npm
 
+      # O emulador do Firestore é um programa Java, e o firebase-tools 15
+      # recusa-se a arrancar com menos do que a 21 — verifica antes de
+      # descarregar seja o que for, com um erro que fala de Java e não diz
+      # quem o pediu.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # Os jars do emulador são centenas de MB e não mudam entre corridas.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}-v1
+
       - run: npm ci
+
+      # Versão exata, a mesma que é usada à mão. Um "latest" aqui significa que
+      # um dia o CI fica vermelho por causa de uma atualização de outra pessoa.
+      - run: npm i -g firebase-tools@15.18.0
 
       - name: Testes unitários
         run: npm test
@@ -53,10 +80,15 @@ jobs:
           sys.exit(1 if bad else 0)
           PY
 
-      - name: As regras compilam
-        # Bloco literal (`|`): um comando de shell leva dois-pontos e aspas, e
-        # num escalar simples de YAML isso parte o ficheiro inteiro — foi o que
-        # aconteceu aqui e o workflow deixou de arrancar sem criar um único job.
-        run: |
-          npx --yes firebase-tools@latest firestore:rules:check firestore.rules --project bookit-51575 \
-            || echo "aviso - verificação de regras precisa de credenciais, ignorado"
+      # Substitui o antigo passo "As regras compilam", que acabava em `|| echo` e
+      # por isso devolvia 0 sempre: regras com erro de sintaxe, ficheiro
+      # apagado, ferramenta que nem arrancava — tudo passava a verde. A única
+      # verificação automática do ficheiro que É toda a segurança deste produto
+      # não verificava nada.
+      #
+      # Agora as regras não são só compiladas: são CARREGADAS pelo emulador,
+      # que se recusa a arrancar se tiverem erro de sintaxe, e depois são
+      # exercidas pelas suites — incluindo o isolamento entre salões, com dois
+      # tenants a sério. emulators:exec propaga o código de saída.
+      - name: Suites contra os emuladores (inclui as regras)
+        run: npm run test:emul
