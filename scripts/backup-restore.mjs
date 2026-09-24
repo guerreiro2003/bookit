@@ -22,15 +22,29 @@
  * every salon document.
  */
 import fs from 'node:fs';
-import { ownerToken, api, listAll, FS, toValue } from './_lib.mjs';
+import { ownerToken, api, listAll, FS, toValue, targetSummary } from './_lib.mjs';
 import { neutraliseOwnership, activeOwnershipIn } from './restore-ownership.mjs';
 import { parseRestoreArgs } from './restore-args.mjs';
+import { crossTargetProblem } from './verify-backup-core.mjs';
 
 const parsed = parseRestoreArgs(process.argv.slice(2));
 if (!parsed.ok) { console.error(parsed.error); process.exit(1); }
 const { file, salonId, target, apply } = parsed;
 
 const dump = JSON.parse(fs.readFileSync(file, 'utf8'));
+
+/* Before anything reaches the network, and before the dry run even prints a
+   plan: a backup taken from the emulator has the same shape and the same salon
+   ids as a real one, and restoring it over a live salon would replace a
+   salon's history with invented people. */
+const crossed = crossTargetProblem(dump);
+if (crossed) {
+  console.error(`\n✗ ${crossed}`);
+  console.error(`  alvo atual: ${targetSummary()}`);
+  console.error('  Para restaurar um backup do emulador, corre dentro do emulador com BOOKIT_TARGET=emulator.\n');
+  process.exit(1);
+}
+
 const original = dump.salons.find(s => s.id === salonId);
 if (!original) throw new Error(`salão ${salonId} não está neste backup`);
 const dest = target || salonId;

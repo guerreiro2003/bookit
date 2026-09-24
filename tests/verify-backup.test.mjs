@@ -9,7 +9,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { checkBackup, countDocuments } from '../scripts/verify-backup-core.mjs';
+import { checkBackup, countDocuments, backupSource, crossTargetProblem } from '../scripts/verify-backup-core.mjs';
 import { TENANT_COLLECTIONS } from '../scripts/_lib.mjs';
 
 /** A salon that would genuinely restore: services to sell, people, history. */
@@ -119,6 +119,65 @@ test('missing exportedAt is reported on its own', () => {
   const d = dump();
   delete d.exportedAt;
   assert.deepEqual(checkBackup(d), ['sem data de exportação']);
+});
+
+/* ── where the file came from ─────────────────────────────────────────────
+   Since the emulator exists, a backup is no longer self-evidently production.
+   A seeded emulator exports the same shape, the same salon ids and the same
+   "✓" as the real thing — and the people in it are invented. */
+
+const fromEmulator = (over = {}) => dump({ source: { target: 'emulator', project: 'demo-bookit' }, ...over });
+const fromReal = (over = {}) => dump({ source: { target: 'real', project: 'bookit-51575' }, ...over });
+
+test('a backup from the emulator is rejected when the target is the real project', () => {
+  const problems = checkBackup(fromEmulator(), { target: 'real' });
+  assert.equal(problems.length, 1, 'nothing else about this file is wrong');
+  assert.match(problems[0], /tirado do EMULADOR \(projeto demo-bookit\)/);
+  assert.match(problems[0], /dados inventados/, 'says why, not just that');
+});
+
+test('the same backup is accepted inside the emulator', () => {
+  // The rehearsal has to be able to restore it (T7), so this direction stays open.
+  assert.deepEqual(checkBackup(fromEmulator(), { target: 'emulator' }), []);
+});
+
+test('a backup with no stamp counts as production', () => {
+  const old = dump();
+  assert.equal('source' in old, false, 'the fixture really has no stamp');
+  assert.deepEqual(backupSource(old), { target: 'real', project: null, stamped: false });
+  assert.deepEqual(checkBackup(old, { target: 'real' }), [], 'every file from before 2026-09-24 is one of these');
+});
+
+test('a production backup is fine against the real project', () => {
+  assert.deepEqual(checkBackup(fromReal(), { target: 'real' }), []);
+  assert.deepEqual(backupSource(fromReal()), { target: 'real', project: 'bookit-51575', stamped: true });
+});
+
+test('a damaged or lying stamp is read as production, never as emulator', () => {
+  // Reading an unreadable stamp as "emulator" would block a real restore in a
+  // real emergency. Reading it as "real" only ever risks a refusal too few,
+  // and the other checks are still there.
+  for (const bad of [null, 'emulator', 42, [], { target: 'EMULATOR' }, { target: 'outra-coisa' }]) {
+    assert.equal(backupSource({ source: bad }).target, 'real', `source=${JSON.stringify(bad)}`);
+  }
+  assert.equal(backupSource({ source: { target: 'emulator' } }).project, null, 'a stamp with no project still counts');
+  assert.match(crossTargetProblem({ source: { target: 'emulator' } }, 'real'), /tirado do EMULADOR/);
+});
+
+test('crossTargetProblem is silent in every direction that is allowed', () => {
+  assert.equal(crossTargetProblem(fromEmulator(), 'emulator'), null);
+  assert.equal(crossTargetProblem(fromReal(), 'real'), null);
+  assert.equal(crossTargetProblem(fromReal(), 'emulator'), null, 'production into the emulator is a rehearsal, not a mistake');
+  assert.equal(crossTargetProblem(dump(), 'real'), null);
+});
+
+test('the crossing is reported even when the file is also broken', () => {
+  // The refusal must not depend on the rest of the file being well-formed,
+  // and it comes first because it makes every other answer beside the point.
+  const bad = fromEmulator({ salons: [] });
+  const problems = checkBackup(bad, { target: 'real' });
+  assert.match(problems[0], /tirado do EMULADOR/);
+  assert.ok(problems.length > 1, 'the other problems are still reported');
 });
 
 test('the document count is what the CLI prints on success', () => {

@@ -9,22 +9,70 @@
  * The CLI keeps the I/O (read the file, parse it, print, exit code). Everything
  * below decides, and decides only from the value it is given.
  */
-import { TENANT_COLLECTIONS } from './_lib.mjs';
+import { TENANT_COLLECTIONS, TARGET } from './_lib.mjs';
+
+/**
+ * Where a backup came from.
+ *
+ * A file with no stamp is production. Until 2026-09-24 there was nowhere else
+ * to take a backup from, so "unstamped" and "real" mean the same thing — and
+ * guessing the other way would quietly wave through every old file.
+ *
+ * @returns {{target: 'real'|'emulator', project: string|null, stamped: boolean}}
+ */
+export function backupSource(dump) {
+  const s = dump?.source;
+  if (!s || typeof s !== 'object') return { target: 'real', project: null, stamped: false };
+  return {
+    target: s.target === 'emulator' ? 'emulator' : 'real',
+    project: typeof s.project === 'string' ? s.project : null,
+    stamped: true,
+  };
+}
+
+/**
+ * Is this backup from somewhere it must not be used?
+ *
+ * One direction only: a backup taken from the emulator must never be used
+ * against the real project. It carries invented people with the same salon
+ * ids, the same shape and the same "✓" as the real thing — restoring one over
+ * a live salon would replace a salon's history with fiction.
+ *
+ * The other direction stays open on purpose: restoring INTO the emulator is
+ * the whole point of a rehearsal, and T7 needs to restore an emulator backup
+ * inside the emulator.
+ *
+ * @returns {string|null} the problem, phrased for the operator, or null
+ */
+export function crossTargetProblem(dump, target = TARGET) {
+  const src = backupSource(dump);
+  if (src.target === 'emulator' && target !== 'emulator') {
+    return `este backup foi tirado do EMULADOR${src.project ? ` (projeto ${src.project})` : ''}`
+      + ' e o alvo atual é o projeto real — são dados inventados, não servem para restaurar nada';
+  }
+  return null;
+}
 
 /**
  * Everything wrong with this backup, in the order a reader should hear it.
  * An empty array means the file is restorable.
  *
  * @param {object} dump parsed backup JSON
- * @param {{collections?: string[]}} [opts] `collections` overrides the list the
- *        export is measured against — the tests use it, the CLI never does.
+ * @param {{collections?: string[], target?: 'real'|'emulator'}} [opts]
+ *        `collections` overrides the list the export is measured against and
+ *        `target` where it is being read — the tests use both, the CLI neither.
  * @returns {string[]} problems, already phrased for the operator
  */
-export function checkBackup(dump, { collections = TENANT_COLLECTIONS } = {}) {
+export function checkBackup(dump, { collections = TENANT_COLLECTIONS, target = TARGET } = {}) {
   const problems = [];
   if (!dump || typeof dump !== 'object' || Array.isArray(dump)) {
     return ['não é um objeto de backup'];
   }
+
+  // First, because it makes every other answer beside the point: a file from
+  // somewhere else is not a backup of this, however well-formed it is.
+  const crossed = crossTargetProblem(dump, target);
+  if (crossed) problems.push(crossed);
 
   if (!dump.exportedAt) problems.push('sem data de exportação');
   if (!Array.isArray(dump.salons) || !dump.salons.length) {

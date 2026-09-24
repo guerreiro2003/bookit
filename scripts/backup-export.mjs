@@ -6,17 +6,29 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { ownerToken, listAll, TENANT_COLLECTIONS } from './_lib.mjs';
+import { ownerToken, listAll, TENANT_COLLECTIONS, TARGET, PROJECT, targetSummary } from './_lib.mjs';
 
 const [outDirArg, onlySalon] = process.argv.slice(2);
 const outDir = outDirArg || 'backups';
 const SUBS = TENANT_COLLECTIONS;
 
+console.log(`Backup ← ${targetSummary()}`);
 const token = await ownerToken();
 const salons = (await listAll(token, 'salons')).filter(s => !onlySalon || s.id === onlySalon);
 // `collections` records what this export WALKED, not just what it found. Without
 // it a backup cannot be told apart from one that silently skipped a collection.
-const dump = { exportedAt: new Date().toISOString(), collections: SUBS, salons: [] };
+//
+// `source` records WHERE it came from. Since the emulator exists, a backup file
+// is no longer self-evidently production: an export from a seeded emulator has
+// the same shape, the same salon ids and the same "✓" as the real thing, and
+// restoring one over a live salon would replace real data with invented people.
+// The verifier and the restore both read this and refuse the crossing.
+const dump = {
+  exportedAt: new Date().toISOString(),
+  source: { target: TARGET, project: PROJECT },
+  collections: SUBS,
+  salons: [],
+};
 for (const s of salons) {
   const entry = { ...s, collections: {} };
   for (const c of SUBS) entry.collections[c] = await listAll(token, `salons/${s.id}/${c}`);
