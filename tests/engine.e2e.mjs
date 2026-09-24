@@ -17,11 +17,7 @@ import {
   whatsAppFor,
 } from '../app.js';
 
-const E = process.env;
-const SALON = E.SALON_ID || 'demo';
-const ADMIN = { email: E.ADMIN_EMAIL || 'admin@bookit.demo', pw: E.ADMIN_PASSWORD || 'Demo2026!' };
-const CLIENT = { email: E.CLIENT_EMAIL || 'cliente@bookit.demo', pw: E.CLIENT_PASSWORD || 'Cliente2026!' };
-const TEAM_PW = E.TEAM_PASSWORD || 'equipa2026';
+import { SALON, ADMIN, CLIENT, TEAM_PW } from './_target.mjs';
 
 let pass = 0, fail = 0; const created = new Set();
 const ok = (name, cond, detail = '') => { if (cond) { pass++; console.log(`  ✓ ${name}`); } else { fail++; console.log(`  ✗ ${name} ${detail}`); } };

@@ -1,24 +1,23 @@
-/* Integration tests for firestore.rules — run against a real project via REST.
+/* Integration tests for firestore.rules — exercised over REST.
  *
- *   node tests/rules.integration.mjs
+ *   node --import ./tests/_register.mjs tests/rules.integration.mjs
  *
- * Env (defaults target the demo salon):
- *   FIREBASE_PROJECT, FIREBASE_API_KEY, SALON_ID, ADMIN_EMAIL, ADMIN_PASSWORD,
- *   TEAM_PASSWORD, CLIENT_EMAIL, CLIENT_PASSWORD, SERVICE_ID, OTHER_SALON_ID
+ * Goes to the EMULATOR by default (tests/_register.mjs), where the two salons
+ * it needs are seeded by scripts/seed-emulator.mjs. `BOOKIT_TARGET=real` sends
+ * it at production instead, and then the salon ids, accounts and SERVICE_ID
+ * have to come from the environment — see tests/_target.mjs.
+ *
+ * An older header here said "point FIREBASE_PROJECT at an emulator project for
+ * CI". That was never true: FIREBASE_PROJECT only changes the project id in
+ * the URL, and the host stayed firestore.googleapis.com — following it wrote
+ * to production. BOOKIT_TARGET is what switches the endpoints.
  *
  * Creates clearly-named test documents (clientName "RULES-TEST …") and deletes
- * them at the end. Point FIREBASE_PROJECT at an emulator project for CI.
+ * them at the end.
  */
-import { signIn, signUp, getDocument, listAll, patchDocument, createDocument, deleteDocument, api, FS, API_KEY, toValue } from '../scripts/_lib.mjs';
+import { signIn, signUp, getDocument, listAll, patchDocument, createDocument, deleteDocument, api, FS, API_KEY, IDENTITY, toValue } from '../scripts/_lib.mjs';
 import { timeToMin } from '../booking-core.js';
-
-const E = process.env;
-const SALON = E.SALON_ID || 'demo';
-const OTHER = E.OTHER_SALON_ID || 'zenorganic';
-const ADMIN = { email: E.ADMIN_EMAIL || 'admin@bookit.demo', pw: E.ADMIN_PASSWORD || 'Demo2026!' };
-const CLIENT = { email: E.CLIENT_EMAIL || 'cliente@bookit.demo', pw: E.CLIENT_PASSWORD || 'Cliente2026!' };
-const TEAM_PW = E.TEAM_PASSWORD || 'equipa2026';
-const SERVICE_ID = E.SERVICE_ID || 'PHsXXzGABGEoeXSwkrJh';
+import { SALON, OTHER_SALON as OTHER, ADMIN, CLIENT, TEAM_PW, SERVICE_ID } from './_target.mjs';
 
 let pass = 0, fail = 0;
 const created = []; // [path] for cleanup
@@ -126,7 +125,7 @@ await expectStatus('public cannot update a booking', () => patchDocument(null, `
 
 /* ── 2. ANONYMOUS AUTH has no staff powers anymore ── */
 console.log('ANONYMOUS AUTH');
-const anon = await (await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${API_KEY}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"returnSecureToken":true}' })).json();
+const anon = await (await fetch(`${IDENTITY}/accounts:signUp?key=${API_KEY}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"returnSecureToken":true}' })).json();
 if (anon.idToken) {
   await expectStatus('anonymous cannot list bookings', () => api('GET', `${FS}/salons/${SALON}/bookings?pageSize=1`, anon.idToken), 403);
   await expectStatus('anonymous cannot confirm a booking', () => patchDocument(anon.idToken, `salons/${SALON}/bookings/${b1}`, { status: 'confirmed' }), 403);

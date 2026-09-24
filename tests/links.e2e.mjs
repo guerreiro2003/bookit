@@ -8,10 +8,7 @@
 import { db, auth, doc, getDoc, updateDoc, deleteDoc, signInWithEmailAndPassword, signOut } from '../firebase.js';
 import { loadSalon, loadBookingContext, computeAvailability, createBooking, confirmBookingByToken, cancelBookingByToken, loadBookingLink, cancelBooking, agendaId, addDaysStr, nowInTimezone, salonSetting } from '../app.js';
 
-const E = process.env;
-const SALON = E.SALON_ID || 'demo';
-const ADMIN = { email: E.ADMIN_EMAIL || 'admin@bookit.demo', pw: E.ADMIN_PASSWORD || 'Demo2026!' };
-const TEAM_PW = E.TEAM_PASSWORD || 'equipa2026';
+import { SALON, ADMIN, TEAM_PW, SERVICE_ID } from './_target.mjs';
 let pass = 0, fail = 0; const created = [];
 const ok = (n, c, d = '') => { if (c) { pass++; console.log(`  ✓ ${n}`); } else { fail++; console.log(`  ✗ ${n} ${d}`); } };
 const expectErr = async (n, fn, code) => { try { await fn(); ok(n, false, `(expected ${code}, got success)`); } catch (e) { ok(n, e.code === code, `(expected ${code}, got ${e.code || e.message})`); } };
@@ -23,7 +20,13 @@ const agendaOf = async (staffId, date) => {
 
 const salon = await loadSalon(SALON);
 const ctx = await loadBookingContext(SALON);
-const service = { id: 'PHsXXzGABGEoeXSwkrJh', name: 'Corte + Brushing', duration: 45, price: 35 };
+// Read the service instead of describing it. This line used to hard-code the
+// production auto-id `PHsXXzGABGEoeXSwkrJh` along with its name, duration and
+// price — against the emulator that id does not exist and every booking was
+// refused with PERMISSION_DENIED on an unknown serviceId.
+const svcSnap = await getDoc(doc(db, 'salons', SALON, 'services', SERVICE_ID));
+if (!svcSnap.exists()) throw new Error(`serviço ${SERVICE_ID} não existe em ${SALON}`);
+const service = { id: svcSnap.id, ...svcSnap.data() };
 const S = ctx.staff[0];   // full-time staff member (others may have day-offs)
 // first Mon–Fri at least 60 days out (some staff have Saturday off)
 const D1 = (() => { let d = new Date(Date.now() + 60 * 86400000); while ([0, 6].includes(d.getUTCDay())) d = new Date(d.getTime() + 86400000); return d.toISOString().slice(0, 10); })();

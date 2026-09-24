@@ -13,10 +13,7 @@ import {
 import { buildClientProfiles, reactivationCandidates, retentionSummary, explain, reactivationMessage, RISK } from '../retention-core.js';
 import { computeRecovered } from '../metrics-core.js';
 
-const E = process.env;
-const SALON = E.SALON_ID || 'demo';
-const ADMIN = { email: E.ADMIN_EMAIL || 'admin@bookit.demo', pw: E.ADMIN_PASSWORD || 'Demo2026!' };
-const TEAM_PW = E.TEAM_PASSWORD || 'equipa2026';
+import { SALON, ADMIN, TEAM_PW, SERVICE_ID } from './_target.mjs';
 const PHONE = '351919000777';                       // dedicated test identity
 
 let pass = 0, fail = 0;
@@ -28,7 +25,12 @@ const salon = await loadSalon(SALON);
 const ctx = await loadBookingContext(SALON);
 const today = todayForSalon(salon);
 const S = ctx.staff[0];
-const service = { id: 'PHsXXzGABGEoeXSwkrJh', name: 'Corte + Brushing', duration: 45, price: 35 };
+// Read the service instead of describing it — the old line hard-coded the
+// production auto-id, which does not exist in the emulator and made every
+// seeded booking fail the rules' unknown-serviceId check.
+const svcSnap = await getDoc(doc(db, 'salons', SALON, 'services', SERVICE_ID));
+if (!svcSnap.exists()) throw new Error(`serviço ${SERVICE_ID} não existe em ${SALON}`);
+const service = { id: svcSnap.id, ...svcSnap.data() };
 console.log(`\nRetention E2E — ${salon.name} · hoje ${today}\n`);
 
 /* ── seed history: visits 140 / 105 / 70 days ago (cadence 35 → 2× overdue) ── */

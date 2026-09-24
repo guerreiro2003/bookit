@@ -77,7 +77,11 @@ async function account(email, password, { verified = false } = {}) {
 
 const ADMIN_DEMO = await account('admin@bookit.demo', 'Demo2026!');
 const TEAM_DEMO = await account('equipa@bookit.demo', 'equipa2026');
-const ANA = await account('ana@bookit.demo', 'Ana2026!!');
+// The individual account goes to Rui, not to Ana. Ana is staff[0] — the
+// person tests/team-access.e2e.mjs grants access to — and seeding her with an
+// account already in place left two staffAuth rows for the same staffId, so
+// loadTeamAccess() resolved to the wrong one.
+const RUI = await account('rui@bookit.demo', 'Rui2026!!');
 const CLIENT_DEMO = await account('cliente@bookit.demo', 'Cliente2026!', { verified: true });
 const ADMIN_ZEN = await account('admin@zen.demo', 'Zen2026!');
 const SOFIA = await account('sofia@zen.demo', 'Sofia2026!');
@@ -98,6 +102,10 @@ const past = (daysBack) => {
   return iso(d);
 };
 
+/* Monday to Saturday, closed on Sunday — and that closed day is load-bearing:
+   tests/engine.e2e.mjs asserts a booking on a Sunday is refused with
+   `salon-closed`. Any suite that picks a date at random has to step over
+   Sunday itself, the way rules.integration.mjs and waitlist.e2e.mjs do. */
 const OPEN_DAY = { open: '09:00', close: '19:00', closed: false };
 const CLOSED = { open: '', close: '', closed: true };
 const SCHEDULE = {
@@ -124,6 +132,9 @@ const SALONS = [
       teamUid: TEAM_DEMO, teamEmail: 'equipa@bookit.demo',
       tagline: 'Dados de mentira, para testes', address: 'Rua Inventada 1, Lisboa',
       phone: '910000001', email: 'geral@bookit.demo', primaryColor: '#3B6E5A',
+      // The booking page reads this one; abuse.e2e checks the public document
+      // still carries what the page needs after the private fields moved out.
+      timezone: 'Europe/Lisbon',
       plan: 'active', slotInterval: 15, bookingLeadMinutes: 30, maxAdvanceDays: 90,
       cancellationHours: 24, loyaltyVisits: 5, loyaltyDiscount: 20,
       referralDiscount: 10, birthdayDiscount: 15, noShowPenalty: 5,
@@ -137,12 +148,16 @@ const SALONS = [
       ['tratamento', { name: 'Tratamento', duration: 30, price: 25, order: 3, active: true, description: '' }],
     ],
     staff: [
-      ['ana', { name: 'Ana Ribeiro', role: 'Cabeleireira', active: true, serviceIds: [], uid: ANA, email: 'ana@bookit.demo', timeOff: [] }],
-      ['rui', { name: 'Rui Matos', role: 'Barbeiro', active: true, serviceIds: ['corte'], timeOff: [] }],
+      ['ana', { name: 'Ana Ribeiro', role: 'Cabeleireira', active: true, serviceIds: [], timeOff: [] }],
+      ['rui', { name: 'Rui Matos', role: 'Barbeiro', active: true, serviceIds: ['corte'], uid: RUI, email: 'rui@bookit.demo', timeOff: [] }],
     ],
-    staffAuth: [[ANA, { staffId: 'ana', name: 'Ana Ribeiro', email: 'ana@bookit.demo', active: true, createdAt: new Date('2026-02-01T09:00:00Z') }]],
+    staffAuth: [[RUI, { staffId: 'rui', name: 'Rui Matos', email: 'rui@bookit.demo', active: true, createdAt: new Date('2026-02-01T09:00:00Z') }]],
     clients: [
-      ['c-rita', { name: 'Rita Alves', email: 'cliente@bookit.demo', phone: '910000011', uid: CLIENT_DEMO, visits: 3, points: 30, totalSpent: 105, discounts: [], createdAt: new Date('2026-02-10T09:00:00Z') }],
+      // A registered client's document id IS their uid — that is how
+      // account.html finds it (`doc(db,'salons',id,'clients', u.uid)`), and
+      // how the rules let them read and edit their own row. Seeding this one
+      // under a readable id like `c-rita` made it invisible to its owner.
+      [CLIENT_DEMO, { name: 'Rita Alves', email: 'cliente@bookit.demo', phone: '910000011', uid: CLIENT_DEMO, visits: 3, points: 30, totalSpent: 105, discounts: [], createdAt: new Date('2026-02-10T09:00:00Z') }],
       ['c-joao', { name: 'João Pinto', email: 'joao@bookit.demo', phone: '910000012', visits: 1, points: 10, totalSpent: 35, discounts: [], createdAt: new Date('2026-03-02T09:00:00Z') }],
       ['c-marta', { name: 'Marta Sousa', email: 'marta@bookit.demo', phone: '910000013', visits: 0, points: 0, totalSpent: 0, discounts: [], createdAt: new Date('2026-04-18T09:00:00Z') }],
     ],
@@ -159,7 +174,7 @@ const SALONS = [
       name: 'Zen Organic (emulador)', slug: 'zen-organic', adminUid: ADMIN_ZEN,
       tagline: 'O salão do lado, que ninguém de fora pode ler',
       address: 'Rua Imaginária 2, Porto', phone: '910000002', email: 'geral@zen.demo',
-      primaryColor: '#7A5C3E', plan: 'active', slotInterval: 15,
+      primaryColor: '#7A5C3E', timezone: 'Europe/Lisbon', plan: 'active', slotInterval: 15,
       bookingLeadMinutes: 30, maxAdvanceDays: 90, cancellationHours: 24,
       loyaltyVisits: 5, loyaltyDiscount: 20, referralDiscount: 10,
       birthdayDiscount: 15, noShowPenalty: 5, pointsPerVisit: 10,

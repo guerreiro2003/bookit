@@ -16,10 +16,9 @@ import {
   freedSlotFrom, waitlistBookingLink,
 } from '../app.js';
 import { rankCandidates, matchesSlot, offerMessage, waitlistSummary } from '../waitlist-core.js';
+import { weekdayOf } from '../booking-core.js';
 
-const E = process.env;
-const SALON = E.SALON_ID || 'demo';
-const ADMIN = { email: E.ADMIN_EMAIL || 'admin@bookit.demo', pw: E.ADMIN_PASSWORD || 'Demo2026!' };
+import { SALON, ADMIN } from './_target.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, d = '') => { if (c) { pass++; console.log(`  ✓ ${n}`); } else { fail++; console.log(`  ✗ ${n} ${d}`); } };
@@ -28,7 +27,11 @@ const refused = (n, r) => ok(n, !r.allowed, '(foi permitido)');
 
 const salon = await loadSalon(SALON);
 const today = todayForSalon(salon);
-const DAY = addDaysStr(today, 30 + (Date.now() % 20));   // a different day per run
+// A different day per run, stepped over Sunday: the salon is closed then, and
+// a random date landed on one roughly one run in seven and failed with
+// `salon-closed` — a red suite that says nothing about the waiting list.
+const DAY0 = addDaysStr(today, 30 + (Date.now() % 20));
+const DAY = weekdayOf(DAY0) === 0 ? addDaysStr(DAY0, 1) : DAY0;
 const made = { bookings: [], waitlist: [] };
 
 await signInWithEmailAndPassword(auth, ADMIN.email, ADMIN.pw);

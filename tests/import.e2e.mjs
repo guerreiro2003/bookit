@@ -10,9 +10,7 @@ import { loadSalon, loadImportContext, runImport, loadRetention, addDaysStr, tod
 import { analyseImport } from '../import-core.js';
 import { buildClientProfiles, reactivationCandidates } from '../retention-core.js';
 
-const E = process.env;
-const SALON = E.SALON_ID || 'demo';
-const ADMIN = { email: E.ADMIN_EMAIL || 'admin@bookit.demo', pw: E.ADMIN_PASSWORD || 'Demo2026!' };
+import { SALON, ADMIN } from './_target.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, d = '') => { if (c) { pass++; console.log(`  ✓ ${n}`); } else { fail++; console.log(`  ✗ ${n} ${d}`); } };

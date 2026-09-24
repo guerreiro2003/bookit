@@ -76,7 +76,11 @@ export const API_KEY = process.env.FIREBASE_API_KEY
 export const FS = IS_EMULATOR
   ? `http://${FIRESTORE_HOST}/v1/projects/${PROJECT}/databases/(default)/documents`
   : `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
-const IDENTITY = IS_EMULATOR
+/** Base URL of the Identity Toolkit for the current target. Exported because
+ *  a suite that writes the production URL by hand creates real accounts even
+ *  when everything else is pointed at the emulator — which is exactly what
+ *  rules.integration.mjs was doing for its anonymous-auth section. */
+export const IDENTITY = IS_EMULATOR
   ? `http://${AUTH_HOST}/identitytoolkit.googleapis.com/v1`
   : 'https://identitytoolkit.googleapis.com/v1';
 
