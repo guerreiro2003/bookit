@@ -38,6 +38,14 @@ jobs:
             | grep -vE 'GrpcConnection|@firebase' | tee resultado.txt
           echo "code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
         env:
+          # Obrigatório e explícito. O `--import ./tests/_register.mjs` acima
+          # existe para o healthcheck poder importar o código do browser sem o
+          # alterar, mas esse mesmo ficheiro põe BOOKIT_TARGET=emulator por
+          # omissão e sela a rede — e aqui não há emulador nenhum. Sem esta
+          # linha, a corrida morre na primeira ligação e este workflow abre um
+          # issue a dizer que o site está em baixo quando está de pé.
+          # Coberto por tests/healthcheck-target.test.mjs.
+          BOOKIT_TARGET: real
           SALON_ID: ${{ vars.SALON_ID }}
           SITE_URL: ${{ vars.SITE_URL }}
 

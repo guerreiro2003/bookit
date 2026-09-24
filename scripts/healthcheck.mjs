@@ -10,14 +10,63 @@
  * Exits non-zero with a plain explanation on the first real failure, so a cron
  * can turn it into an alert. Writes nothing.
  */
-import { db, auth, doc, getDoc, getDocs, collection, setDoc, signOut } from '../firebase.js';
+import { app, db, auth, doc, getDoc, getDocs, collection, setDoc, signOut } from '../firebase.js';
 import {
   loadSalon, loadBookingContext, computeAvailability, planActive,
   todayForSalon, addDaysStr, resolveDayWindow,
 } from '../app.js';
+import { FS, TARGET, IS_EMULATOR, targetSummary } from './_lib.mjs';
 
 const SALON = process.argv[2] || process.env.SALON_ID || 'demo';
 const SITE = process.env.SITE_URL || 'https://bookit-51575.web.app';
+
+/* ── The guard, the seed's guard turned around ─────────────────────────────
+   The seed refuses to run unless the target IS an emulator; this refuses
+   unless it is NOT. The healthcheck exists to answer one question — can a
+   real client book on the real site, right now — and an emulator cannot
+   answer it. It has to say so instead of going green against a local copy,
+   or red because the local copy is not there.
+
+   How this broke, and why the check is structural: this script is launched
+   with `--import ./tests/_register.mjs`, which since T5 sets
+   BOOKIT_TARGET=emulator by default and seals the network. In CI, where no
+   emulator exists, the very first fetch was blocked and the workflow opened
+   an issue saying the site was down — while the site was up. The alarm was
+   the thing that was broken.
+
+   So: not the flag alone. The SDK's projectId is what actually decides where
+   the reads in section 2 go (the loader hook rewrites it in emulator mode),
+   and the endpoint is what actually happens, while a flag is only a statement
+   of intent. A localhost SITE is checked too — fetching a local copy of the
+   page is not watching production either. */
+const LOCAL_HOSTS = ['127.0.0.1', 'localhost', '::1', '0.0.0.0'];
+const hostOf = (url) => {
+  try { return new URL(url).hostname.replace(/^\[|\]$/g, ''); } catch { return '(URL ilegível)'; }
+};
+
+function assertProduction() {
+  const problems = [];
+  const sdkProject = app.options.projectId;
+
+  if (IS_EMULATOR) problems.push(`BOOKIT_TARGET resolveu para "${TARGET}"`);
+  if (String(sdkProject).startsWith('demo-')) problems.push(`o SDK está num projeto de emulador: ${sdkProject}`);
+  if (LOCAL_HOSTS.includes(hostOf(FS))) problems.push(`o endpoint do Firestore é local: ${hostOf(FS)}`);
+  if (LOCAL_HOSTS.includes(hostOf(SITE))) problems.push(`o site a vigiar é local: ${SITE}`);
+
+  if (problems.length) {
+    console.error('\n✗ o healthcheck só vigia PRODUÇÃO, e este alvo não é produção:');
+    for (const p of problems) console.error(`   · ${p}`);
+    console.error(`\n  alvo atual: ${targetSummary()} · SDK projectId ${sdkProject}`);
+    console.error('\n  Um emulador não responde à pergunta que este script faz — se um');
+    console.error('  cliente real consegue marcar agora, no site que está no ar. Correr');
+    console.error('  aqui daria verde contra uma cópia local, ou vermelho por ela não');
+    console.error('  existir; nenhum dos dois é notícia sobre o produto.');
+    console.error('\n  Corre assim:');
+    console.error('    BOOKIT_TARGET=real npm run health\n');
+    process.exit(2);
+  }
+}
+assertProduction();
 
 const problems = [];
 const notes = [];
