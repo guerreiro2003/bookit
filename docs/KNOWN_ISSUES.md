@@ -107,11 +107,15 @@ Todo o código vive em `<script type="module">` dentro do HTML, por isso a CSP t
 
 ---
 
-## KI-011 · CI parcial
+## ~~KI-011 · CI parcial~~ ✅ resolvido 2026-09-24
 
-**Gravidade:** baixa · **Estado:** parcialmente resolvido 2026-09-20
+**Estado:** os testes estão todos no CI; o deploy continua manual, e de propósito.
 
-Os testes unitários e a verificação de sintaxe passaram a correr a cada push (`.github/workflows/tests.yml`). **As suites E2E continuam de fora**, porque escrevem no projeto real — correm-se à mão com `npm run test:all` antes de um deploy. O deploy também continua manual.
+Os unitários e a verificação de sintaxe corriam a cada push desde 2026-09-20. As suites E2E ficavam de fora porque escreviam no projeto real — deixaram de escrever: correm contra os **emuladores**, semeados com dois salões inventados, sem segredos e sem conta nenhuma ([KI-016](#ki-016)).
+
+`.github/workflows/tests.yml` corre agora `npm test` (172 testes puros) e `npm run test:emul` (9 suites, 291 asserções, regras incluídas).
+
+**O que continua manual:** o deploy, por escolha, e correr as suites contra o projeto real (`BOOKIT_TARGET=real npm run test:all`) antes desse deploy — ver [DEPLOY.md](../DEPLOY.md).
 
 
 ---
@@ -156,9 +160,9 @@ O exportador, o eliminador e as regras mantinham cada um a sua lista de subcole�
 
 ---
 
-## KI-015 · Os testes cross-tenant podem estar a testar um salão que não existe
+## ~~KI-015 · Os testes cross-tenant podem estar a testar um salão que não existe~~ ✅ resolvido 2026-09-24
 
-**Gravidade:** média · **Estado:** por corrigir (encontrado 2026-09-23)
+**Encontrado 2026-09-23 · corrigido 2026-09-24**
 
 `tests/rules.integration.mjs` escolhe os dois salões por omissão:
 
@@ -169,15 +173,20 @@ const OTHER = E.OTHER_SALON_ID || 'zenorganic';
 
 O segundo **não existe**: o salão chama-se `zen-organic`, com hífen ([KI-001](#ki-001)). As cinco asserções de isolamento (linhas 186–190) pedem `salons/zenorganic/...` e esperam 403 — e recebem 403, porque as regras chamam `get()` no documento do salão, não o encontram, e negam. **O teste passa pela razão errada:** prova que não se lê um salão inexistente, não que não se lê o salão do vizinho. A propriedade que interessa — dois tenants com dados a sério, um não vê o outro — nunca chega a ser exercida.
 
-Corrigir é mudar o valor por omissão para `zen-organic`. Vale a pena confirmar primeiro que o `zen-organic` tem marcações e clientes que sirvam de alvo, senão a correção troca um falso positivo por outro.
+**Correção.** Mudar a omissão para `zen-organic` não chegava: bastava o vizinho estar vazio para o teste voltar a não testar nada. São duas coisas:
 
-`SALON` por omissão é `demo`, o que está certo hoje, mas prende a suite a um tenant escolhido em 2025 — se o `demo` for renomeado ([KI-001](#ki-001)), estes testes vão dizer que está tudo bem sobre um salão que já não existe.
+1. As omissões saíram para `tests/_target.mjs`, uma só lista, e `OTHER_SALON_ID` é `zen-organic`.
+2. `scripts/seed-emulator.mjs` semeia esse vizinho **com clientes e marcações**, e `tests/rules.integration.mjs` verifica-o antes de afirmar seja o que for: que o salão existe, que tem marcações, clientes e serviços, e que é de outro dono. Só depois pergunta se é ilegível, e cada asserção só corre se a sua pré-condição passar.
+
+A leitura da pré-condição usa o token de dono, que passa por cima das regras — é o instrumento certo porque responde "o que está lá", não "o que este utilizador pode ver".
+
+**Impede o regresso:** `tests/rules.integration.mjs`, secção TENANT ISOLATION (5 pré-condições + 5 asserções), dentro de `npm run test:emul`. Com `OTHER_SALON_ID=zenorganic` — a omissão antiga — a suite dá 6 falhas em vez de passar em silêncio.
 
 ---
 
-## KI-016 · O passo das regras no CI nunca falha
+## ~~KI-016 · O passo das regras no CI nunca falha~~ ✅ resolvido 2026-09-24
 
-**Gravidade:** média · **Estado:** por corrigir (encontrado 2026-09-23)
+**Encontrado 2026-09-23 · corrigido 2026-09-24**
 
 Em `.github/workflows/tests.yml`, o passo *As regras compilam* acaba em:
 
@@ -187,7 +196,11 @@ Em `.github/workflows/tests.yml`, o passo *As regras compilam* acaba em:
 
 O `|| echo` devolve 0 **sempre**. Regras com erro de sintaxe, ficheiro apagado, `firebase-tools` que nem arranca: o passo fica verde na mesma. O objetivo era não partir o CI em forks sem credenciais, mas o efeito é que a única verificação automática das regras — o ficheiro que **é** toda a segurança deste produto — não verifica nada.
 
-Distinguir os dois casos: falta de credenciais (ignorar) de regras inválidas (falhar). O `firestore:rules:check` devolve códigos diferentes, ou corre-se a validação com o emulador, que não precisa de login.
+**Correção.** O passo desapareceu, e com ele a necessidade de distinguir casos. O CI passou a arrancar os **emuladores**, que não precisam de login nenhum: o emulador recusa-se a servir regras com erro de sintaxe, e as suites exercem-nas a seguir. As regras deixaram de ser compiladas e passaram a ser executadas.
+
+`.github/workflows/tests.yml` corre `npm test` e `npm run test:emul`, com Java 21, cache dos jars e `firebase-tools@15.18.0` fixado. O `emulators:exec` propaga o código de saída. Sem segredos, por isso corre em forks e em pull requests — que é onde o `|| echo` mais doía.
+
+**Impede o regresso:** as nove suites de `npm run test:emul`. Verificado com duas mutações temporárias do `firestore.rules`: uma chaveta em falta na `isAuth()` → `exit 1` com *"Error compiling rules: L7:5 missing '}'"*; e `allow read: if isAuth()` nas marcações → `exit 1` com três asserções vermelhas. Nenhum workflow tem `|| echo`, `|| true` ou `continue-on-error`.
 
 ---
 

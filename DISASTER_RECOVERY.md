@@ -38,6 +38,11 @@ npm run backup:verify backups/bookit-<data>.json
 
 Um export vazio parece ter corrido bem e não serve para nada. O verificador apanha isso, apanha leituras incompletas, e **apanha coleções em falta** — compara o que o backup diz ter exportado com a lista única em `scripts/_lib.mjs`.
 
+> **Backups anteriores a 2026-09-24 não se restauram.** Foram escritos sem
+> guardar o TIPO dos valores, por isso um restauro devolvia as datas como texto:
+> o salão voltava inteiro e, se estivesse em período experimental, incapaz de
+> receber marcações. O verificador recusa-os (`formato 1`). Faz um backup novo.
+>
 > **Backups anteriores a 2026-09-21 são incompletos.** Não incluem `staffAuth` nem `waitlist`: um restauro a partir deles traria o salão de volta com **todos os colaboradores sem acesso** e sem a fila de espera. O verificador rejeita-os por esse motivo. Guarda-os se quiseres, mas não contes com eles.
 
 ---
@@ -108,6 +113,44 @@ O workflow corre às 03:00 de Lisboa, cifra antes de guardar, **decifra outra ve
 ---
 
 ## Ensaio trimestral
+
+**O ensaio passou a ser automático, e corre nos emuladores:**
+
+```bash
+npm run test:emul
+```
+
+A última das nove suites é `tests/restore.e2e.mjs`, e faz o ensaio inteiro
+contra uma base de dados a sério, sem tocar em produção:
+
+```
+(a) RESTAURO NO LUGAR
+  ✓ o backup foi escrito            ✓ e diz em que formato está
+  ✓ o verificador aceita-o          ✓ estragado de propósito: 2 documentos a menos e 1 campo trocado
+  ✓ o salão voltou ao estado do backup, documento a documento e com os tipos
+  ✓ lido em cru da API: createdAt é um timestamp, não texto
+
+(b) CÓPIA DE ENSAIO COM --as
+  ✓ a cópia existe                  ✓ com os mesmos documentos
+  ✓ e sem uma única associação a um utilizador ativa
+  ✓ o salão original ficou intocado pela cópia
+
+(c) APAGAMENTO COMPLETO (o que o RGPD exige)
+  ✓ todas as 17 coleções de TENANT_COLLECTIONS ficaram vazias
+  ✓ e o demo ficou intocado
+     zen-organic: 13 → 0 documentos
+     demo:        17 → 17 documentos
+```
+
+Repara no que (a) verifica: **documento a documento, com os tipos**. A
+verificação antiga contava documentos por coleção, e foi assim que um restauro
+que devolvia todas as datas como texto imprimiu "tudo bate certo". Um salão em
+período experimental restaurado assim voltava sem conseguir receber marcações,
+porque `request.time < s.trialEndsAt` nas regras compara um instante com texto
+e um erro nega.
+
+**O ensaio contra o projeto real** continua a valer a pena de tempos a tempos —
+o emulador não é o Firestore — e faz-se assim:
 
 ```bash
 npm run backup

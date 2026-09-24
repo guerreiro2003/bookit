@@ -91,3 +91,65 @@ O frontend fala diretamente com o Firestore; as regras de segurança fazem autor
 Em Portugal um salão tem o número de toda a gente e o email de quase ninguém. O email é opcional na marcação; o telemóvel é obrigatório e normalizado para E.164.
 
 Isto foi corrigido depois de um bug real: a cadência de retenção partia-se ao meio porque a mesma pessoa, ora visitante ora com conta, contava como duas.
+
+---
+
+## D-008 · O emulador é um projeto `demo-`, não o nosso {#d-008}
+
+**2026-09-24**
+
+Os emuladores correm com o project id `demo-bookit`. O prefixo `demo-` é convenção do Firebase: a ferramenta trata um projeto assim como existindo só no emulador, não pede login, e **não há nada do outro lado** se alguma configuração se enganar.
+
+Foi por isso, e não por gosto no nome. Um emulador a correr com `bookit-51575` também funciona — testei, e sem credenciais, só com um aviso — mas nesse caso os URLs passam a nomear o projeto real, e uma má resolução de host aponta para produção. O `demo-` torna esse acidente impossível em vez de improvável.
+
+Custo: mais um nome parecido. `demo-bookit` é um **projeto** que só existe no emulador; `demo` é um **salão** dentro dele, e também dentro do projeto real. Está comentado no `scripts/_lib.mjs`, onde a constante vive.
+
+---
+
+## D-009 · Os testes vão ao emulador por omissão; produção exige um ato deliberado {#d-009}
+
+**2026-09-24**
+
+`BOOKIT_TARGET=real|emulator` decide, e é o único interruptor. A omissão depende de quem pergunta: os **scripts** de operação apontam para o projeto real (um backup tem de copiar o que existe), os **testes** apontam para o emulador.
+
+A razão é a assimetria do engano. Um teste que vai a produção por distração escreve num salão vivo; um teste que vai ao emulador por distração não faz mal a ninguém. Um valor não reconhecido atira erro em vez de cair para "real": um `BOOKIT_TARGET=emulador` mal escrito não pode ser lido como produção.
+
+**O que isto custa, e é preciso saber:** as suites deixaram de ser um smoke test de produção. Verificar o que está no ar é `BOOKIT_TARGET=real npm run test:all`, com `SERVICE_ID` e as contas no ambiente — e o emulador **não exige índices compostos**, por isso uma query que passa lá pode falhar em produção a pedir um. Ver [DEPLOY.md](../DEPLOY.md).
+
+---
+
+## D-010 · O `projectId` é reescrito no carregamento, e o `firebase.js` não se toca {#d-010}
+
+**2026-09-24**
+
+O emulador do Firestore guarda uma base de dados **separada por project id**, e o `connectFirestoreEmulator()` muda o host mas não o projeto. Como o `firebase.js` fixa `projectId: "bookit-51575"`, as suites do SDK liam uma base vazia enquanto as suites REST escreviam noutra, dentro do mesmo emulador.
+
+Três saídas: correr o emulador como `bookit-51575` (perde-se a garantia do `demo-`, ver [D-008](#d-008)); alterar o `firebase.js` para ler o projeto de fora; ou reescrever o valor **à leitura do ficheiro**, só nos testes. Ficou a terceira.
+
+`tests/_node-firebase-loader.mjs` já traduzia os imports do gstatic; ganhou um passo que troca o `projectId` quando o alvo é o emulador. O ficheiro em disco não muda, e é o mesmo que vai para o browser. Cobre também o `getSecondaryAuth()`, que constrói a segunda app a partir do mesmo objeto de configuração.
+
+**O preço:** é uma segunda cópia da forma do `firebase.js`, fora dele. Por isso a substituição tem de encontrar **exatamente uma** ocorrência, ou lança — se o ficheiro mudar de forma queremos saber, não correr contra o projeto errado. Coberto por `tests/loader-rewrite.test.mjs`. No dia em que o `projectId` puder vir de fora, isto desaparece.
+
+---
+
+## D-011 · Backups do emulador: bloqueados só na direção de produção {#d-011}
+
+**2026-09-24**
+
+Um export do emulador tem a mesma forma, os mesmos ids de salão e o mesmo "✓" que um de produção, e as pessoas lá dentro são inventadas. O ficheiro passou a dizer de onde veio (`source: { target, project }`), e restaurá-lo **contra o projeto real** é recusado antes de qualquer pedido de rede.
+
+A direção contrária fica aberta de propósito: restaurar **dentro** do emulador é o ensaio, e é o que `tests/restore.e2e.mjs` faz a cada corrida.
+
+Um ficheiro sem estampa conta como produção — até 2026-09-24 não havia outro sítio de onde tirar um backup, e adivinhar ao contrário deixaria passar em silêncio todos os ficheiros antigos. Uma estampa ilegível também: lê-la como "emulador" bloquearia um restauro verdadeiro numa emergência verdadeira.
+
+---
+
+## D-012 · As regras de bloqueio vivem no ficheiro global {#d-012}
+
+**2026-09-24**
+
+O `.claude/settings.json` do projeto só se aplica quando a sessão foi aberta nessa pasta. Abrir a app noutro sítio e navegar até aqui não carrega esse ficheiro — e as regras que interessam (`git push`, `firebase deploy`, `firestore:delete`) são precisamente as que não podem depender de por onde a sessão entrou.
+
+Por isso estão no `~/.claude/settings.json`, que vale sempre, **e** repetidas no do projeto, que viaja com o repositório e documenta a intenção para quem o clonar. Duplicação deliberada: uma para valer, outra para explicar.
+
+O `.claude/settings.local.json` — permissões desta máquina — está no `.gitignore` do repositório desde 2026-09-24. Estava protegido só pelo gitignore global do Pedro, o que é o mesmo que não estar protegido em mais nenhum sítio.

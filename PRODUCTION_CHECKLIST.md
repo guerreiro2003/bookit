@@ -15,7 +15,9 @@ Verificar **tudo** antes de entregar uma instalação a um salão. Marca cada it
 ## 2. Código e configuração
 - [ ] `firebase.js` aponta para o projeto certo (`projectId`, `apiKey`, `authDomain`).
 - [ ] `firebase.json`: `ignore` exclui `tests/`, `scripts/`, `functions/`, `*.md`, `*.docx`, `.git/**`; headers de segurança presentes (CSP/HSTS).
-- [ ] `npm test` passa; `npm run test:rules` e o E2E do motor passam contra o projeto (ou emulador).
+- [ ] `npm test` passa (172 testes puros, sem rede).
+- [ ] `npm run test:emul` passa (9 suites contra os emuladores locais, regras incluídas). Precisa de Java 21 — confirma com `npm run check:emul`.
+- [ ] **A partir do primeiro cliente pagante:** `BOOKIT_TARGET=real npm run test:all` passa contra o projeto real, com `SERVICE_ID`, `ADMIN_EMAIL`/`ADMIN_PASSWORD`, `CLIENT_EMAIL`/`CLIENT_PASSWORD`, `TEAM_PASSWORD` e `OTHER_SALON_ID` no ambiente (ver [DEPLOY.md](DEPLOY.md)). O emulador não exige índices compostos; só esta corrida apanha uma query a que falta um índice.
 - [ ] Sem ficheiros de desenvolvimento a serem servidos: `curl -I https://<dominio>/package.json` → 404; `/.git/config` → 404.
 
 ## 3. Salão

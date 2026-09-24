@@ -421,6 +421,48 @@ You should see your service appear in the list below. 🎉
 
 ---
 
+## ✅ Antes de cada deploy — correr os testes
+
+**Sempre, e não custa nada:**
+
+```bash
+npm test          # 172 testes puros: sem rede, sem Firebase, segundos
+npm run test:emul # 9 suites contra os emuladores locais, regras incluídas
+```
+
+O `test:emul` arranca os emuladores do Firestore e do Auth, semeia dois salões
+inventados e corre tudo — incluindo as regras de segurança e o isolamento entre
+salões. Não toca no projeto real, não precisa de credenciais, e é o mesmo que o
+GitHub Actions corre a cada push. Precisa de Java 21 e do `firebase-tools`:
+`npm run check:emul` diz se esta máquina os tem.
+
+**Contra o projeto real — opcional hoje, obrigatório a partir do primeiro
+cliente pagante:**
+
+```bash
+BOOKIT_TARGET=real \
+SERVICE_ID=<id de um serviço que exista no salão> \
+ADMIN_EMAIL=... ADMIN_PASSWORD=... \
+CLIENT_EMAIL=... CLIENT_PASSWORD=... TEAM_PASSWORD=... \
+OTHER_SALON_ID=<outro salão, com dados> \
+npm run test:all
+```
+
+Porque é que isto continua a fazer falta, apesar de o emulador estar verde: **o
+emulador não exige índices compostos.** Uma query que passa lá pode falhar em
+produção a pedir um índice que não existe, e a página fica em branco para um
+cliente. É a diferença que o emulador não sabe imitar.
+
+`SERVICE_ID` não tem valor por omissão fora do emulador, e isso é de propósito
+(`tests/_target.mjs` recusa-se a arrancar sem ele): em produção os ids dos
+serviços são gerados pelo Firestore, e um teste que adivinhasse estaria a testar
+ficção. As contas são as de teste do salão, nunca as de um cliente real.
+
+**Isto escreve no projeto real** — cria marcações com o nome `RULES-TEST …` e
+apaga-as no fim. Corre-o com o salão fechado, não a meio de um sábado de manhã.
+
+---
+
 ## 🎓 Congratulations
 
 Your salon booking site is live. Customers can book online, your team can manage the day's schedule, and you have full control over everything.
